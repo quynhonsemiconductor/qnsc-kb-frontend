@@ -106,9 +106,15 @@ export default function ArticleListPage() {
       const duplicates = items.filter((item: any) => ['duplicate', 'duplicate_document'].includes(item.status) || item.detail?.code === 'duplicate_document')
       const failed = items.filter((item: any) => !queued.includes(item) && !duplicates.includes(item))
       const processed = items.length || Number(result?.queued_count || 0) + Number(result?.duplicate_count || 0) + Number(result?.failed_count || 0)
+      const failureDetails = failed
+        .map((item: any) => {
+          const message = item.detail?.message || item.detail || 'Upload failed without a detailed error.'
+          return `• ${item.filename || 'File'}: ${typeof message === 'string' ? message : 'Upload failed without a detailed error.'}`
+        })
+        .join('\n')
       const summary = processed === 0
         ? 'No files were processed. Please select files again and retry.'
-        : `${processed} file${processed === 1 ? '' : 's'} processed\n\n${queued.length} queued for review\n${duplicates.length} duplicate${duplicates.length === 1 ? '' : 's'} skipped\n${failed.length} failed`
+        : `${processed} file${processed === 1 ? '' : 's'} processed\n\n${queued.length} queued for review\n${duplicates.length} duplicate${duplicates.length === 1 ? '' : 's'} skipped\n${failed.length} failed${failureDetails ? `\n\nDetails:\n${failureDetails}` : ''}`
       const resultTone = queued.length > 0 ? 'success' : failed.length > 0 ? 'danger' : 'info'
       const resultTitle = queued.length > 0 ? 'Upload successful' : failed.length > 0 ? 'Upload needs attention' : 'No new files uploaded'
       const openQueue = queued.length > 0

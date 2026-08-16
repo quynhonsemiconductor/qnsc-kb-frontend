@@ -1,27 +1,15 @@
 import client from './client'
 
-async function sha256Hex(file: File) {
-  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
-  return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('')
-}
-
 export async function uploadSource(file: File, tags: string[] = [], dept?: string, departmentIds: string[] = []) {
-  const sourceHash = await sha256Hex(file)
-  const intent = (await client.post('/articles/source-uploads', {
-    filename: file.name,
-    source_hash: sourceHash,
-    content_length: file.size,
-    dept,
-    department_ids: departmentIds,
-    tags,
-  })).data
-  const uploadResponse = await fetch(intent.upload_url, {
-    method: 'PUT',
-    body: file,
-    headers: intent.required_headers || {},
-  })
-  if (!uploadResponse.ok) throw new Error(`Private source upload failed (${uploadResponse.status})`)
-  return (await client.post(`/articles/source-uploads/${intent.draft_id}/complete`, { content_length: file.size })).data
+  // Upload through the authenticated API rather than PUTing directly from the
+  // browser to R2. This keeps the R2 bucket private and avoids a browser CORS
+  // failure leaving an invisible "uploading" reservation behind.
+  const form = new FormData()
+  form.append('file', file)
+  form.append('tags', JSON.stringify(tags))
+  if (dept) form.append('dept', dept)
+  if (departmentIds.length) form.append('department_ids', JSON.stringify(departmentIds))
+  return (await client.post('/articles/upload-source', form)).data
 }
 
 export async function uploadSources(files: File[], tagsByFile: string[][] = [], dept?: string, departmentIds: string[] = []) {
@@ -97,7 +85,7 @@ export async function getDraftCandidates(draftId: string) {
   return response.data
 }
 
-export async function reviewDraftCandidate(draftId: string, payload: { operation: string; candidate_id: string; other_candidate_id?: string; title?: string; split_at?: number; note?: string }) {
+export async function reviewDraftCandidate(draftId: string, payload: { operation: string; candidate_id: string; other_candidate_id?: string; title?: string; split_at?: number; department_ids?: string[]; note?: string }) {
   const response = await client.post(`/governance/pending-drafts/${draftId}/candidates/operation`, payload)
   return response.data
 }

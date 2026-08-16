@@ -47,11 +47,11 @@ export async function listAccessGroups() {
   return (await client.get('/auth/groups')).data
 }
 
-export async function createDepartment(data: { name: string; company_domain?: string }) {
+export async function createDepartment(data: { name: string; description: string; company_domain?: string }) {
   return (await client.post('/auth/departments', data)).data
 }
 
-export async function updateDepartment(departmentId: string, data: { name?: string; active?: boolean }) {
+export async function updateDepartment(departmentId: string, data: { name?: string; description?: string; active?: boolean }) {
   return (await client.patch(`/auth/departments/${departmentId}`, data)).data
 }
 
