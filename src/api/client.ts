@@ -11,15 +11,30 @@ const client = axios.create({
   },
 })
 
-export async function refreshSession(): Promise<boolean> {
-  try {
-    const response = await client.post('/auth/refresh')
-    accessToken = response.data.access_token
-    localStorage.setItem('user', JSON.stringify(response.data.user))
-    return true
-  } catch {
-    return false
+// Single-flight refresh: concurrent 401s share one POST /auth/refresh instead
+// of each firing their own request.
+let refreshInFlight: Promise<boolean> | null = null
+
+export function refreshSession(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const response = await client.post('/auth/refresh')
+        accessToken = response.data.access_token
+        if (response.data.user) {
+          localStorage.setItem('user', JSON.stringify(response.data.user))
+        } else {
+          localStorage.removeItem('user')
+        }
+        return true
+      } catch {
+        return false
+      } finally {
+        refreshInFlight = null
+      }
+    })()
   }
+  return refreshInFlight
 }
 
 export function clearExpiredSession() {
@@ -51,7 +66,9 @@ client.interceptors.response.use(
   (response) => response,
   async (error) => {
     const request = error.config as (typeof error.config & { _authRetry?: boolean }) | undefined
-    if (error.response?.status === 401 && request && !request._authRetry && !String(request.url || '').includes('/auth/refresh') && !String(request.url || '').includes('/auth/logout')) {
+    const requestUrl = String(request?.url || '')
+    const isAuthBootstrapRequest = ['/auth/login', '/auth/register', '/auth/oidc', '/auth/entra'].some((path) => requestUrl.includes(path))
+    if (error.response?.status === 401 && request && !request._authRetry && !requestUrl.includes('/auth/refresh') && !requestUrl.includes('/auth/logout') && !isAuthBootstrapRequest) {
       request._authRetry = true
       if (await refreshSession()) {
         request.headers = request.headers || {}

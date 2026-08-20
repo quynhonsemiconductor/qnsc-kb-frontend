@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertCircle, ArrowUp, BookOpen, Bot, Check, ChevronDown, ChevronLeft, ChevronRight,
   Copy, ExternalLink, FileText, Layers, List, MessageSquare, Pencil, Search as SearchIcon,
-  Plus, Sparkles, ThumbsDown, ThumbsUp, Trash2, User as UserIcon, X,
+  Plus, Sparkles, Square, ThumbsDown, ThumbsUp, Trash2, User as UserIcon, X,
 } from 'lucide-react'
 import {
   askAIStream, createConversation, deleteConversation, getConversationMessages,
   getConversations, renameConversation, submitAIFeedback,
   downloadArticleSource,
 } from '../../api/ai'
+import { createArticleEditRequest } from '../../api/articles'
 import PdfViewer from '../../components/ai/PdfViewer'
 import AnswerText from '../../components/ai/AnswerText'
 import AnswerSections from '../../components/ai/AnswerSections'
@@ -41,6 +42,21 @@ interface Message {
   feedbackSubmitted?: boolean
   failed?: boolean
   retryQuestion?: string
+  action?: string
+  articleId?: string
+  articleTitle?: string
+  articlePreview?: string
+  originalInformation?: string
+  willUpdate?: string
+  editInstruction?: string
+}
+
+interface PendingEditConfirmation {
+  articleId: string
+  articleTitle: string
+  articlePreview: string
+  originalInformation: string
+  editInstruction: string
 }
 
 interface Conversation {
@@ -138,13 +154,19 @@ const MOTION_STYLES = `
 
 export default function AskPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const requestArticleId = searchParams.get('articleId') || ''
+  const requestArticleTitle = searchParams.get('articleTitle') || 'this article'
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
-  const [question, setQuestion] = useState('')
+  const [question, setQuestion] = useState(() => searchParams.get('prompt') || '')
   const [loading, setLoading] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(true)
   const [error, setError] = useState('')
+  const [requestStatus, setRequestStatus] = useState('')
+  const [lastRequestText, setLastRequestText] = useState('')
+  const [pendingEditConfirmation, setPendingEditConfirmation] = useState<PendingEditConfirmation | null>(null)
   const [selectedSource, setSelectedSource] = useState<Citation | null>(null)
   const [viewerSource, setViewerSource] = useState<{ citation: Citation; url: string } | null>(null)
   const [sourceUrl, setSourceUrl] = useState<string | null>(null)
@@ -164,6 +186,7 @@ export default function AskPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sourceUrlRef = useRef<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const chatDesktopRef = useRef(typeof window !== 'undefined' && window.innerWidth >= 1024)
   const dialog = useDialog()
   const { language, t } = useLanguage()
@@ -187,16 +210,35 @@ export default function AskPage() {
     if (window.innerWidth < 1024) setSidebarOpen(false)
     try {
       const history = await getConversationMessages(id)
-      setMessages(history.map((item: any) => ({
+      const mappedMessages: Message[] = history.map((item: any) => {
+        const actionData = item.action_data || {}
+        return {
         id: item.id,
-        sender: item.role === 'user' ? 'user' : 'ai',
+        sender: item.role === 'user' ? ('user' as const) : ('ai' as const),
         text: item.content,
         citations: item.citations || [],
         answerGrounded: item.answer_grounded,
         answerExtended: item.answer_extended,
         hasExtended: item.has_extended,
         logId: item.usage_log_id,
-      })))
+        action: item.action || actionData.action,
+        articleId: actionData.article_id,
+        articleTitle: actionData.article_title,
+        articlePreview: actionData.article_preview,
+        originalInformation: actionData.original_information,
+        willUpdate: actionData.will_update,
+        editInstruction: actionData.edit_instruction,
+      }
+      })
+      setMessages(mappedMessages)
+      const pending = [...mappedMessages].reverse().find((message: Message) => message.action === 'edit_confirmation_required' && message.articleId && message.editInstruction)
+      setPendingEditConfirmation(pending ? {
+        articleId: pending.articleId as string,
+        articleTitle: pending.articleTitle || 'Matching article',
+        articlePreview: pending.articlePreview || '',
+        originalInformation: pending.originalInformation || pending.articlePreview || '',
+        editInstruction: pending.editInstruction as string,
+      } : null)
     } catch {
       setError('Could not load this conversation.')
     }
@@ -214,6 +256,32 @@ export default function AskPage() {
   }, [])
 
   useEffect(() => {
+    const prompt = searchParams.get('prompt') || ''
+    if (prompt) setQuestion(prompt)
+    setRequestStatus('')
+    setLastRequestText('')
+  }, [searchParams])
+
+  const handleCreateEditRequest = async () => {
+    if (!requestArticleId) return
+    const requestText = question.trim()
+    const submittedText = requestText || lastRequestText.trim()
+    if (submittedText.length < 5) {
+      setRequestStatus('Please describe the correction in the message box first.')
+      return
+    }
+    try {
+      const result = await createArticleEditRequest(requestArticleId, submittedText)
+      setRequestStatus(result.message || 'Edit request sent to authorized editors.')
+      setQuestion('')
+      setLastRequestText('')
+    } catch (requestError: any) {
+      const detail = requestError?.response?.data?.detail
+      setRequestStatus(typeof detail === 'string' ? detail : 'The edit request could not be submitted.')
+    }
+  }
+
+  useEffect(() => {
     const handleViewportChange = () => {
       const desktop = window.innerWidth >= 1024
       if (desktop !== chatDesktopRef.current) setSidebarOpen(desktop)
@@ -226,6 +294,15 @@ export default function AskPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: loading ? 'auto' : 'smooth' })
   }, [messages, loading])
+
+  // Abort any in-flight answer stream and release the active source blob URL
+  // when the page unmounts.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+      if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     const element = textareaRef.current
@@ -272,6 +349,7 @@ export default function AskPage() {
     setConversationId(null)
     setMessages([])
     setQuestion('')
+    setLastRequestText('')
     setError('')
     setSelectedSource(null)
     setViewerSource(null)
@@ -284,9 +362,23 @@ export default function AskPage() {
     if (sourceUrlRef.current) setViewerSource({ citation, url: sourceUrlRef.current })
   }
 
-  const handleAsk = async (value = question) => {
+  const handleAsk = async (
+    value = question,
+    editOptions?: { confirmEdit?: boolean; articleId?: string; editInstruction?: string },
+  ) => {
     const query = value.trim()
     if (!query || loading) return
+    const confirmsPendingEdit = Boolean(
+      pendingEditConfirmation
+      && /^(yes|yeah|yep|ok|okay|confirm|đúng|có|co|xác nhận|đồng ý)(\s|[.!?]|$)/i.test(query),
+    )
+    const confirmEdit = editOptions?.confirmEdit ?? confirmsPendingEdit
+    const confirmedArticleId = editOptions?.articleId || (confirmsPendingEdit ? pendingEditConfirmation?.articleId : undefined)
+    const confirmedInstruction = editOptions?.editInstruction || (confirmsPendingEdit ? pendingEditConfirmation?.editInstruction : undefined)
+    if (confirmsPendingEdit || editOptions?.confirmEdit) setPendingEditConfirmation(null)
+    if (requestArticleId) setLastRequestText(query)
+    const controller = new AbortController()
+    abortRef.current = controller
     setLoading(true)
     setError('')
     setQuestion('')
@@ -313,18 +405,61 @@ export default function AskPage() {
             : { ...message, text: message.text + content }
         })),
         (citations) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, citations } : message)),
-        (data) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, logId: data.log_id, answerGrounded: data.answer_grounded, answerExtended: data.answer_extended, hasExtended: data.has_extended } : message)),
+        (data) => {
+          const actionData = data.action_data || {}
+          const articleId = data.article_id || actionData.article_id
+          const articleTitle = data.article_title || actionData.article_title
+          const articlePreview = data.article_preview || actionData.article_preview
+          const originalInformation = data.original_information || actionData.original_information
+          const editInstruction = data.edit_instruction || actionData.edit_instruction
+          if (data.action === 'edit_confirmation_required' && articleId && editInstruction) {
+            setPendingEditConfirmation({
+              articleId,
+              articleTitle: articleTitle || 'this article',
+              articlePreview: articlePreview || '',
+              originalInformation: originalInformation || articlePreview || '',
+              editInstruction,
+            })
+          } else if (data.action === 'article_updated' || data.action === 'edit_request_created') {
+            setPendingEditConfirmation(null)
+          }
+          setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? {
+            ...message,
+            logId: data.log_id,
+            answerGrounded: data.answer_grounded,
+            answerExtended: data.answer_extended,
+            hasExtended: data.has_extended,
+            action: data.action,
+            articleId,
+            articleTitle,
+            articlePreview,
+            originalInformation,
+            willUpdate: data.will_update || actionData.will_update,
+            editInstruction,
+          } : message))
+        },
+        confirmedArticleId || requestArticleId,
+        controller.signal,
+        true,
+        confirmEdit,
+        confirmedInstruction,
       )
       await refreshConversations()
     } catch (requestError: any) {
-      setError(requestError?.response?.data?.detail || 'Could not reach the answer service. Try again.')
-      setMessages((previous) => {
-        const failure = { text: 'I could not complete that request. You can retry without losing this conversation.', failed: true, retryQuestion: query }
-        return assistantMessageId
-          ? previous.map((message) => message.id === assistantMessageId ? { ...message, ...failure } : message)
-          : [...previous, { sender: 'ai' as const, ...failure }]
-      })
+      if (controller.signal.aborted || requestError?.name === 'AbortError') {
+        // Stopped by the user — finalize the message with whatever streamed.
+      } else {
+        const errorDetail = requestError?.response?.data?.detail || requestError?.message || 'Could not reach the answer service. Try again.'
+        setError(errorDetail)
+        setMessages((previous) => {
+          const failure = { text: errorDetail, failed: true, retryQuestion: query }
+          return assistantMessageId
+            ? previous.map((message) => message.id === assistantMessageId ? { ...message, ...failure } : message)
+            : [...previous, { sender: 'ai' as const, ...failure }]
+        })
+      }
     } finally {
+      if (abortRef.current === controller) abortRef.current = null
       setLoading(false)
     }
   }
@@ -334,6 +469,15 @@ export default function AskPage() {
       event.preventDefault()
       void handleAsk()
     }
+  }
+
+  const cancelPendingEdit = () => {
+    setPendingEditConfirmation(null)
+    setRequestStatus('No changes were made. You can describe the correct article or correction whenever you are ready.')
+  }
+
+  const updatePendingEditInstruction = (value: string) => {
+    setPendingEditConfirmation((current) => current ? { ...current, editInstruction: value } : current)
   }
 
   const handleDelete = async (id: string) => {
@@ -583,6 +727,10 @@ export default function AskPage() {
                     const isNoAnswer = !message.failed && !isStreamingThis &&
                       /not found in the knowledge base/i.test(message.text.trim()) && !(message.citations && message.citations.length > 0)
                     const isFailure = Boolean(message.failed)
+                    const pendingForMessage = pendingEditConfirmation && pendingEditConfirmation.articleId === message.articleId
+                      ? pendingEditConfirmation
+                      : null
+                    const editDraft = pendingForMessage?.editInstruction || message.editInstruction || ''
                     return (
                       <div
                         key={messageId}
@@ -611,7 +759,36 @@ export default function AskPage() {
                             ) : isNoAnswer ? (
                               <p className="text-[13px] italic leading-6 text-stone">{message.text}</p>
                             ) : (
-                              message.answerGrounded !== undefined ? (
+                              message.action === 'edit_confirmation_required' ? (
+                                <div className="rounded-xl border border-amber-300/25 bg-amber-400/10 px-3 py-3 text-amber-50">
+                                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-amber-300">Article found</p>
+                                  <p className="text-sm font-bold text-amber-50">{message.articleTitle || 'Matching article'}</p>
+                                  <div className="mt-3 rounded-lg border border-amber-200/20 bg-black/10 px-3 py-2"><p className="text-[10px] font-bold uppercase tracking-widest text-amber-300">Original information</p><p className="mt-1 text-xs leading-5 text-amber-100/80">{message.originalInformation || message.articlePreview || 'The matched source passage is unavailable.'}</p></div>
+                                  <div className="mt-3"><label className="text-[10px] font-bold uppercase tracking-widest text-amber-300" htmlFor={`edit-instruction-${messageId}`}>Will update</label><textarea id={`edit-instruction-${messageId}`} value={editDraft} onChange={(event) => updatePendingEditInstruction(event.target.value)} rows={4} className="mt-1 w-full resize-y rounded-lg border border-amber-200/20 bg-black/10 px-3 py-2 text-xs leading-5 text-amber-50 outline-none placeholder:text-amber-100/50 focus:border-amber-300/50" placeholder="Describe the corrected information" /></div>
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      disabled={loading || !message.articleId || !editDraft.trim()}
+                                      onClick={() => void handleAsk('Yes, update this article', { confirmEdit: true, articleId: message.articleId, editInstruction: editDraft })}
+                                      className="ask-press rounded-lg bg-emerald-500 px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      Yes, update this article
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={loading}
+                                      onClick={cancelPendingEdit}
+                                      className="ask-press rounded-lg border border-amber-200/25 px-3 py-2 text-[11px] font-bold text-amber-100 hover:bg-amber-300/10 disabled:opacity-50"
+                                    >
+                                      No
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : message.action === 'edit_target_required' ? (
+                                <div className="rounded-xl border border-amber-300/20 bg-amber-400/10 px-3 py-3 text-amber-100"><p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-amber-300">Article not found</p><AnswerText content={message.text} citations={[]} onCitationClick={setSelectedSource} /></div>
+                              ) : message.action ? (
+                                <div className="rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-3 text-emerald-100"><p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-emerald-300">AI action completed</p><AnswerText content={message.text} citations={[]} onCitationClick={setSelectedSource} /></div>
+                              ) : message.answerGrounded !== undefined ? (
                                 <AnswerSections grounded={message.answerGrounded} extended={message.answerExtended} citations={message.citations} onCitationClick={setSelectedSource} />
                               ) : (
                                 <AnswerText content={message.text} citations={message.citations} onCitationClick={setSelectedSource} />
@@ -694,6 +871,8 @@ export default function AskPage() {
                   <button onClick={() => setError('')} className="ask-press underline hover:text-rose-100">Dismiss</button>
                 </div>
               )}
+               {requestArticleId && <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-info/20 bg-info/10 px-3 py-2.5 text-xs text-info"><span className="min-w-0 flex-1">Requesting a correction for <strong>{requestArticleTitle}</strong>. Type the exact change, then submit it to an authorized editor.</span><button type="button" onClick={() => void handleCreateEditRequest()} disabled={loading || (question.trim().length < 5 && lastRequestText.trim().length < 5)} className="rounded-lg bg-info px-3 py-2 text-[11px] font-bold text-[#07131a] disabled:cursor-not-allowed disabled:opacity-50">Create edit request</button></div>}
+               {requestStatus && <div role="status" className="mb-3 rounded-lg border border-emerald-300/20 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-200">{requestStatus}</div>}
                <div className="mb-2 flex items-center gap-1.5 text-[11px] text-stone">
                  <span className="inline-flex items-center gap-1.5 rounded-full border border-info/20 bg-info/10 px-2 py-1 text-[10px] font-bold text-info"><span className="h-1.5 w-1.5 rounded-full bg-info" /> Grounded mode</span><span className="hidden sm:inline">Press <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[10px] text-steel">Enter</kbd> to send · <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[10px] text-steel">Shift+Enter</kbd> for a new line</span>
                 <span className="ml-auto tabular-nums">{question.length}/4000</span>
@@ -710,6 +889,17 @@ export default function AskPage() {
                   placeholder={t('chat.askPlaceholder')}
                   className="max-h-44 min-h-[28px] flex-1 resize-none overflow-hidden bg-transparent px-2 py-1.5 text-[13px] leading-6 text-ink outline-none placeholder:text-stone"
                 />
+                {loading && (
+                  <button
+                    type="button"
+                    onClick={() => abortRef.current?.abort()}
+                    aria-label="Stop generating"
+                    title="Stop generating"
+                    className="ask-press grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-hairline bg-surface text-steel transition hover:bg-surface-soft hover:text-ink"
+                  >
+                    <Square size={14} />
+                  </button>
+                )}
                 <button
                   onClick={() => void handleAsk()}
                   disabled={!question.trim() || loading}

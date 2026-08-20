@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowUpRight, Mail, Monitor, ShieldCheck, Sparkles } from 'lucide-react'
 import { useAuth } from './useAuth'
 import { getMicrosoftLoginUrl, getOidcConfig, login as loginApi } from '../api/auth'
@@ -17,6 +17,8 @@ export default function LoginPage() {
   const { login } = useAuth()
   const { isAuthenticated, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const sessionExpired = searchParams.get('expired') === '1'
   const { language, setLanguage, t } = useLanguage()
   const { theme, setTheme } = useTheme()
 
@@ -69,6 +71,7 @@ export default function LoginPage() {
       <div className="absolute right-5 top-5 flex items-center gap-2"><label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Monitor size={13} /><Select value={theme} onChange={event => setTheme(event.target.value as ThemePreference)} className="theme-select" aria-label="Appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></Select></label><Select value={language} onChange={event => setLanguage(event.target.value as 'en' | 'vi')} className="theme-select" aria-label={t('language.switch')}><option value="en">English</option><option value="vi">Tiếng Việt</option></Select></div>
       <form onSubmit={handleSubmit} className="login-panel glass-panel w-full max-w-xl rounded-panel border border-border p-6 shadow-[0_20px_56px_rgb(var(--shadow)/.16)] sm:p-8">
         <div className="mb-8"><span className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.14em] text-primary"><ShieldCheck size={14} /> Secure sign in</span><h2 className="font-display text-3xl font-extrabold tracking-[-.04em] text-foreground">Welcome back.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{language === 'vi' ? 'Sử dụng tài khoản công ty được cấp.' : 'Sign in to continue to your knowledge workspace.'}</p></div>
+        {sessionExpired && !error && <div className="mb-5 rounded-xl border border-info/20 bg-info/10 p-3 text-sm text-info">{t('auth.sessionExpired')}</div>}
         {error && <div className="mb-5 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-destructive">{error}</div>}
         <div className="space-y-4">
           {ssoAvailable && <>

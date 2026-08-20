@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { Activity, ArrowRight, ArrowUpRight, BookOpen, CheckCircle2, Clock3, FileCheck2, FolderTree, Plus, Search, ShieldCheck, Sparkles, UploadCloud } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getHomeSummary } from '../api/knowledge'
 import type { HomeSummary } from '../types/governance'
 import { usePermission } from '../hooks/usePermission'
 import { useAuth } from '../auth/useAuth'
+import { useLanguage } from '../i18n/LanguageProvider'
+import { useAsyncResource } from '../hooks/useAsyncResource'
 
 function Metric({ label, value, detail, Icon, tone }: { label: string; value: number | string; detail: string; Icon: React.ElementType; tone: 'primary' | 'warning' | 'info' | 'success' }) {
   const tones = {
@@ -21,29 +23,29 @@ function Metric({ label, value, detail, Icon, tone }: { label: string; value: nu
 }
 
 export default function HomePage() {
-  const [summary, setSummary] = useState<HomeSummary | null>(null)
+  const { data: summary, error: loadError } = useAsyncResource<HomeSummary>('home-summary', getHomeSummary)
   const { has } = usePermission()
   const { user } = useAuth()
-  useEffect(() => { void getHomeSummary().then(setSummary).catch(console.error) }, [])
+  const { t } = useLanguage()
   const ownerCoverage = useMemo(() => summary ? Math.max(0, Math.min(100, summary.with_owner_percent)) : 0, [summary])
 
-  if (!summary) return <div className="grid min-h-[65vh] place-items-center"><div className="flex items-center gap-3 text-base text-muted-foreground"><Activity size={17} className="animate-pulse text-info" />Loading the control room…</div></div>
+  if (!summary) return loadError ? <div className="page-shell-wide page-stack"><div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">Failed to load. Please retry.</div></div> : <div className="grid min-h-[65vh] place-items-center"><div className="flex items-center gap-3 text-base text-muted-foreground"><Activity size={17} className="animate-pulse text-info" />Loading the control room…</div></div>
 
   return <div className="page-shell-wide page-stack pb-8">
     <header className="page-hero glass-panel soft-grid relative overflow-hidden rounded-panel border border-border px-5 py-6 pb-8 md:px-7 md:py-7">
       <div className="pointer-events-none absolute -right-20 -top-32 h-80 w-80 rounded-full bg-primary/20 blur-3xl" /><div className="pointer-events-none absolute bottom-[-10rem] right-[28%] h-64 w-64 rounded-full bg-info/10 blur-3xl" /><div className="pointer-events-none absolute right-8 top-8 hidden h-44 w-44 opacity-60 xl:block"><div className="hero-orb h-full w-full"><div className="orbit-ring" /><div className="orb-core text-2xl">Q</div></div></div>
       <div className="relative flex flex-col gap-6 2xl:flex-row 2xl:flex-wrap 2xl:items-end">
-        <div className="min-w-0 max-w-2xl 2xl:flex-1"><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-success/25 bg-success/10 px-3 py-1.5 text-[12px] font-bold uppercase tracking-[.15em] text-success"><span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_10px_rgb(var(--success)/.65)]" /> All systems healthy</div><p className="mb-2 text-base font-semibold text-info">Good morning, {user?.name?.split(' ')[0] || 'there'}.</p><h1 className="font-display text-4xl font-extrabold leading-[1.05] tracking-[-.05em] text-foreground sm:text-5xl">Make knowledge<br /><span className="text-info">move your team.</span></h1><p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">A calm, focused view of what needs attention, what is trusted, and where your teams need knowledge next.</p></div>
-        <div className="grid w-full gap-2 sm:grid-cols-2 2xl:w-[380px] 2xl:shrink-0"><div className="rounded-2xl border border-border bg-surface/70 p-4"><div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[.14em] text-stone"><Sparkles size={13} className="text-warning" /> Today’s focus</div><p className="mt-3 text-xl font-bold text-foreground">{summary.pending_drafts ? `${summary.pending_drafts} drafts` : 'Library clear'}</p><p className="mt-1 text-sm leading-5 text-muted-foreground">{summary.pending_drafts ? 'Ready for a thoughtful review.' : 'No urgent approvals waiting.'}</p></div><div className="flex flex-col justify-between rounded-2xl border border-primary/20 bg-primary/10 p-4"><div className="flex items-center justify-between text-[12px] font-bold uppercase tracking-[.14em] text-primary-muted"><span>Workspace pulse</span><ArrowUpRight size={14} /></div><p className="mt-3 text-xl font-bold text-foreground">{ownerCoverage}% owned</p><p className="mt-1 text-sm leading-5 text-muted-foreground">Documents with a clear steward.</p></div></div>
-        {has('article.create') && <div className="flex flex-wrap gap-2 2xl:basis-full"><Link to="/sources" className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-bold text-foreground transition hover:border-info/40 hover:bg-surface-soft"><UploadCloud size={15} className="text-info" /> Upload source</Link><Link to="/articles/new" className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_20px_rgb(var(--primary)/.22)] transition hover:-translate-y-0.5 hover:bg-primary/90"><Plus size={15} /> New article</Link></div>}
+        <div className="min-w-0 max-w-2xl 2xl:flex-1"><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-success/25 bg-success/10 px-3 py-1.5 text-[12px] font-bold uppercase tracking-[.15em] text-success"><span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_10px_rgb(var(--success)/.65)]" /> {t('home.healthy')}</div><p className="mb-2 text-base font-semibold text-info">{t('home.goodMorning', { name: user?.name?.split(' ')[0] || 'bạn' })}</p><h1 className="font-display text-4xl font-extrabold leading-[1.05] tracking-[-.05em] text-foreground sm:text-5xl">{t('home.headline')}</h1><p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">{t('home.subtitle')}</p></div>
+        <div className="grid w-full gap-2 sm:grid-cols-2 2xl:w-[380px] 2xl:shrink-0"><div className="rounded-2xl border border-border bg-surface/70 p-4"><div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[.14em] text-stone"><Sparkles size={13} className="text-warning" /> {t('home.todaysFocus')}</div><p className="mt-3 text-xl font-bold text-foreground">{summary.pending_drafts ? t('home.drafts', { count: summary.pending_drafts }) : t('home.libraryClear')}</p><p className="mt-1 text-sm leading-5 text-muted-foreground">{summary.pending_drafts ? t('home.readyReview') : t('home.noApprovals')}</p></div><div className="flex flex-col justify-between rounded-2xl border border-primary/20 bg-primary/10 p-4"><div className="flex items-center justify-between text-[12px] font-bold uppercase tracking-[.14em] text-primary-muted"><span>{t('home.workspacePulse')}</span><ArrowUpRight size={14} /></div><p className="mt-3 text-xl font-bold text-foreground">{t('home.owned', { percent: ownerCoverage })}</p><p className="mt-1 text-sm leading-5 text-muted-foreground">{t('home.clearSteward')}</p></div></div>
+        {has('article.create') && <div className="flex flex-wrap gap-2 2xl:basis-full"><Link to="/sources" className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-bold text-foreground transition hover:border-info/40 hover:bg-surface-soft"><UploadCloud size={15} className="text-info" /> {t('home.uploadSource')}</Link><Link to="/articles/new" className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_20px_rgb(var(--primary)/.22)] transition hover:-translate-y-0.5 hover:bg-primary/90"><Plus size={15} /> {t('home.newArticle')}</Link></div>}
       </div>
     </header>
 
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 xl:pt-1">
-      <Metric label="Knowledge library" value={summary.total_articles} detail="Published, trusted documents" Icon={BookOpen} tone="primary" />
-      <Metric label="Approval inbox" value={summary.pending_drafts} detail="Drafts waiting for a decision" Icon={FileCheck2} tone="warning" />
-      <Metric label="Open gaps" value={summary.open_gaps} detail="Questions with no trusted answer" Icon={Search} tone="info" />
-      <Metric label="Departments" value={summary.departments} detail="Teams contributing knowledge" Icon={FolderTree} tone="success" />
+      <Metric label={t('home.knowledgeLibrary')} value={summary.total_articles} detail={t('home.publishedTrusted')} Icon={BookOpen} tone="primary" />
+      <Metric label={t('home.approvalInbox')} value={summary.pending_drafts} detail={t('home.waitingDecision')} Icon={FileCheck2} tone="warning" />
+      <Metric label={t('home.openGaps')} value={summary.open_gaps} detail={t('home.questionsNoAnswer')} Icon={Search} tone="info" />
+      <Metric label={t('home.departments')} value={summary.departments} detail={t('home.teamsKnowledge')} Icon={FolderTree} tone="success" />
     </section>
 
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.8fr)]">

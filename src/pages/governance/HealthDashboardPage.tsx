@@ -1,24 +1,27 @@
 import React, { useEffect, useState } from 'react'
 import { Activity, Layers, AlertTriangle, ShieldCheck, HelpCircle, BarChart3, TrendingUp, RefreshCw } from 'lucide-react'
-import { getHealthMetrics, getEvalRuns, verifyReviewDeadlines } from '../../api/governance'
+import { getHealthMetrics, getEvalReport, getEvalRuns, verifyReviewDeadlines } from '../../api/governance'
 import PageHeader from '../../components/ui/PageHeader'
 
 export default function HealthDashboardPage() {
   const [metrics, setMetrics] = useState<any>(null)
   const [evalRuns, setEvalRuns] = useState<any[]>([])
+  const [evalReport, setEvalReport] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [verifyingReviews, setVerifyingReviews] = useState(false)
+  const [error, setError] = useState(false)
 
   const fetchDashboardData = async () => {
     setLoading(true)
     try {
-      const m = await getHealthMetrics()
+      const [m, ev, report] = await Promise.all([getHealthMetrics(), getEvalRuns(), getEvalReport()])
       setMetrics(m)
-
-      const ev = await getEvalRuns()
       setEvalRuns(ev)
+      setEvalReport(report)
+      setError(false)
     } catch (err) {
       console.error(err)
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -47,9 +50,20 @@ export default function HealthDashboardPage() {
     )
   }
 
+  if (error && !metrics) {
+    return (
+      <div className="page-shell page-stack">
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <span>Failed to load. Please retry.</span>
+          <button type="button" onClick={() => void fetchDashboardData().catch(() => undefined)} className="text-xs font-bold uppercase tracking-wide hover:underline">Retry</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="page-shell page-stack">
-      <PageHeader eyebrow="System observability" title="KB health dashboard" description="Live metrics, governance audits, and offline RAG evaluation scores." icon={Activity} actions={<button onClick={() => void runReviewScan()} disabled={verifyingReviews} className="mm-secondary flex items-center gap-2 px-3 py-2 text-xs font-semibold disabled:opacity-50">
+      <PageHeader eyebrow="System observability" title="KB health dashboard" description="Live metrics, governance audits, and offline RAG evaluation scores." icon={Activity} actions={<button onClick={() => void runReviewScan().catch(() => undefined)} disabled={verifyingReviews} className="mm-secondary flex items-center gap-2 px-3 py-2 text-xs font-semibold disabled:opacity-50">
             <RefreshCw size={14} className={verifyingReviews ? 'animate-spin' : ''} />
             {verifyingReviews ? 'Checking reviews…' : 'Check review deadlines'}
           </button>} />
@@ -200,6 +214,8 @@ export default function HealthDashboardPage() {
           <BarChart3 size={18} className="text-brand-400" />
           <span>Offline RAG Evaluation Runs</span>
         </h2>
+
+        {evalReport && <div className={`rounded-2xl border p-4 ${evalReport.verdict === 'GO' ? 'border-emerald-400/25 bg-emerald-500/10' : 'border-amber-400/25 bg-amber-500/10'}`}><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Current evaluation verdict</p><p className={`mt-1 text-xl font-extrabold ${evalReport.verdict === 'GO' ? 'text-emerald-400' : 'text-amber-400'}`}>{evalReport.verdict}</p></div><div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><span>Samples <strong className="ml-1 text-primary-foreground">{evalReport.sample_count || 0}</strong></span><span>Grounded <strong className="ml-1 text-primary-foreground">{((evalReport.kpis?.groundedness || 0) * 100).toFixed(1)}%</strong></span><span>Latency <strong className="ml-1 text-primary-foreground">{evalReport.kpis?.latency_ms || 0}ms</strong></span><span>Leakage <strong className={`ml-1 ${evalReport.permission_leakage ? 'text-rose-400' : 'text-emerald-400'}`}>{evalReport.permission_leakage || 0}</strong></span></div></div>{evalReport.reason && <p className="mt-3 text-xs text-amber-200">{evalReport.reason}</p>}</div>}
         
         {evalRuns.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-850 p-8 text-center bg-slate-900/5 text-slate-500 text-xs">

@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, ChevronDown } from 'lucide-react'
 
 type Option = { value: string; label: React.ReactNode; disabled?: boolean }
@@ -32,22 +33,66 @@ export function Select({ children, value, defaultValue, onChange, disabled = fal
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(selectedIndex)
   const root = useRef<HTMLDivElement>(null)
+  const listbox = useRef<HTMLDivElement>(null)
   const typeAhead = useRef('')
   const resetTypeAhead = useRef<number>()
+  const [position, setPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 240 })
 
   useEffect(() => setActiveIndex(selectedIndex), [selectedIndex])
   useEffect(() => {
-    const closeOnOutside = (event: MouseEvent) => { if (root.current && !root.current.contains(event.target as Node)) setOpen(false) }
+    const closeOnOutside = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (root.current?.contains(target) || listbox.current?.contains(target)) return
+      setOpen(false)
+    }
     document.addEventListener('mousedown', closeOnOutside)
     return () => document.removeEventListener('mousedown', closeOnOutside)
   }, [])
   useEffect(() => () => window.clearTimeout(resetTypeAhead.current), [])
+
+  useEffect(() => {
+    if (!open) return
+    const updatePosition = () => {
+      const anchor = root.current?.querySelector('button')
+      if (!anchor) return
+      const rect = anchor.getBoundingClientRect()
+      const gap = 4
+      const viewportPadding = 8
+      const roomBelow = window.innerHeight - rect.bottom - gap - viewportPadding
+      const roomAbove = rect.top - gap - viewportPadding
+      const openAbove = roomBelow < 180 && roomAbove > roomBelow
+      const maxHeight = Math.max(96, Math.min(320, openAbove ? roomAbove : roomBelow))
+      setPosition({
+        top: openAbove ? Math.max(viewportPadding, rect.top - gap - maxHeight) : rect.bottom + gap,
+        left: Math.min(Math.max(viewportPadding, rect.left), Math.max(viewportPadding, window.innerWidth - rect.width - viewportPadding)),
+        width: rect.width,
+        maxHeight,
+      })
+    }
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [open])
 
   const emit = (next: string) => {
     if (next === selectedValue) return
     onChange?.({ target: { value: next }, currentTarget: { value: next } } as React.ChangeEvent<HTMLSelectElement>)
   }
   const move = (delta: number) => {
+    if (!options.length) return activeIndex
     let next = activeIndex
     for (let attempts = 0; attempts < options.length; attempts += 1) {
       next = (next + delta + options.length) % options.length
@@ -80,8 +125,18 @@ export function Select({ children, value, defaultValue, onChange, disabled = fal
     <button type="button" id={id} role="combobox" aria-controls={`${listboxId}-listbox`} aria-expanded={open} aria-haspopup="listbox" aria-label={ariaLabel} aria-labelledby={ariaLabelledBy} disabled={disabled} onClick={() => setOpen(current => !current)} onKeyDown={handleKeyDown} className={selectClass}>
       <span className="min-w-0 flex-1 truncate">{selected?.label}</span><ChevronDown size={16} aria-hidden="true" className={`shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
     </button>
-    {open && <div id={`${listboxId}-listbox`} role="listbox" aria-labelledby={id} className="absolute z-50 mt-xxs max-h-60 w-full overflow-y-auto rounded-surface border border-border bg-surface-elevated p-xxs shadow-[0_16px_35px_rgb(var(--shadow)/.25)]">
-      {options.map((option, index) => <button key={option.value} type="button" role="option" aria-selected={option.value === selectedValue} disabled={option.disabled} onMouseEnter={() => setActiveIndex(index)} onClick={() => { emit(option.value); setOpen(false) }} className={`flex w-full min-h-controlSm items-center gap-xs rounded-control px-sm text-left text-body-sm transition ${index === activeIndex ? 'bg-surface-muted text-foreground' : 'text-foreground hover:bg-surface-muted'} disabled:cursor-not-allowed disabled:opacity-50`}><span className="min-w-0 flex-1 truncate">{option.label}</span>{option.value === selectedValue && <Check size={14} className="shrink-0 text-primary" />}</button>)}
-    </div>}
+    {open && typeof document !== 'undefined' && createPortal(
+      <div
+        ref={listbox}
+        id={`${listboxId}-listbox`}
+        role="listbox"
+        aria-labelledby={id}
+        className="fixed z-[1000] overflow-y-auto rounded-surface border border-border bg-surface-elevated p-xxs shadow-[0_16px_35px_rgb(var(--shadow)/.25)]"
+        style={{ top: position.top, left: position.left, width: position.width, maxHeight: position.maxHeight }}
+      >
+        {options.map((option, index) => <button key={option.value} type="button" role="option" aria-selected={option.value === selectedValue} disabled={option.disabled} onMouseEnter={() => setActiveIndex(index)} onClick={() => { emit(option.value); setOpen(false) }} className={`flex w-full min-h-controlSm items-center gap-xs rounded-control px-sm text-left text-body-sm transition ${index === activeIndex ? 'bg-surface-muted text-foreground' : 'text-foreground hover:bg-surface-muted'} disabled:cursor-not-allowed disabled:opacity-50`}><span className="min-w-0 flex-1 truncate">{option.label}</span>{option.value === selectedValue && <Check size={14} className="shrink-0 text-primary" />}</button>)}
+      </div>,
+      document.body,
+    )}
   </div>
 }

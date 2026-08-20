@@ -6,6 +6,7 @@ import { listDepartments } from '../../api/auth'
 import { useAuth } from '../../auth/useAuth'
 import { useLanguage } from '../../i18n/LanguageProvider'
 import { requestContent } from '../../api/knowledge'
+import { safeExternalUrl } from '../../lib/formatters'
 import PageHeader from '../../components/ui/PageHeader'
 import { Select } from '../../components/ui/Select'
 
@@ -20,6 +21,7 @@ export default function SearchResultsPage() {
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [requested, setRequested] = useState(false)
+  const [error, setError] = useState(false)
   const [departments, setDepartments] = useState<{ id: string; name: string; company_domain: string; active: boolean }[]>([])
   
   const navigate = useNavigate()
@@ -36,11 +38,12 @@ export default function SearchResultsPage() {
     if (dept && !visibleDepartments.some(item => item.name === dept)) setDept('')
   }, [dept, visibleDepartments])
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSearch = async (e?: React.FormEvent) => {
+    e?.preventDefault()
     if (!query.trim()) return
     setLoading(true)
     setSearched(true)
+    setError(false)
 
     try {
       const data = await search({
@@ -55,6 +58,7 @@ export default function SearchResultsPage() {
       setResults(data)
     } catch (err) {
       console.error(err)
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -106,30 +110,30 @@ export default function SearchResultsPage() {
               onChange={(e) => setDept(e.target.value)}
               className="theme-select"
             >
-              <option value="">All Departments</option>
+              <option value="">{t('search.allDepartments')}</option>
               {visibleDepartments.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}
             </Select>
 
             <input
               value={tag}
               onChange={(e) => setTag(e.target.value)}
-              placeholder="Tag"
+              placeholder={t('search.tag')}
               className="field min-w-0"
               aria-label="Tag filter"
             />
 
             <Select value={status} onChange={(e) => setStatus(e.target.value)} className="theme-select" aria-label="Status filter">
-              <option value="published">Published</option>
-              <option value="">Any status</option>
+              <option value="published">{t('search.statusPublished')}</option>
+              <option value="">{t('search.statusAny')}</option>
             </Select>
 
             <label className="text-muted">
-              From
+              {t('search.from')}
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="field mt-1 w-full" aria-label="Date from" />
             </label>
 
             <label className="text-muted">
-              To
+              {t('search.to')}
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="field mt-1 w-full" aria-label="Date to" />
             </label>
 
@@ -152,22 +156,35 @@ export default function SearchResultsPage() {
       {loading ? (
         <div className="glass-panel flex h-48 items-center justify-center rounded-2xl border border-border text-muted-foreground">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-500 mr-3" />
-          <span>Fusing keyword and embedding metrics...</span>
+          <span>{t('search.loadingDetails')}</span>
+        </div>
+      ) : searched && error ? (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <span>Failed to load. Please retry.</span>
+          <button type="button" onClick={() => void handleSearch()} className="text-xs font-bold uppercase tracking-wide hover:underline">Retry</button>
         </div>
       ) : searched && results.length === 0 ? (
           <div className="glass-panel rounded-2xl border border-dashed border-border bg-surface/30 p-12 text-center">
           <Layers className="mx-auto mb-3 text-muted" size={40} />
           <h3 className="text-md font-semibold text-foreground">{t('search.noMatches')}</h3>
           <p className="mt-1 text-xs text-muted-foreground">No authorized document matched this query.</p>
-          <button type="button" disabled={requested} onClick={() => void requestContent(query, dept || undefined).then(() => setRequested(true))} className="mm-primary mt-5 px-4 py-2 text-xs font-semibold disabled:opacity-60">{requested ? 'Content request submitted' : 'Request this content'}</button>
+          <button type="button" disabled={requested} onClick={() => void requestContent(query, dept || undefined).then(() => setRequested(true)).catch(() => undefined)} className="mm-primary mt-5 px-4 py-2 text-xs font-semibold disabled:opacity-60">{requested ? t('search.contentRequested') : t('search.requestContent')}</button>
         </div>
       ) : (
         <div className="space-y-4">
-          {results.map((res, idx) => (
-              <div
-              key={idx}
-              onClick={() => navigate(`/articles/${res.article_id}`)}
-              className="glass-panel interactive-lift group flex cursor-pointer items-start justify-between gap-4 rounded-2xl border border-border p-5"
+          {results.map((res, idx) => {
+            const sourceHref = res.source_url ? safeExternalUrl(res.source_url) : undefined
+            const resultKey = String(res.chunk_id || res.article_id || idx)
+            const articleId = res.article_id ? String(res.article_id) : ''
+            return (
+            <div
+              key={resultKey}
+              role="link"
+              tabIndex={articleId ? 0 : -1}
+              aria-disabled={!articleId}
+              onClick={() => articleId && navigate(`/articles/${articleId}`)}
+              onKeyDown={(event) => { if (articleId && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); navigate(`/articles/${articleId}`) } }}
+              className={`glass-panel interactive-lift group flex items-start justify-between gap-4 rounded-2xl border border-border p-5 ${articleId ? 'cursor-pointer' : ''}`}
             >
               <div className="space-y-2.5 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -181,7 +198,7 @@ export default function SearchResultsPage() {
                   )}
                   {/* Score helper */}
                   <span className="ml-auto text-[10px] font-semibold text-muted">
-                    {t('search.matchStrength')}: {(res.score * 100).toFixed(0)}%
+                    {t('search.matchStrength')}: {(Number(res.score || 0) * 100).toFixed(0)}%
                   </span>
                 </div>
 
@@ -193,14 +210,19 @@ export default function SearchResultsPage() {
                 <p className="whitespace-pre-wrap border-l-2 border-border pl-5 text-sm leading-relaxed text-muted-foreground">
                   {res.chunk_text}
                 </p>
-                {res.source_url && <a href={res.source_url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="mt-3 inline-flex text-xs font-semibold text-info hover:underline">Open cited source{res.page_number ? ` · page ${res.page_number}` : ''}</a>}
+                {res.source_url && (sourceHref ? (
+                  <a href={sourceHref} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="mt-3 inline-flex text-xs font-semibold text-info hover:underline">{t('search.openSource')}{res.page_number ? ` · page ${res.page_number}` : ''}</a>
+                ) : (
+                  <span className="mt-3 inline-flex text-xs font-semibold text-muted-foreground">{t('search.openSource')}{res.page_number ? ` · page ${res.page_number}` : ''}</span>
+                ))}
               </div>
 
               <div className="shrink-0 self-center rounded-xl bg-surface-muted p-2 text-muted transition-all group-hover:bg-primary group-hover:text-primary-foreground">
                 <ArrowRight size={14} />
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

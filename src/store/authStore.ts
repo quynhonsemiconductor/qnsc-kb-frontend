@@ -9,10 +9,21 @@ interface AuthState {
   clearAuth: () => void
 }
 
+// localStorage can hold corrupt JSON (manual edits, quota truncation). Drop the
+// entry instead of crashing hydration for every consumer.
+export function readStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem('user') || 'null')
+  } catch {
+    localStorage.removeItem('user')
+    return null
+  }
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   token: null,
   refreshToken: null,
-  user: JSON.parse(localStorage.getItem('user') || 'null'),
+  user: readStoredUser(),
   setAuth: (token, user, refreshToken) => {
     setAccessToken(token)
     localStorage.setItem('user', JSON.stringify(user))

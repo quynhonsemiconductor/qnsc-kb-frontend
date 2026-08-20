@@ -30,6 +30,11 @@ export async function updateArticle(id: string, data: any) {
   return response.data
 }
 
+export async function createArticleEditRequest(articleId: string, requestText: string) {
+  const response = await client.post(`/articles/${articleId}/edit-requests`, { request_text: requestText })
+  return response.data
+}
+
 export async function autoTagArticles(articleIds: string[]) {
   const response = await client.post('/articles/auto-tags', { article_ids: articleIds })
   return response.data
@@ -116,4 +121,16 @@ export async function isBookmarked(userId: string, articleId: string) {
     console.error(err)
     return false
   }
+}
+
+export async function getFollowStatus(articleId: string) {
+  return (await client.get(`/articles/${articleId}/follow`)).data
+}
+
+export async function followArticle(articleId: string) {
+  return (await client.post(`/articles/${articleId}/follow`)).data
+}
+
+export async function unfollowArticle(articleId: string) {
+  return (await client.delete(`/articles/${articleId}/follow`)).data
 }

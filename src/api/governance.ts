@@ -50,8 +50,8 @@ export async function approveDraft(id: string, dept: string, departmentIds: stri
   return response.data
 }
 
-export async function assignDraftApprover(id: string, approverId: string) {
-  const response = await client.post(`/governance/pending-drafts/${id}/assign-approver`, { approver_id: approverId })
+export async function assignDraftApprover(id: string, approverId: string, reason?: string) {
+  const response = await client.post(`/governance/pending-drafts/${id}/assign-approver`, { approver_id: approverId, reason: reason || undefined })
   return response.data
 }
 
@@ -144,6 +144,11 @@ export async function getHealthMetrics() {
 
 export async function getEvalRuns() {
   const response = await client.get('/governance/eval-runs')
+  return response.data
+}
+
+export async function getEvalReport() {
+  const response = await client.get('/governance/eval-report')
   return response.data
 }
 

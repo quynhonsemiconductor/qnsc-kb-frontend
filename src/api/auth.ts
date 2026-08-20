@@ -47,6 +47,18 @@ export async function listAccessGroups() {
   return (await client.get('/auth/groups')).data
 }
 
+export async function listAccessGroupMembers(groupId: string) {
+  return (await client.get(`/auth/groups/${groupId}/members`)).data
+}
+
+export async function createAccessGroup(name: string) {
+  return (await client.post('/auth/groups', { name })).data
+}
+
+export async function replaceAccessGroupMembers(groupId: string, userIds: string[]) {
+  return (await client.put(`/auth/groups/${groupId}/members`, { user_ids: userIds })).data
+}
+
 export async function createDepartment(data: { name: string; description: string; company_domain?: string }) {
   return (await client.post('/auth/departments', data)).data
 }
@@ -67,6 +79,22 @@ export async function updateUser(userId: string, data: { name?: string; dept?: s
 export async function createManagedUser(data: { email: string; name: string; password?: string; dept?: string; department_ids?: string[]; role: string; role_ids?: string[]; owned_department_ids?: string[] }) {
   const response = await client.post('/auth/users', data)
   return response.data
+}
+
+export async function createInvitation(data: { email: string; name: string; role: string; audience_ids?: string[] }) {
+  return (await client.post('/auth/invitations', data)).data
+}
+
+export async function listInvitations() {
+  return (await client.get('/auth/invitations')).data
+}
+
+export async function resendInvitation(id: string) {
+  return (await client.post(`/auth/invitations/${id}/resend`)).data
+}
+
+export async function revokeInvitation(id: string) {
+  return (await client.post(`/auth/invitations/${id}/revoke`)).data
 }
 
 export async function deactivateUser(userId: string) {

@@ -35,7 +35,7 @@ export default function PdfViewer({ open, fileName, url, page, loading = false, 
           <button onClick={onClose} aria-label="Close document" className="rounded-lg p-2 text-steel transition hover:bg-surface-soft hover:text-ink"><X size={17} /></button>
         </header>
         <div className="min-h-0 flex-1 bg-canvas">
-          {loading || !url ? <div className="grid h-full place-items-center text-steel"><Loader2 size={20} className="animate-spin" /></div> : <iframe src={sourceUrl} title={fileName} className="size-full border-0 bg-white" />}
+          {loading || !url ? <div className="grid h-full place-items-center text-steel"><Loader2 size={20} className="animate-spin" /></div> : <iframe src={sourceUrl} title={fileName} sandbox="allow-same-origin" className="size-full border-0 bg-white" />}
         </div>
       </div>
     </div>

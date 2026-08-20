@@ -1,5 +1,5 @@
 import React, { createContext, useEffect, useRef, useState } from 'react'
-import { useAuthStore } from '../store/authStore'
+import { readStoredUser, useAuthStore } from '../store/authStore'
 import { logoutSession } from '../api/auth'
 import { getAccessToken, refreshSession } from '../api/client'
 
@@ -8,7 +8,7 @@ interface AuthContextType {
   loading: boolean
   user: any
   login: (token: string, user: any, refreshToken?: string) => void
-  logout: () => void
+  logout: () => void | Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
     void refreshSession().then((ok) => {
-      const refreshedUser = JSON.parse(localStorage.getItem('user') || 'null')
+      const refreshedUser = readStoredUser()
       const refreshedToken = getAccessToken()
       if (ok && refreshedToken && refreshedUser) setAuth(refreshedToken, refreshedUser)
     }).finally(() => setLoading(false))
@@ -39,13 +39,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuth(token, user, refreshToken)
   }
 
-  const logout = () => {
+  const logout = async () => {
     // Clearing local state triggers the authentication bootstrap effect. Keep
     // that effect from renewing the still-active refresh cookie before the
     // logout response has had a chance to clear it.
     logoutInProgress.current = true
-    void logoutSession().catch(() => undefined)
+    // Fire the server-side revocation before clearing local auth so the
+    // request is already on the wire with the current session cookie.
+    const logoutRequest = logoutSession().catch(() => undefined)
     clearAuth()
+    // Wait briefly for the cookie to be cleared, but never strand the user if
+    // the call hangs or fails.
+    const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, 3000))
+    await Promise.race([logoutRequest, timeout])
+    if (window.location.pathname !== '/login') window.location.assign('/login')
   }
 
   return (

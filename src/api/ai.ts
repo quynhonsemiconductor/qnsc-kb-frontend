@@ -1,7 +1,21 @@
 import client, { clearExpiredSession, getAccessToken, refreshSession } from './client'
 
-export async function askAI(question: string, conversation_id?: string, language: 'en' | 'vi' = 'en') {
-  const response = await client.post('/ai/ask', { question, conversation_id, language })
+export async function askAI(
+  question: string,
+  conversation_id?: string,
+  language: 'en' | 'vi' = 'vi',
+  articleId?: string,
+  confirmEdit = false,
+  editInstruction?: string,
+) {
+  const response = await client.post('/ai/ask', {
+    question,
+    conversation_id,
+    language,
+    article_id: articleId,
+    confirm_edit: confirmEdit,
+    edit_instruction: editInstruction || undefined,
+  })
   return response.data
 }
 
@@ -12,51 +26,64 @@ export async function askAIStream(
   onToken: (content: string) => void,
   onSources: (sources: any[]) => void,
   onDone: (data: any) => void,
+  articleId?: string,
+  signal?: AbortSignal,
   retry = true,
+  confirmEdit = false,
+  editInstruction?: string,
 ) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
   const token = getAccessToken()
   const response = await fetch(`${baseUrl}/ai/ask/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ question, conversation_id: conversationId, language }),
+    // The refresh token is httpOnly. Keep the cookie on this fetch path just
+    // as Axios does, otherwise a cross-origin deployment cannot recover a
+    // streamed request after the short-lived access token expires.
+    credentials: 'include',
+    body: JSON.stringify({ question, conversation_id: conversationId, language, article_id: articleId || undefined, confirm_edit: confirmEdit, edit_instruction: editInstruction || undefined }),
+    signal,
   })
   if (response.status === 401 && retry && await refreshSession()) {
-    return askAIStream(question, conversationId, language, onToken, onSources, onDone, false)
+    return askAIStream(question, conversationId, language, onToken, onSources, onDone, articleId, signal, false, confirmEdit, editInstruction)
   }
   if (response.status === 401) clearExpiredSession()
   if (!response.ok || !response.body) throw new Error(`AI stream failed (${response.status})`)
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  while (true) {
-    const { value, done } = await reader.read()
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
-    const events = buffer.split('\n\n')
-    buffer = events.pop() || ''
-    for (const event of events) {
-      const line = event.split('\n').find((item) => item.startsWith('data: '))
-      if (!line) continue
-      const payload = JSON.parse(line.slice(6))
-      if (payload.type === 'token') onToken(payload.content || '')
-      if (payload.type === 'replace') onToken(`\u0000REPLACE\u0000${payload.content || ''}`)
-      if (payload.type === 'sources') onSources(payload.sources || [])
-      if (payload.type === 'error') throw new Error(payload.detail || 'AI generation failed')
-      if (payload.type === 'done') onDone(payload)
+  // Dispatch a single SSE event; malformed payloads are skipped so one bad
+  // event cannot kill the whole stream.
+  const dispatchEvent = (event: string) => {
+    const line = event.split('\n').find((item) => item.startsWith('data: '))
+    if (!line) return
+    let payload: any
+    try {
+      payload = JSON.parse(line.slice(6))
+    } catch {
+      return
     }
-    if (done) break
+    if (payload.type === 'token') onToken(payload.content || '')
+    if (payload.type === 'replace') onToken(`\u0000REPLACE\u0000${payload.content || ''}`)
+    if (payload.type === 'sources') onSources(payload.sources || [])
+    if (payload.type === 'error') throw new Error(payload.detail || 'AI generation failed')
+    if (payload.type === 'done') onDone(payload)
   }
-  // Process a final event if the server closed immediately after writing it.
-  if (buffer.trim()) {
-    const line = buffer.split('\n').find((item) => item.startsWith('data: '))
-    if (line) {
-      const payload = JSON.parse(line.slice(6))
-      if (payload.type === 'token') onToken(payload.content || '')
-      if (payload.type === 'replace') onToken(`\u0000REPLACE\u0000${payload.content || ''}`)
-      if (payload.type === 'sources') onSources(payload.sources || [])
-      if (payload.type === 'done') onDone(payload)
-      if (payload.type === 'error') throw new Error(payload.detail || 'AI generation failed')
+  try {
+    while (true) {
+      if (signal?.aborted) throw new DOMException('The request was aborted', 'AbortError')
+      const { value, done } = await reader.read()
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+      const events = buffer.split('\n\n')
+      buffer = events.pop() || ''
+      for (const event of events) dispatchEvent(event)
+      if (done) break
     }
+    // Process a final event if the server closed immediately after writing it.
+    if (buffer.trim()) dispatchEvent(buffer)
+  } finally {
+    // Close the underlying stream when we exit early (abort or error).
+    void reader.cancel().catch(() => undefined)
   }
 }
 

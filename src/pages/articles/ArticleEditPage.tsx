@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Check, ChevronDown, Save, X } from 'lucide-react'
 import { getArticle, createArticle, updateArticle } from '../../api/articles'
@@ -6,6 +6,7 @@ import { listDepartments, listUsers } from '../../api/auth'
 import { useAuth } from '../../auth/useAuth'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { Select } from '../../components/ui/Select'
+import { FloatingPanel } from '../../components/ui/FloatingPanel'
 
 const ARTICLE_TEMPLATE = '# Purpose\n\n## Summary\n\n## Procedure or details\n\n## Ownership and review\n'
 type Department = { id: string; name: string; company_domain: string; active: boolean }
@@ -13,6 +14,7 @@ type ManagedUser = { id: string; name: string; email: string; company_domain: st
 
 function DepartmentPicker({ value, options, onChange }: { value: string[]; options: Department[]; onChange: (value: string[]) => void }) {
   const [open, setOpen] = useState(false)
+  const anchorRef = useRef<HTMLButtonElement>(null)
   const selected = value.map(id => options.find(item => item.id === id)).filter(Boolean) as Department[]
   const toggle = (id: string) => onChange(value.includes(id) ? value.filter(item => item !== id) : [...value, id])
 
@@ -21,23 +23,23 @@ function DepartmentPicker({ value, options, onChange }: { value: string[]; optio
       <label className="block text-xs font-semibold text-slate-400">Departments</label>
       <span className="text-[10px] font-semibold text-slate-500">{selected.length} selected</span>
     </div>
-    <button type="button" aria-expanded={open} onClick={() => setOpen(current => !current)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 text-left text-xs text-primary-foreground outline-none transition hover:border-brand-500/70 focus:border-brand-500">
+    <button ref={anchorRef} type="button" aria-expanded={open} onClick={() => setOpen(current => !current)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 text-left text-xs text-primary-foreground outline-none transition hover:border-brand-500/70 focus:border-brand-500">
       <span className={selected.length ? 'font-semibold text-primary-foreground' : 'text-slate-500'}>{selected.length ? `${selected.length} department${selected.length === 1 ? '' : 's'} selected` : 'Choose departments'}</span>
       <ChevronDown size={15} className={`shrink-0 text-slate-500 transition ${open ? 'rotate-180 text-brand-400' : ''}`} />
     </button>
-    {open && <div className="absolute inset-x-0 top-[calc(100%+5px)] z-30 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 p-1.5 shadow-2xl shadow-black/40">
+    <FloatingPanel anchorRef={anchorRef} open={open} onClose={() => setOpen(false)} className="border-slate-700 bg-slate-900 p-1.5 shadow-2xl shadow-black/40">
       <div className="flex items-center justify-between border-b border-slate-800 px-2.5 py-2">
         <span className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">Article visibility</span>
         {selected.length > 0 && <button type="button" onClick={() => onChange([])} className="text-[10px] font-semibold text-brand-400 hover:text-brand-300">Clear all</button>}
       </div>
-      <div className="max-h-52 overflow-y-auto py-1">
+      <div className="py-1">
         {options.length ? options.map(item => { const checked = value.includes(item.id); return <button key={item.id} type="button" onClick={() => toggle(item.id)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-xs text-slate-200 transition hover:bg-slate-800">
           <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${checked ? 'border-brand-500 bg-brand-500 text-primary-foreground' : 'border-slate-600 bg-slate-950'}`}>{checked && <Check size={11} strokeWidth={3} />}</span>
           <span className="min-w-0 flex-1 truncate font-semibold">{item.name}</span>
           {checked && value[0] === item.id && <span className="text-[10px] font-semibold text-brand-400">Primary</span>}
         </button> }) : <p className="px-2.5 py-3 text-xs text-slate-500">No departments available.</p>}
       </div>
-    </div>}
+    </FloatingPanel>
     {selected.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{selected.map((item, index) => <span key={item.id} className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold ${index === 0 ? 'border-brand-500/30 bg-brand-500/10 text-brand-300' : 'border-slate-700 bg-slate-800 text-slate-300'}`}>
       {item.name}{index === 0 && <span className="text-[9px] uppercase tracking-wide opacity-70">primary</span>}
       <button type="button" aria-label={`Remove ${item.name}`} onClick={() => toggle(item.id)} className="rounded-full p-0.5 hover:bg-white/10"><X size={11} /></button>
@@ -56,7 +58,7 @@ export default function ArticleEditPage() {
   const [bodyMd, setBodyMd] = useState('')
   const [dept, setDept] = useState('')
   const [departmentIds, setDepartmentIds] = useState<string[]>([])
-  const [language, setLanguage] = useState('en')
+  const [language, setLanguage] = useState('vi')
   const [status, setStatus] = useState('draft')
   const [tagsInput, setTagsInput] = useState('')
   const [nextReview, setNextReview] = useState('')
@@ -93,7 +95,7 @@ export default function ArticleEditPage() {
           const articleDepartmentIds = art.departments?.length ? art.departments.map((item: { id: string; name?: string }) => item.id) : departmentData.filter(item => item.name === art.dept).map(item => item.id)
           const primaryDepartmentId = art.departments?.find((item: { id: string; name?: string }) => item.name === art.dept)?.id || articleDepartmentIds[0]
           setDepartmentIds(primaryDepartmentId ? [primaryDepartmentId, ...articleDepartmentIds.filter((item: string) => item !== primaryDepartmentId)] : [])
-          setLanguage(art.language || 'en')
+          setLanguage(art.language || 'vi')
           setStatus(art.status)
           setVisibility(art.visibility || 'department')
           setExplicitUserIds((art.explicit_user_ids || []).map((item: string) => String(item)))
@@ -233,6 +235,7 @@ export default function ArticleEditPage() {
               className="field h-96 resize-y p-4 font-mono"
               required
             />
+            <p className="text-[11px] leading-5 text-slate-500">Use standard Markdown links or wiki links such as <code className="rounded bg-slate-800 px-1 py-0.5 text-slate-300">[[Incident Response Playbook]]</code>. Matching document titles become clickable links when published.</p>
           </div>
 
           {/* Tags */}
@@ -245,6 +248,7 @@ export default function ArticleEditPage() {
               onChange={(e) => setTagsInput(e.target.value)}
               className="field py-2.5"
             />
+            <p className="text-[11px] leading-5 text-slate-500">Tags become topics in the library. Add the primary topic first, then any secondary topics.</p>
           </div>
         </div>
 

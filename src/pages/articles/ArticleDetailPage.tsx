@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useParams, Link, useNavigate } from 'react-router-dom'
@@ -13,6 +13,7 @@ import {
   ThumbsDown, 
   MessageSquare,
   History
+  ,Bell
 } from 'lucide-react'
 import { 
   getArticle, 
@@ -29,13 +30,56 @@ import {
   isBookmarked,
   getHistory,
   restoreArticleVersion
+  ,getFollowStatus, followArticle, unfollowArticle
 } from '../../api/articles'
 import { downloadArticleSource } from '../../api/articles'
+import { getArticles } from '../../api/articles'
 import PdfViewer from '../../components/ai/PdfViewer'
 import { useAuth } from '../../auth/useAuth'
 import { usePermission } from '../../hooks/usePermission'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
+import { canEditArticleForUser } from '../../utils/articlePermissions'
+
+function normalizeWikiTarget(value: string) {
+  return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+}
+
+async function resolveWikiLinks(markdown: string, currentArticle: any, related: any[]) {
+  const matches = [...markdown.matchAll(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g)]
+  const targets = [...new Set(matches.map(match => normalizeWikiTarget(match[1])))]
+  if (!targets.length) return markdown
+
+  const known = new Map<string, any>()
+  ;[currentArticle, ...related].forEach(item => {
+    if (item?.title) known.set(normalizeWikiTarget(item.title), item)
+  })
+
+  await Promise.all(targets.filter(target => !known.has(target)).map(async target => {
+    try {
+      const candidates = await getArticles({ q: target, status: 'published', limit: 10 })
+      const exact = candidates.find((candidate: any) => normalizeWikiTarget(candidate.title) === target)
+      if (exact) known.set(target, exact)
+    } catch (error) {
+      // An unresolved wiki link should never make the document unreadable.
+      console.warn('Could not resolve wiki link', target, error)
+    }
+  }))
+
+  return markdown.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (raw, rawTarget, rawLabel) => {
+    const target = normalizeWikiTarget(rawTarget)
+    const article = known.get(target)
+    if (!article) return rawLabel || rawTarget
+    const label = String(rawLabel || article.title).replace(/[\[\]]/g, '')
+    return `[${label}](/articles/${article.id})`
+  })
+}
+
+function MarkdownLink({ href, children, ...props }: React.ComponentProps<'a'>) {
+  if (href?.startsWith('/articles/')) return <Link to={href} {...props}>{children}</Link>
+  if (href?.startsWith('article:')) return <Link to={`/articles/${href.slice('article:'.length)}`} {...props}>{children}</Link>
+  return <a href={href} target={href?.startsWith('#') ? undefined : '_blank'} rel={href?.startsWith('#') ? undefined : 'noreferrer'} {...props}>{children}</a>
+}
 
 export default function ArticleDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -46,29 +90,35 @@ export default function ArticleDetailPage() {
   const { t } = useLanguage()
 
   const [article, setArticle] = useState<any>(null)
+  const [renderedBody, setRenderedBody] = useState('')
   const [relatedArticles, setRelatedArticles] = useState<any[]>([])
   const [comments, setComments] = useState<any[]>([])
   const [newComment, setNewComment] = useState('')
   const [votes, setVotes] = useState({ upvotes: 0, downvotes: 0 })
   const [userVote, setUserVote] = useState(0)
   const [bookmarked, setBookmarked] = useState(false)
+  const [following, setFollowing] = useState(false)
   const [history, setHistory] = useState<any[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [sourceViewer, setSourceViewer] = useState<{ url: string; name: string } | null>(null)
   const [sourceLoading, setSourceLoading] = useState(false)
-  
+  const sourceUrlRef = useRef<string | null>(null)
+
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [submittingComment, setSubmittingComment] = useState(false)
 
   const loadArticleDetails = async () => {
     if (!id) return
     setLoading(true)
+    setLoadError(false)
     try {
       const art = await getArticle(id)
       setArticle(art)
+      setRenderedBody(art.body_md)
       const related = await getRelatedArticles(id).catch(() => [])
       setRelatedArticles(related)
-      
+
       const comm = await getComments(id)
       setComments(comm)
 
@@ -80,11 +130,14 @@ export default function ArticleDetailPage() {
 
       const book = await isBookmarked(currentUser.id, id).catch(() => false)
       setBookmarked(book)
+      const follow = await getFollowStatus(id).catch(() => ({ following: false }))
+      setFollowing(Boolean(follow.following))
 
       const hist = await getHistory(id)
       setHistory(hist)
     } catch (err) {
       console.error(err)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -93,6 +146,22 @@ export default function ArticleDetailPage() {
   useEffect(() => {
     loadArticleDetails()
   }, [id])
+
+  useEffect(() => {
+    if (!article?.body_md) return
+    let active = true
+    void resolveWikiLinks(article.body_md, article, relatedArticles).then(body => {
+      if (active) setRenderedBody(body)
+    })
+    return () => { active = false }
+  }, [article?.body_md, article?.id, relatedArticles])
+
+  // Release the active source blob URL when leaving the page.
+  useEffect(() => {
+    return () => {
+      if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current)
+    }
+  }, [])
 
   const handleDelete = async () => {
     if (!id) return
@@ -112,6 +181,7 @@ export default function ArticleDetailPage() {
     setSourceLoading(true)
     try {
       const url = await downloadArticleSource(id)
+      sourceUrlRef.current = url
       setSourceViewer({ url, name: article?.title || 'Original source' })
     } catch {
       await dialog.alert('The original source is not available for this article.', { title: 'Source unavailable', tone: 'info' })
@@ -164,6 +234,15 @@ export default function ArticleDetailPage() {
     }
   }
 
+  const handleFollowToggle = async () => {
+    if (!id) return
+    try {
+      if (following) await unfollowArticle(id)
+      else await followArticle(id)
+      setFollowing(!following)
+    } catch (err) { console.error(err) }
+  }
+
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!id || !newComment.trim()) return
@@ -198,6 +277,16 @@ export default function ArticleDetailPage() {
   }
 
   if (!article) {
+    if (loadError) {
+      return (
+        <div className="page-shell page-stack">
+          <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <span>Failed to load. Please retry.</span>
+            <button type="button" onClick={() => void loadArticleDetails()} className="text-xs font-bold uppercase tracking-wide hover:underline">Retry</button>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="text-center p-12">
         <h3 className="text-xl font-bold text-rose-500">Article not found</h3>
@@ -207,7 +296,8 @@ export default function ArticleDetailPage() {
     )
   }
 
-  const canEdit = Boolean(currentUser && (has('article.edit') || (currentUser.id === article.owner_id && has('article.edit'))))
+  const canEdit = canEditArticleForUser(currentUser, article)
+  const requestEditPrompt = `I need help identifying who is allowed to change the knowledge-base article "${article.title}" (article ID: ${article.id}). I cannot change it directly. Please explain which role or person owns this responsibility and help me prepare a clear request for them.`
 
   return (
     <div className="page-shell page-stack">
@@ -229,6 +319,9 @@ export default function ArticleDetailPage() {
             title={bookmarked ? "Bookmarked" : "Bookmark article"}
           >
             <Bookmark size={18} fill={bookmarked ? "currentColor" : "none"} />
+          </button>
+          <button type="button" onClick={() => void handleFollowToggle()} className={`rounded-xl border p-2 transition-all ${following ? 'border-info/30 bg-info/10 text-info' : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'}`} title={following ? 'Unfollow article' : 'Follow article'}>
+            <Bell size={18} fill={following ? 'currentColor' : 'none'} />
           </button>
           
           <button
@@ -260,6 +353,11 @@ export default function ArticleDetailPage() {
                 <Trash2 size={18} />
               </button>
             </>
+          )}
+          {!canEdit && has('ai.ask') && (
+            <Link to={`/ai?articleId=${encodeURIComponent(article.id)}&articleTitle=${encodeURIComponent(article.title)}&prompt=${encodeURIComponent(requestEditPrompt)}`} className="inline-flex items-center gap-1.5 rounded-xl border border-info/30 bg-info/10 px-3 py-2 text-xs font-semibold text-info transition hover:bg-info/15" title="Ask who can update this article">
+              <MessageSquare size={16} /> <span className="hidden sm:inline">Request edit</span>
+            </Link>
           )}
           {article.source_available && (
             <button
@@ -298,12 +396,14 @@ export default function ArticleDetailPage() {
                 <span className="bg-slate-800/60 text-slate-400 px-2 py-0.5 rounded uppercase font-semibold">
                   v{article.version}
                 </span>
+                {article.self_approved && <span className="rounded-full bg-warning/10 px-2 py-0.5 font-semibold text-warning">Self-approved</span>}
+                {article.source_changed && <span className="rounded-full bg-rose-500/10 px-2 py-0.5 font-semibold text-rose-400">Source changed</span>}
               </div>
             </div>
 
             {/* Render Markdown text (simple fallback renderer for preview logic) */}
             <div className="markdown-surface max-w-none border-t border-border pt-xl">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.body_md}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: MarkdownLink }}>{renderedBody || article.body_md}</ReactMarkdown>
             </div>
 
             {/* Voting Bar */}
@@ -425,6 +525,11 @@ export default function ArticleDetailPage() {
                   Review overdue — content needs update
                 </div>
               )}
+              {article.self_approved && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-300">
+                  Self-approved by Admin/CEO
+                </div>
+              )}
               {article.status === 'published' && article.index_status && article.index_status !== 'ready' && (
                 <div className={`rounded-lg border px-3 py-2 text-xs font-semibold ${article.index_status === 'failed' ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>
                   Search index: {article.index_status === 'processing' ? 'processing in background…' : article.index_status}
@@ -492,7 +597,8 @@ export default function ArticleDetailPage() {
           fileName={sourceViewer.name}
           url={sourceViewer.url}
           onClose={() => {
-            URL.revokeObjectURL(sourceViewer.url)
+            if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current)
+            sourceUrlRef.current = null
             setSourceViewer(null)
           }}
         />

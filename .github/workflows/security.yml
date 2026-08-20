@@ -52,20 +52,11 @@ jobs:
       scan_container: false
       node_version: '20'
 
-      # NON-BLOCKING, deliberately and temporarily. The scan still runs and its findings
-      # are still reported — this only stops them failing the build.
-      #
-      # The backlog it is standing on cannot be cleared by a dependency bump:
-      #
-      #   react-router / react-router-dom  6.30.4 → 7.18.2   PRODUCTION, major migration
-      #   vite / @vitejs/plugin-react      5.4.21 → 8.2.1    dev, major build tooling
-      #   brace-expansion (transitive)     1.1.16 → 5.0.8    dev, major
-      #   js-yaml, esbuild, nanoid                            dev, patch-level
-      #
-      # Only the react-router pair is a runtime exposure (GHSA-337j-9hxr-rhxg,
-      # GHSA-wrjc-x8rr-h8h6, GHSA-jjmj-jmhj-qwj2); everything else is build-time only.
-      #
-      # Flipping this back to true is the definition of done for that upgrade. Leaving it
-      # false past then means the next real CVE lands silently — which is exactly the
-      # failure this gate exists to prevent.
-      osv_blocking: false
+      # BLOCKING again as of 2026-08-16: the react-router-dom 6.30.4 runtime
+      # advisories (GHSA-337j-9hxr-rhxg, GHSA-wrjc-x8rr-h8h6,
+      # GHSA-jjmj-jmhj-qwj2) were cleared by the 7.18.2 migration, and the
+      # dev-tooling backlog (vite 8, vitest 4, brace-expansion, js-yaml,
+      # esbuild, nanoid) was upgraded until `npm audit` reported zero
+      # findings. Keep this true: a new CVE must fail the build, not land
+      # silently.
+      osv_blocking: true
