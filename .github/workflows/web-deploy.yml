@@ -84,6 +84,8 @@ jobs:
 
   deploy:
     needs: [wait-for-ci]
+    permissions:
+      contents: read
     # v1.7.1 or later is REQUIRED here: v1.7.0 exported only VITE_API_URL, which rally
     # builds empty on purpose. This SPA calls its API cross-origin and needs the absolute
     # origin at build time — without it the bundle falls back to a relative /api/v1,
