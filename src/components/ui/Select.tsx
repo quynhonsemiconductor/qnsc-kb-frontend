@@ -35,7 +35,9 @@ export function Select({ children, value, defaultValue, onChange, disabled = fal
   const root = useRef<HTMLDivElement>(null)
   const listbox = useRef<HTMLDivElement>(null)
   const typeAhead = useRef('')
-  const resetTypeAhead = useRef<number>()
+  // Explicit `undefined` rather than a bare call: React 19 dropped the zero-argument
+  // useRef overload, so the initial value has to be stated and the type has to admit it.
+  const resetTypeAhead = useRef<number | undefined>(undefined)
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 240 })
 
   useEffect(() => setActiveIndex(selectedIndex), [selectedIndex])

@@ -56,7 +56,10 @@ export default function AnswerText({ content, citations = [], onCitationClick }:
       if (last < child.length) nodes.push(child.slice(last))
       return nodes.length <= 1 ? (nodes[0] ?? child) : nodes
     }
-    if (React.isValidElement(child) && child.props.children) {
+    // The props shape is stated on isValidElement because React 19 types a bare
+    // ReactElement's props as `unknown`, which makes both the guard below and the
+    // cloneElement call untypable without it.
+    if (React.isValidElement<{ children?: React.ReactNode }>(child) && child.props.children) {
       return React.cloneElement(child, { children: processCitations(child.props.children) })
     }
     return child
