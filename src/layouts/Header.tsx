@@ -46,19 +46,23 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
     else if (item.payload.draft_id && has('governance.read')) navigate('/governance/pending-drafts')
   }
 
+  // min-h in rem, not px: the contents (h-8 controls, py-2) are rem-based and grow with
+  // the workspace scale, so a frozen 56px box stopped matching them and the controls
+  // pressed into each other. flex-wrap is the guarantee — a row of non-shrinking controls
+  // that cannot wrap has nowhere to go but on top of itself.
   return (
-    <header className="ops-header relative z-10 flex min-h-[56px] items-center justify-between gap-3 border-b border-border px-3 py-2 backdrop-blur-xl md:min-h-[60px] md:px-5">
+    <header className="ops-header relative z-10 flex min-h-[3.5rem] flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border px-3 py-2 backdrop-blur-xl md:min-h-[3.75rem] md:px-5">
       <button type="button" onClick={onMenuClick} aria-label="Open navigation" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-border bg-surface text-steel transition hover:bg-surface-soft hover:text-ink md:hidden"><Menu size={16} /></button>
-      <div className="hidden min-w-[150px] lg:block"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-stone">QNSC / Workspace</p></div>
+      <div className="hidden min-w-[9.375rem] lg:block"><p className="text-caption font-bold uppercase tracking-[.16em] text-stone">QNSC / Workspace</p></div>
       <div className="ml-auto flex items-center gap-1.5 md:gap-2">
         {has('article.create') && <button type="button" onClick={() => navigate('/articles/new')} className="hidden items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground shadow-[0_5px_12px_rgb(var(--primary)/.18)] transition hover:bg-primary/90 sm:inline-flex"><Plus size={13} /> New article</button>}
         <div className="relative">
           <Tooltip content="Notifications"><button ref={notificationAnchor} type="button" onClick={() => setNotificationsOpen((open) => !open)} aria-label="Notifications" aria-expanded={notificationsOpen} className="relative grid h-8 w-8 place-items-center rounded-lg border border-border bg-surface text-steel transition hover:bg-surface-soft hover:text-ink">
             <Bell size={15} />
-            {unreadCount > 0 && <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[9px] font-bold text-primary-foreground ring-2 ring-surface">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+            {unreadCount > 0 && <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-caption font-bold text-primary-foreground ring-2 ring-surface">{unreadCount > 9 ? '9+' : unreadCount}</span>}
           </button></Tooltip>
-          <FloatingPanel anchorRef={notificationAnchor} open={notificationsOpen} onClose={() => setNotificationsOpen(false)} width={320} className="rounded-2xl p-0">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3"><span className="text-sm font-bold text-ink">Notifications</span>{unreadCount > 0 && <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold text-primary">{unreadCount} unread</span>}</div>
+          <FloatingPanel anchorRef={notificationAnchor} open={notificationsOpen} onClose={() => setNotificationsOpen(false)} widthRem={20} className="rounded-2xl p-0">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3"><span className="text-sm font-bold text-ink">Notifications</span>{unreadCount > 0 && <span className="rounded-full bg-primary/10 px-2 py-1 text-caption font-bold text-primary">{unreadCount} unread</span>}</div>
             <div className="max-h-80 overflow-y-auto">
               {notifications.length === 0 ? <p className="px-3 py-6 text-center text-sm text-stone">You’re all caught up.</p> : notifications.map((item) => <button type="button" key={item.id} onClick={() => void openNotification(item)} className={`block w-full border-b border-border px-3 py-3 text-left transition hover:bg-surface-soft ${item.read_at ? 'text-stone' : 'bg-primary/5 text-ink'}`}>
                 <span className="block text-sm font-semibold">{item.payload.event === 'article_edit_request' ? `Edit requested: ${item.payload.article_title || 'article'}` : item.payload.event === 'draft_assigned' ? 'Draft assigned for review' : item.payload.event === 'draft_rejected' ? 'Draft needs changes' : 'Draft approved'}</span>
@@ -68,20 +72,20 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
             </div>
           </FloatingPanel>
         </div>
-        <label className="flex h-8 items-center gap-1 rounded-lg border border-border bg-surface px-2 text-[11px] font-semibold text-steel">
+        <label className="flex h-8 items-center gap-1 rounded-lg border border-border bg-surface px-2 text-body-sm font-semibold text-steel">
           <Globe size={12} />
           <Select
             value={language}
             onChange={(event) => setLanguage(event.target.value as 'en' | 'vi')}
             aria-label={t('language.switch')}
-            className="cursor-pointer border-0 bg-transparent p-0 text-[11px] font-semibold text-ink outline-none"
+            className="cursor-pointer border-0 bg-transparent p-0 text-body-sm font-semibold text-ink outline-none"
           >
             <option value="en">EN</option>
             <option value="vi">VI</option>
           </Select>
         </label>
-        <label className="hidden h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-2 text-[11px] font-semibold text-steel md:flex"><Monitor size={12} /><Select value={theme} onChange={(event) => setTheme(event.target.value as ThemePreference)} aria-label="Appearance" className="theme-select text-[11px]"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></Select></label>
-        <div className="hidden items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-[.12em] text-stone lg:flex"><Command size={11} /> Ops console</div>
+        <label className="hidden h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-2 text-body-sm font-semibold text-steel md:flex"><Monitor size={12} /><Select value={theme} onChange={(event) => setTheme(event.target.value as ThemePreference)} aria-label="Appearance" className="theme-select text-body-sm"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></Select></label>
+        <div className="hidden items-center gap-1.5 px-1 text-caption font-semibold uppercase tracking-[.12em] text-stone lg:flex"><Command size={11} /> Ops console</div>
       </div>
     </header>
   )

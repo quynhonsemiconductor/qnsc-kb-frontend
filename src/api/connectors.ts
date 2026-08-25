@@ -15,6 +15,7 @@ export async function listConnectors() { return (await client.get('/connectors')
 export async function createConnector(data: { name: string; system: string; path?: string; config?: Record<string, unknown> }) { return (await client.post('/connectors', data)).data }
 export async function syncConnector(id: string) { return (await client.post(`/connectors/${id}/sync`)).data }
 export async function listConnectorJobs(id: string, limit = 10) { return (await client.get(`/connectors/${id}/jobs`, { params: { limit } })).data }
+export async function getConnectorHealth(id: string) { return (await client.get(`/connectors/${id}/health`)).data }
 export async function getConnectorSourceTree(id: string) { return (await client.get(`/connectors/${id}/source-tree`)).data }
 export async function getConnectorReadme(id: string) { return (await client.get(`/connectors/${id}/readme`)).data }
 export async function updateConnector(id: string, data: { sync_mode?: string; department_ids?: string[] }) { return (await client.patch(`/connectors/${id}`, data)).data }

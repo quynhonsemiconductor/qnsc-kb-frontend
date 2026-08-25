@@ -28,7 +28,7 @@ function DocumentCard({ article, canEdit, canAsk }: { article: ArticleCard; canE
   const requestPrompt = `I need help identifying who is allowed to change the knowledge-base article "${article.title}" (article ID: ${article.id}). I cannot change it directly. Please explain which role or person owns this responsibility and help me prepare a clear request for them.`
   return <article className="glass-panel interactive-lift group rounded-2xl border border-border p-5">
     <div className="flex items-start justify-between gap-3">
-      <div className="flex min-w-0 flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[.1em] text-primary">
+      <div className="flex min-w-0 flex-wrap gap-2 text-caption font-bold uppercase tracking-[.1em] text-primary">
         {topicsFor(article).slice(0, 3).map(topic => <span key={topic} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1"><Hash size={10} />{topic}</span>)}
       </div>
       <ArrowUpRight size={16} className="shrink-0 text-muted transition group-hover:text-primary" />
@@ -44,7 +44,7 @@ function DocumentCard({ article, canEdit, canAsk }: { article: ArticleCard; canE
 
 function CatalogLevel({ catalog, basePath, dept, topic, query }: { catalog: KnowledgeCatalogResponse; basePath: string; dept?: string; topic?: string; query?: string }) {
   if (!dept) return <section className="space-y-4">
-    <div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">Level 1</p><h2 className="mt-1 font-display text-xl font-bold text-foreground">Choose a department</h2></div>
+    <div><p className="text-caption font-bold uppercase tracking-[.18em] text-primary">Level 1</p><h2 className="mt-1 font-display text-xl font-bold text-foreground">Choose a department</h2></div>
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {catalog.departments.map(group => <Link key={group.name} to={browsePath(basePath, group.name, undefined, query)} className="glass-panel interactive-lift group rounded-2xl border border-border p-5">
         <div className="flex items-start justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-info/10 text-info"><FolderTree size={18} /></span><ArrowUpRight size={16} className="text-muted group-hover:text-primary" /></div>
@@ -55,7 +55,7 @@ function CatalogLevel({ catalog, basePath, dept, topic, query }: { catalog: Know
 
   if (topic) return null
   return <section className="space-y-4">
-    <div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">Level 2</p><h2 className="mt-1 font-display text-xl font-bold text-foreground">Choose a topic</h2></div>
+    <div><p className="text-caption font-bold uppercase tracking-[.18em] text-primary">Level 2</p><h2 className="mt-1 font-display text-xl font-bold text-foreground">Choose a topic</h2></div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {catalog.topics.map(group => <Link key={group.name} to={browsePath(basePath, dept, group.name, query)} className="interactive-lift flex items-center gap-3 rounded-xl border border-border bg-surface-elevated p-4 transition hover:border-primary/40">
         <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary"><Hash size={16} /></span><span className="min-w-0 flex-1"><span className="block truncate font-semibold text-foreground">{group.name}</span><span className="mt-0.5 block text-xs text-muted-foreground">{group.count} document{group.count === 1 ? '' : 's'}</span></span><ChevronRight size={15} className="text-muted" />
@@ -138,7 +138,7 @@ export default function BrowsePage() {
     {!query && <CatalogLevel catalog={catalog} basePath={basePath} dept={dept} topic={topic} query={query} />}
 
     {(dept || topic || query) && <section className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">{topic ? 'Level 3' : query ? 'Search index' : 'Document index'}</p><h2 className="mt-1 font-display text-xl font-bold text-foreground">{query ? `Matching documents` : topic ? `Documents in ${topic}` : dept ? 'Documents in this department' : 'Recently available documents'}</h2></div><span className="text-xs text-muted-foreground">Server-side pagination · {pageRange}</span></div>
+      <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-caption font-bold uppercase tracking-[.18em] text-primary">{topic ? 'Level 3' : query ? 'Search index' : 'Document index'}</p><h2 className="mt-1 font-display text-xl font-bold text-foreground">{query ? `Matching documents` : topic ? `Documents in ${topic}` : dept ? 'Documents in this department' : 'Recently available documents'}</h2></div><span className="text-xs text-muted-foreground">Server-side pagination · {pageRange}</span></div>
       {data.articles.length ? <div className="grid gap-3 md:grid-cols-2">{data.articles.map(article => <DocumentCard key={article.id} article={article} canEdit={canEditArticleForUser(user, article)} canAsk={Boolean(user?.permissions?.includes('ai.ask'))} />)}</div> : <div className="rounded-2xl border border-dashed border-border bg-surface/60 px-5 py-12 text-center text-sm text-muted-foreground">No documents match this part of the library.</div>}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><button type="button" disabled={data.offset <= 0} onClick={() => updateParams({ offset: String(Math.max(0, data.offset - PAGE_SIZE)) })} className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold text-foreground transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-40"><ArrowLeft size={14} /> Previous</button><span className="text-xs text-muted-foreground">Showing {pageRange}</span><button type="button" disabled={data.offset + data.articles.length >= data.total} onClick={() => updateParams({ offset: String(data.offset + PAGE_SIZE) })} className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold text-foreground transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-40">Next <ArrowRight size={14} /></button></div>
     </section>}

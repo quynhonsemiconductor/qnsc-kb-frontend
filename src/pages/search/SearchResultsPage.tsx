@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search as SearchIcon, Filter, Layers, Shield, FileText, ArrowRight, X, Sparkles } from 'lucide-react'
 import { search } from '../../api/search'
@@ -32,7 +32,12 @@ export default function SearchResultsPage() {
     void listDepartments().then(setDepartments).catch((err) => console.error('Failed to load departments', err))
   }, [])
 
-  const visibleDepartments = departments.filter(item => item.active && item.company_domain === user?.company_domain)
+  // Memoised so the reset effect below depends on a stable reference instead of
+  // re-running on every render.
+  const visibleDepartments = useMemo(
+    () => departments.filter(item => item.active && item.company_domain === user?.company_domain),
+    [departments, user?.company_domain],
+  )
 
   useEffect(() => {
     if (dept && !visibleDepartments.some(item => item.name === dept)) setDept('')
@@ -97,7 +102,7 @@ export default function SearchResultsPage() {
         </div>
 
         {/* Filters Row */}
-        <div className="flex flex-wrap items-end justify-between gap-4 pt-3 border-t border-slate-800/60">
+        <div className="flex flex-wrap items-end justify-between gap-4 pt-3 border-t border-border/60">
           <div className="grid w-full gap-3 text-xs sm:grid-cols-2 lg:grid-cols-5">
             <span className="flex items-center gap-1 font-semibold uppercase tracking-wider text-muted">
               <Filter size={12} />
@@ -166,7 +171,7 @@ export default function SearchResultsPage() {
       ) : searched && results.length === 0 ? (
           <div className="glass-panel rounded-2xl border border-dashed border-border bg-surface/30 p-12 text-center">
           <Layers className="mx-auto mb-3 text-muted" size={40} />
-          <h3 className="text-md font-semibold text-foreground">{t('search.noMatches')}</h3>
+          <h3 className="text-base font-semibold text-foreground">{t('search.noMatches')}</h3>
           <p className="mt-1 text-xs text-muted-foreground">No authorized document matched this query.</p>
           <button type="button" disabled={requested} onClick={() => void requestContent(query, dept || undefined).then(() => setRequested(true)).catch(() => undefined)} className="mm-primary mt-5 px-4 py-2 text-xs font-semibold disabled:opacity-60">{requested ? t('search.contentRequested') : t('search.requestContent')}</button>
         </div>
@@ -188,16 +193,16 @@ export default function SearchResultsPage() {
             >
               <div className="space-y-2.5 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary-foreground">
+                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-caption font-semibold uppercase tracking-wider text-secondary-foreground">
                     {res.dept}
                   </span>
                   {res.section_ref && (
-                    <span className="rounded-full border border-primary/10 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
+                    <span className="rounded-full border border-primary/10 bg-primary/10 px-2 py-0.5 text-caption font-semibold uppercase text-primary">
                       {res.section_ref}
                     </span>
                   )}
                   {/* Score helper */}
-                  <span className="ml-auto text-[10px] font-semibold text-muted">
+                  <span className="ml-auto text-caption font-semibold text-muted">
                     {t('search.matchStrength')}: {(Number(res.score || 0) * 100).toFixed(0)}%
                   </span>
                 </div>

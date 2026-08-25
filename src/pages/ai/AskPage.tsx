@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertCircle, ArrowUp, BookOpen, Bot, Check, ChevronDown, ChevronLeft, ChevronRight,
@@ -71,43 +73,103 @@ const PROMPT_CARDS = [
   { label: 'Learn', text: 'Explain what RAG means in QNSC.', tone: 'text-warning bg-warning/10 border-warning/20' },
 ]
 
-function HighlightedSourceText({ text, highlights, highlight }: { text: string; highlights?: string[]; highlight?: string }) {
-  const sourceText = text || 'Open the article to inspect the full source.'
-  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const highlightValues = (highlights?.length ? highlights : [highlight || '']).map((value) => value.trim()).filter(Boolean)
-  const ranges: Array<{ start: number; end: number }> = []
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-  for (const value of highlightValues) {
-    const tokens = value.split(/\s+/).filter(Boolean).slice(0, 48)
-    if (!tokens.length) continue
-    const pattern = new RegExp(tokens.map(escapeRegExp).join('\\s+'), 'gi')
+/**
+ * One pattern per highlighted passage, matched against what the READER sees.
+ *
+ * The stored chunk is Markdown, so `**Synthesis** flow` reaches the screen as
+ * `Synthesis flow`: matching the raw text would find nothing precisely where the source
+ * is best formatted. Emphasis characters are dropped from the needle, and words are
+ * joined by `\s+` so a phrase still matches across the line wrapping of the original.
+ */
+function buildHighlightPatterns(values: string[]): RegExp[] {
+  return values
+    .map((value) => value.replace(/[*_`~]+/g, ' ').split(/\s+/).filter(Boolean).slice(0, 48))
+    .filter((tokens) => tokens.length > 0)
+    .map((tokens) => new RegExp(tokens.map(escapeRegExp).join('\\s+'), 'gi'))
+}
+
+function markMatches(value: string, patterns: RegExp[]): React.ReactNode {
+  const ranges: Array<{ start: number; end: number }> = []
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0
     let match: RegExpExecArray | null
-    while ((match = pattern.exec(sourceText)) !== null) {
-      ranges.push({ start: match.index, end: match.index + match[0].length })
-      if (!match[0].length) pattern.lastIndex += 1
+    while ((match = pattern.exec(value)) !== null) {
+      if (match[0].length) ranges.push({ start: match.index, end: match.index + match[0].length })
+      else pattern.lastIndex += 1
     }
   }
+  if (!ranges.length) return value
 
-  if (!ranges.length) return <>{sourceText}</>
   ranges.sort((left, right) => left.start - right.start)
-  const mergedRanges = ranges.reduce<Array<{ start: number; end: number }>>((merged, range) => {
-    const previous = merged[merged.length - 1]
+  const merged = ranges.reduce<Array<{ start: number; end: number }>>((accumulator, range) => {
+    const previous = accumulator[accumulator.length - 1]
     if (previous && range.start <= previous.end) previous.end = Math.max(previous.end, range.end)
-    else merged.push({ ...range })
-    return merged
+    else accumulator.push({ ...range })
+    return accumulator
   }, [])
 
+  const nodes: React.ReactNode[] = []
+  let cursor = 0
+  for (const range of merged) {
+    if (range.start > cursor) nodes.push(value.slice(cursor, range.start))
+    // A highlight must stay readable: normal ink on a warning wash, never
+    // warning-on-warning. The old amber-100 text assumed a dark surface.
+    nodes.push(
+      <mark key={`${range.start}-${range.end}`} className="rounded bg-warning/25 px-0.5 text-foreground ring-1 ring-warning/30">
+        {value.slice(range.start, range.end)}
+      </mark>,
+    )
+    cursor = range.end
+  }
+  if (cursor < value.length) nodes.push(value.slice(cursor))
+  return nodes
+}
+
+/**
+ * The cited passage, rendered as the Markdown it was written in.
+ *
+ * Articles are stored as Markdown and chunked as Markdown, so an excerpt arrives full of
+ * `###`, `-` and `**`. Printed verbatim it read as a wall of punctuation — the passage a
+ * reader opens the panel to verify was the least legible text on the screen. Highlighting
+ * happens after rendering, on the text nodes, so the marks land on words rather than on
+ * the syntax around them.
+ */
+function HighlightedSourceText({ text, highlights, highlight }: { text: string; highlights?: string[]; highlight?: string }) {
+  const sourceText = (text || '').trim() || 'Open the article to inspect the full source.'
+  const patterns = useMemo(
+    () => buildHighlightPatterns((highlights?.length ? highlights : [highlight || '']).map((value) => value.trim()).filter(Boolean)),
+    [highlights, highlight],
+  )
+
+  const decorate = (children: React.ReactNode): React.ReactNode => React.Children.map(children, (child) => {
+    if (typeof child === 'string') return patterns.length ? markMatches(child, patterns) : child
+    if (React.isValidElement(child) && (child.props as any)?.children) {
+      return React.cloneElement(child as React.ReactElement<any>, { children: decorate((child.props as any).children) })
+    }
+    return child
+  })
+
+  // Code stays verbatim: a highlight inside a fenced block would fight the syntax
+  // colouring and mark characters the reader is trying to read exactly.
+  const withHighlight = (tag: React.ElementType) => ({ children, ...props }: any) =>
+    React.createElement(tag, props, decorate(children))
+
   return (
-    <>
-      {mergedRanges.map((range, index) => (
-        <React.Fragment key={`${range.start}-${range.end}`}>
-          {index === 0 && sourceText.slice(0, range.start)}
-          {index > 0 && sourceText.slice(mergedRanges[index - 1].end, range.start)}
-          <mark className="rounded bg-amber-300/25 px-0.5 text-amber-100 ring-1 ring-amber-300/30">{sourceText.slice(range.start, range.end)}</mark>
-          {index === mergedRanges.length - 1 && sourceText.slice(range.end)}
-        </React.Fragment>
-      ))}
-    </>
+    <div className="markdown-surface markdown-excerpt max-w-none">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: withHighlight('p'), li: withHighlight('li'), td: withHighlight('td'), th: withHighlight('th'),
+          strong: withHighlight('strong'), em: withHighlight('em'), blockquote: withHighlight('blockquote'),
+          h1: withHighlight('h1'), h2: withHighlight('h2'), h3: withHighlight('h3'),
+          h4: withHighlight('h4'), h5: withHighlight('h5'), h6: withHighlight('h6'),
+        }}
+      >
+        {sourceText}
+      </ReactMarkdown>
+    </div>
   )
 }
 
@@ -141,11 +203,6 @@ const MOTION_STYLES = `
 .ask-avatar-live { animation: askPulseRing 1.7s ease-in-out infinite; }
 .ask-press { transition: transform 120ms ease, background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease; }
 .ask-press:active { transform: scale(0.96); }
-.ask-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.14) transparent; }
-.ask-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-.ask-scroll::-webkit-scrollbar-track { background: transparent; }
-.ask-scroll::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.14); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
-.ask-scroll::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.24); background-clip: content-box; }
 @media (prefers-reduced-motion: reduce) {
   .ask-fade-up, .ask-fade-in, .ask-slide-in, .ask-avatar-live { animation: none !important; }
   .ask-press:active { transform: none; }
@@ -168,7 +225,7 @@ export default function AskPage() {
   const [lastRequestText, setLastRequestText] = useState('')
   const [pendingEditConfirmation, setPendingEditConfirmation] = useState<PendingEditConfirmation | null>(null)
   const [selectedSource, setSelectedSource] = useState<Citation | null>(null)
-  const [viewerSource, setViewerSource] = useState<{ citation: Citation; url: string } | null>(null)
+  const [viewerSource, setViewerSource] = useState<{ citation: Citation; url: string; type: string } | null>(null)
   const [sourceUrl, setSourceUrl] = useState<string | null>(null)
   const [sourceLoading, setSourceLoading] = useState(false)
   const [sourceError, setSourceError] = useState('')
@@ -186,6 +243,7 @@ export default function AskPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sourceUrlRef = useRef<string | null>(null)
+  const sourceTypeRef = useRef<string>('')
   const abortRef = useRef<AbortController | null>(null)
   const chatDesktopRef = useRef(typeof window !== 'undefined' && window.innerWidth >= 1024)
   const dialog = useDialog()
@@ -210,12 +268,18 @@ export default function AskPage() {
     if (window.innerWidth < 1024) setSidebarOpen(false)
     try {
       const history = await getConversationMessages(id)
-      const mappedMessages: Message[] = history.map((item: any) => {
+      const mappedMessages: Message[] = history.map((item: any, index: number) => {
         const actionData = item.action_data || {}
+        // A turn the server recorded as failed is restored as a failure, with the
+        // question that produced it, so a reload offers the same retry the live
+        // stream did instead of presenting the error text as if it were an answer.
+        const previous = index > 0 ? history[index - 1] : undefined
         return {
         id: item.id,
         sender: item.role === 'user' ? ('user' as const) : ('ai' as const),
         text: item.content,
+        failed: Boolean(item.failed),
+        retryQuestion: item.failed && previous?.role === 'user' ? previous.content : undefined,
         citations: item.citations || [],
         answerGrounded: item.answer_grounded,
         answerExtended: item.answer_extended,
@@ -327,12 +391,13 @@ export default function AskPage() {
     setSourceLoading(true)
     setSourceError('')
     downloadArticleSource(selectedSource.article_id)
-      .then((url) => {
+      .then(({ url, type }) => {
         if (!active) {
           URL.revokeObjectURL(url)
           return
         }
         sourceUrlRef.current = url
+        sourceTypeRef.current = type
         setSourceUrl(url)
       })
       .catch(() => {
@@ -359,7 +424,7 @@ export default function AskPage() {
   }
 
   const openSourceViewer = (citation: Citation) => {
-    if (sourceUrlRef.current) setViewerSource({ citation, url: sourceUrlRef.current })
+    if (sourceUrlRef.current) setViewerSource({ citation, url: sourceUrlRef.current, type: sourceTypeRef.current })
   }
 
   const handleAsk = async (
@@ -483,35 +548,52 @@ export default function AskPage() {
   const handleDelete = async (id: string) => {
     const conversation = conversations.find((item) => item.id === id)
     if (!(await dialog.confirm(`Delete “${conversation?.title || 'this chat'}”? The conversation history will be removed.`, { title: 'Delete conversation', confirmLabel: 'Delete chat', tone: 'danger' }))) return
-    await deleteConversation(id)
-    const remaining = await refreshConversations()
-    if (conversationId === id) {
-      if (remaining.length > 0) await loadConversation(remaining[0].id)
-      else startNewChat()
+    try {
+      await deleteConversation(id)
+      const remaining = await refreshConversations()
+      if (conversationId === id) {
+        if (remaining.length > 0) await loadConversation(remaining[0].id)
+        else startNewChat()
+      }
+    } catch {
+      setError('Could not delete this conversation. Try again.')
     }
   }
 
   const saveRename = async (id: string) => {
     const title = editTitle.trim()
     if (title) {
-      const updated = await renameConversation(id, title)
-      setConversations((items) => items.map((item) => item.id === id ? { ...item, title: updated.title } : item))
+      try {
+        const updated = await renameConversation(id, title)
+        setConversations((items) => items.map((item) => item.id === id ? { ...item, title: updated.title } : item))
+      } catch {
+        setError('Could not rename this conversation. Try again.')
+      }
     }
     setEditingId(null)
   }
 
   const copyMessage = async (message: Message, index: number) => {
     const id = message.id || `${message.sender}-${index}`
-    await navigator.clipboard.writeText(message.text)
-    setCopiedId(id)
-    window.setTimeout(() => setCopiedId(null), 1600)
+    try {
+      // Unavailable on insecure origins and when the permission is refused.
+      await navigator.clipboard.writeText(message.text)
+      setCopiedId(id)
+      window.setTimeout(() => setCopiedId(null), 1600)
+    } catch {
+      setError('Copying is blocked by the browser. Select the text and copy it manually.')
+    }
   }
 
   const handleFeedback = async (index: number, rating: number) => {
     const message = messages[index]
     if (!message.logId || message.feedbackSubmitted) return
-    await submitAIFeedback({ ai_usage_log_id: message.logId, rating })
-    setMessages((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, feedbackSubmitted: true } : item))
+    try {
+      await submitAIFeedback({ ai_usage_log_id: message.logId, rating })
+      setMessages((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, feedbackSubmitted: true } : item))
+    } catch {
+      setError('Your feedback could not be recorded. Try again.')
+    }
   }
 
   const isEmpty = messages.length === 0
@@ -548,8 +630,8 @@ export default function AskPage() {
               </div>
               <div className="ask-scroll flex-1 space-y-1 overflow-y-auto p-2">
                 <div className="mb-2 flex items-center justify-between px-3 pt-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-stone">{t('chat.history')}</p>
-                  {conversations.length > 0 && <span className="text-[10px] tabular-nums text-stone">{conversations.length}</span>}
+                  <p className="text-caption font-semibold uppercase tracking-widest text-stone">{t('chat.history')}</p>
+                  {conversations.length > 0 && <span className="text-caption tabular-nums text-stone">{conversations.length}</span>}
                 </div>
                 {conversations.length > 0 && (
                   <label className="relative mx-2 mb-2 block">
@@ -559,7 +641,7 @@ export default function AskPage() {
                       onChange={(event) => setHistoryQuery(event.target.value)}
                       placeholder={t('chat.findChat')}
                       aria-label="Search chat history"
-                      className="w-full rounded-lg border border-hairline bg-canvas py-2 pl-8 pr-2 text-[13px] text-ink outline-none placeholder:text-stone focus:border-minimaxBlue focus:ring-2 focus:ring-minimaxBlue/20"
+                      className="w-full rounded-lg border border-hairline bg-canvas py-2 pl-8 pr-2 text-body text-ink outline-none placeholder:text-stone focus:border-minimaxBlue focus:ring-2 focus:ring-minimaxBlue/20"
                     />
                   </label>
                 )}
@@ -590,7 +672,7 @@ export default function AskPage() {
                         />
                       ) : (
                         <span
-                          className="min-w-0 flex-1 truncate text-[13px] leading-5"
+                          className="min-w-0 flex-1 truncate text-body leading-5"
                           onDoubleClick={(event) => { event.stopPropagation(); setEditingId(conversation.id); setEditTitle(conversation.title) }}
                         >
                           {conversation.title || t('chat.new')}
@@ -607,7 +689,7 @@ export default function AskPage() {
                           </button>
                           <button
                             onClick={(event) => { event.stopPropagation(); void handleDelete(conversation.id) }}
-                            className="ask-press rounded p-1 text-stone hover:bg-rose-500/15 hover:text-rose-400"
+                            className="ask-press rounded p-1 text-stone hover:bg-destructive/15 hover:text-destructive"
                             title="Delete chat"
                           >
                             <Trash2 size={13} />
@@ -621,7 +703,7 @@ export default function AskPage() {
                   <button
                     type="button"
                     onClick={() => setShowAllHistory((current) => !current)}
-                    className="mt-1 w-full rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-minimaxBlue transition hover:bg-surface hover:text-ink"
+                    className="mt-1 w-full rounded-lg px-3 py-2 text-left text-body font-semibold text-minimaxBlue transition hover:bg-surface hover:text-ink"
                   >
                     {showAllHistory ? t('chat.showLess') : t('chat.showMore', { count: visibleConversations.length - 8 })}
                   </button>
@@ -663,11 +745,11 @@ export default function AskPage() {
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden items-center gap-2 sm:flex">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-info/20 bg-info/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-info"><span className="h-1.5 w-1.5 rounded-full bg-info shadow-[0_0_8px_currentColor]" /> RAG online</span>
-                <span className="rounded-full border border-hairline bg-canvas px-2.5 py-1 text-[10px] font-semibold text-stone">{messages.length ? `${messages.length} turns` : 'New session'}</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-info/20 bg-info/10 px-2.5 py-1 text-caption font-bold uppercase tracking-[.12em] text-info"><span className="h-1.5 w-1.5 rounded-full bg-info shadow-[0_0_8px_currentColor]" /> RAG online</span>
+                <span className="rounded-full border border-hairline bg-canvas px-2.5 py-1 text-caption font-semibold text-stone">{messages.length ? `${messages.length} turns` : 'New session'}</span>
               </div>
-              <span className="hidden items-center gap-1.5 text-[11px] text-stone sm:flex">
-                <span className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${loading ? 'animate-pulse bg-amber-300' : 'bg-emerald-400'}`} />
+              <span className="hidden items-center gap-1.5 text-body-sm text-stone sm:flex">
+                <span className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${loading ? 'animate-pulse bg-warning' : 'bg-success'}`} />
                 {loading ? t('search.searching') : t('chat.ready')}
               </span>
 
@@ -682,7 +764,7 @@ export default function AskPage() {
                   <span className="ask-fade-up relative z-10 grid h-11 w-11 place-items-center rounded-xl border border-hairline bg-surface-soft text-minimaxBlue">
                     <Layers size={20} />
                   </span>
-                  <div className="ask-fade-up relative z-10 mt-5 flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1.5 text-[11px] text-stone" style={{ animationDelay: '60ms' }}>
+                  <div className="ask-fade-up relative z-10 mt-5 flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1.5 text-body-sm text-stone" style={{ animationDelay: '60ms' }}>
                     <Sparkles size={13} className="text-coral" /> Private workspace intelligence
                   </div>
                   <h2 className="ask-fade-up relative z-10 mt-4 font-display text-3xl font-extrabold tracking-tight text-ink" style={{ animationDelay: '120ms' }}>{t('chat.askKnowledge')}</h2>
@@ -694,13 +776,13 @@ export default function AskPage() {
                         style={{ animationDelay: `${220 + suggestionIndex * 60}ms` }}
                         className="ask-fade-up ask-press group flex min-h-28 flex-col items-start justify-between rounded-2xl border border-hairline bg-canvas p-4 text-left transition-all duration-200 hover:-translate-y-1 hover:border-minimaxBlue hover:bg-surface hover:text-ink hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-minimaxBlue/40"
                       >
-                        <span className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-[.14em] ${prompt.tone}`}>{prompt.label}</span>
+                        <span className={`rounded-full border px-2 py-1 text-caption font-bold uppercase tracking-[.14em] ${prompt.tone}`}>{prompt.label}</span>
                         <span className="mt-3 text-sm leading-5 text-steel transition group-hover:text-ink">{prompt.text}</span>
                         <ArrowUp size={14} className="mt-3 rotate-45 text-stone transition group-hover:text-minimaxBlue" />
                       </button>
                     ))}
                   </div>
-                  <div className="mt-7 flex flex-wrap justify-center gap-2 text-[10px] font-semibold uppercase tracking-[.12em] text-stone"><span className="rounded-full border border-hairline bg-surface px-2.5 py-1.5">Authorized sources only</span><span className="rounded-full border border-hairline bg-surface px-2.5 py-1.5">Clickable citations</span><span className="rounded-full border border-hairline bg-surface px-2.5 py-1.5">Department aware</span></div>
+                  <div className="mt-7 flex flex-wrap justify-center gap-2 text-caption font-semibold uppercase tracking-[.12em] text-stone"><span className="rounded-full border border-hairline bg-surface px-2.5 py-1.5">Authorized sources only</span><span className="rounded-full border border-hairline bg-surface px-2.5 py-1.5">Clickable citations</span><span className="rounded-full border border-hairline bg-surface px-2.5 py-1.5">Department aware</span></div>
                 </div>
               ) : (
                 <div className="flex flex-col gap-5">
@@ -710,7 +792,7 @@ export default function AskPage() {
                     if (message.sender === 'user') return (
                       <div key={messageId} className="ask-fade-up group flex justify-end">
                         <div className="flex w-full max-w-[96%] flex-col items-end gap-1">
-                          <p className="whitespace-pre-wrap rounded-2xl border border-hairline bg-surface px-4 py-2.5 text-[13px] leading-6 text-ink transition-shadow duration-200 group-hover:shadow-sm">{message.text}</p>
+                          <p className="whitespace-pre-wrap rounded-2xl border border-hairline bg-surface px-4 py-2.5 text-body leading-6 text-ink transition-shadow duration-200 group-hover:shadow-sm">{message.text}</p>
                           <button
                             onClick={() => void copyMessage(message, index)}
                             className="ask-press mr-2 p-1 text-stone opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-ink"
@@ -734,43 +816,43 @@ export default function AskPage() {
                     return (
                       <div
                         key={messageId}
-                         className={`ask-fade-up group relative w-full rounded-xl border-0 p-5 shadow-none sm:p-6 transition-colors ${isFailure ? 'bg-rose-500/5' : 'bg-transparent'}`}
+                         className={`ask-fade-up group relative w-full rounded-xl border-0 p-5 shadow-none sm:p-6 transition-colors ${isFailure ? 'bg-destructive/5' : 'bg-transparent'}`}
                       >
                         <div className="flex gap-3">
                           <div
-                            className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-shadow ${isFailure ? 'bg-rose-500/15 text-rose-300' : isNoAnswer ? 'bg-surface-soft text-stone' : 'bg-coral text-primary-foreground'} ${isStreamingThis ? 'ask-avatar-live' : ''}`}
+                            className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-shadow ${isFailure ? 'bg-destructive/15 text-destructive' : isNoAnswer ? 'bg-surface-soft text-stone' : 'bg-coral text-primary-foreground'} ${isStreamingThis ? 'ask-avatar-live' : ''}`}
                           >
                             {isFailure || isNoAnswer ? <AlertCircle size={14} /> : <Bot size={14} />}
                           </div>
                           <div className="min-w-0 flex-1">
                             {message.failed ? (
-                              <div className="rounded-xl border border-rose-400/25 bg-rose-500/10 px-3 py-2.5">
-                                <div className="flex items-start gap-2 text-[13px] leading-6 text-rose-100">
-                                  <AlertCircle size={15} className="mt-0.5 shrink-0 text-rose-300" />
+                              <div className="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2.5">
+                                <div className="flex items-start gap-2 text-body leading-6 text-destructive">
+                                  <AlertCircle size={15} className="mt-0.5 shrink-0 text-destructive" />
                                   <span>{message.text}</span>
                                 </div>
                                 <button
                                   onClick={() => void handleAsk(message.retryQuestion || '')}
-                                  className="ask-press mt-2 inline-flex items-center gap-1.5 rounded-md border border-rose-300/25 bg-rose-500/10 px-2 py-1 text-xs font-medium text-rose-100 hover:bg-rose-500/20"
+                                  className="ask-press mt-2 inline-flex items-center gap-1.5 rounded-md border border-destructive/25 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/20"
                                 >
                                   Try again <ArrowUp size={12} />
                                 </button>
                               </div>
                             ) : isNoAnswer ? (
-                              <p className="text-[13px] italic leading-6 text-stone">{message.text}</p>
+                              <p className="text-body italic leading-6 text-stone">{message.text}</p>
                             ) : (
                               message.action === 'edit_confirmation_required' ? (
-                                <div className="rounded-xl border border-amber-300/25 bg-amber-400/10 px-3 py-3 text-amber-50">
-                                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-amber-300">Article found</p>
-                                  <p className="text-sm font-bold text-amber-50">{message.articleTitle || 'Matching article'}</p>
-                                  <div className="mt-3 rounded-lg border border-amber-200/20 bg-black/10 px-3 py-2"><p className="text-[10px] font-bold uppercase tracking-widest text-amber-300">Original information</p><p className="mt-1 text-xs leading-5 text-amber-100/80">{message.originalInformation || message.articlePreview || 'The matched source passage is unavailable.'}</p></div>
-                                  <div className="mt-3"><label className="text-[10px] font-bold uppercase tracking-widest text-amber-300" htmlFor={`edit-instruction-${messageId}`}>Will update</label><textarea id={`edit-instruction-${messageId}`} value={editDraft} onChange={(event) => updatePendingEditInstruction(event.target.value)} rows={4} className="mt-1 w-full resize-y rounded-lg border border-amber-200/20 bg-black/10 px-3 py-2 text-xs leading-5 text-amber-50 outline-none placeholder:text-amber-100/50 focus:border-amber-300/50" placeholder="Describe the corrected information" /></div>
+                                <div className="rounded-xl border border-warning/25 bg-warning/10 px-3 py-3 text-warning">
+                                  <p className="mb-2 text-caption font-bold uppercase tracking-widest text-warning">Article found</p>
+                                  <p className="text-sm font-bold text-warning">{message.articleTitle || 'Matching article'}</p>
+                                  <div className="mt-3 rounded-lg border border-warning/20 bg-black/10 px-3 py-2"><p className="text-caption font-bold uppercase tracking-widest text-warning">Original information</p><p className="mt-1 text-xs leading-5 text-warning/80">{message.originalInformation || message.articlePreview || 'The matched source passage is unavailable.'}</p></div>
+                                  <div className="mt-3"><label className="text-caption font-bold uppercase tracking-widest text-warning" htmlFor={`edit-instruction-${messageId}`}>Will update</label><textarea id={`edit-instruction-${messageId}`} value={editDraft} onChange={(event) => updatePendingEditInstruction(event.target.value)} rows={4} className="mt-1 w-full resize-y rounded-lg border border-warning/20 bg-black/10 px-3 py-2 text-xs leading-5 text-warning outline-none placeholder:text-warning/50 focus:border-warning/50" placeholder="Describe the corrected information" /></div>
                                   <div className="mt-3 flex flex-wrap gap-2">
                                     <button
                                       type="button"
                                       disabled={loading || !message.articleId || !editDraft.trim()}
                                       onClick={() => void handleAsk('Yes, update this article', { confirmEdit: true, articleId: message.articleId, editInstruction: editDraft })}
-                                      className="ask-press rounded-lg bg-emerald-500 px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                      className="ask-press rounded-lg bg-success px-3 py-2 text-body-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       Yes, update this article
                                     </button>
@@ -778,16 +860,16 @@ export default function AskPage() {
                                       type="button"
                                       disabled={loading}
                                       onClick={cancelPendingEdit}
-                                      className="ask-press rounded-lg border border-amber-200/25 px-3 py-2 text-[11px] font-bold text-amber-100 hover:bg-amber-300/10 disabled:opacity-50"
+                                      className="ask-press rounded-lg border border-warning/25 px-3 py-2 text-body-sm font-bold text-warning hover:bg-warning/10 disabled:opacity-50"
                                     >
                                       No
                                     </button>
                                   </div>
                                 </div>
                               ) : message.action === 'edit_target_required' ? (
-                                <div className="rounded-xl border border-amber-300/20 bg-amber-400/10 px-3 py-3 text-amber-100"><p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-amber-300">Article not found</p><AnswerText content={message.text} citations={[]} onCitationClick={setSelectedSource} /></div>
+                                <div className="rounded-xl border border-warning/20 bg-warning/10 px-3 py-3 text-warning"><p className="mb-2 text-caption font-bold uppercase tracking-widest text-warning">Article not found</p><AnswerText content={message.text} citations={[]} onCitationClick={setSelectedSource} /></div>
                               ) : message.action ? (
-                                <div className="rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-3 text-emerald-100"><p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-emerald-300">AI action completed</p><AnswerText content={message.text} citations={[]} onCitationClick={setSelectedSource} /></div>
+                                <div className="rounded-xl border border-success/20 bg-success/10 px-3 py-3 text-success"><p className="mb-2 text-caption font-bold uppercase tracking-widest text-success">AI action completed</p><AnswerText content={message.text} citations={[]} onCitationClick={setSelectedSource} /></div>
                               ) : message.answerGrounded !== undefined ? (
                                 <AnswerSections grounded={message.answerGrounded} extended={message.answerExtended} citations={message.citations} onCitationClick={setSelectedSource} />
                               ) : (
@@ -803,7 +885,7 @@ export default function AskPage() {
                               type="button"
                               aria-expanded={expandedSources[messageId] ?? true}
                               onClick={() => setExpandedSources((items) => ({ ...items, [messageId]: !(items[messageId] ?? true) }))}
-                              className="ask-press mb-2 flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-widest text-stone hover:bg-surface hover:text-ink"
+                              className="ask-press mb-2 flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-caption font-semibold uppercase tracking-widest text-stone hover:bg-surface hover:text-ink"
                             >
                               <span>{message.citations.length} source{message.citations.length > 1 ? 's' : ''}</span>
                               <ChevronDown size={14} className={`transition-transform duration-200 ${expandedSources[messageId] ?? true ? 'rotate-0' : '-rotate-90'}`} />
@@ -817,10 +899,10 @@ export default function AskPage() {
                                     style={{ animationDelay: `${citationIndex * 40}ms` }}
                                     className="ask-fade-up flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-surface hover:shadow-sm"
                                   >
-                                    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-blue-500/20 text-[11px] font-semibold text-blue-300 transition-transform duration-150 group-hover:scale-105">{citation.source_index ?? citationIndex + 1}</span>
+                                    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-info/20 text-body-sm font-semibold text-info transition-transform duration-150 group-hover:scale-105">{citation.source_index ?? citationIndex + 1}</span>
                                     <FileText size={14} className="shrink-0 text-stone" />
-                                    <span className="truncate text-[13px] text-steel">{citation.title}</span>
-                                    <span className="ml-auto shrink-0 text-[11px] text-stone">{citation.section_ref || 'General'}</span>
+                                    <span className="truncate text-body text-steel">{citation.title}</span>
+                                    <span className="ml-auto shrink-0 text-body-sm text-stone">{citation.section_ref || 'General'}</span>
                                   </button>
                                 ))}
                               </div>
@@ -838,8 +920,8 @@ export default function AskPage() {
                           {message.logId && !message.feedbackSubmitted && (
                             <>
                               <span className="ml-2 text-xs text-stone">Helpful?</span>
-                              <button onClick={() => void handleFeedback(index, 1)} className="ask-press rounded-full p-1 text-stone hover:bg-emerald-500/10 hover:text-success"><ThumbsUp size={13} /></button>
-                              <button onClick={() => void handleFeedback(index, -1)} className="ask-press rounded-full p-1 text-stone hover:bg-rose-500/10 hover:text-rose-400"><ThumbsDown size={13} /></button>
+                              <button onClick={() => void handleFeedback(index, 1)} className="ask-press rounded-full p-1 text-stone hover:bg-success/10 hover:text-success"><ThumbsUp size={13} /></button>
+                              <button onClick={() => void handleFeedback(index, -1)} className="ask-press rounded-full p-1 text-stone hover:bg-destructive/10 hover:text-destructive"><ThumbsDown size={13} /></button>
                             </>
                           )}
                         </div>
@@ -865,16 +947,16 @@ export default function AskPage() {
           <div className="shrink-0 border-t border-hairline bg-canvas">
               <div className="mx-auto w-full max-w-none px-5 py-4 lg:px-8">
               {error && (
-                <div className="ask-fade-up mb-3 flex items-start gap-2 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2.5 text-xs text-rose-200">
+                <div className="ask-fade-up mb-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
                   <AlertCircle size={15} className="mt-0.5 shrink-0" />
                   <span className="flex-1">{error}</span>
-                  <button onClick={() => setError('')} className="ask-press underline hover:text-rose-100">Dismiss</button>
+                  <button onClick={() => setError('')} className="ask-press underline hover:text-destructive">Dismiss</button>
                 </div>
               )}
-               {requestArticleId && <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-info/20 bg-info/10 px-3 py-2.5 text-xs text-info"><span className="min-w-0 flex-1">Requesting a correction for <strong>{requestArticleTitle}</strong>. Type the exact change, then submit it to an authorized editor.</span><button type="button" onClick={() => void handleCreateEditRequest()} disabled={loading || (question.trim().length < 5 && lastRequestText.trim().length < 5)} className="rounded-lg bg-info px-3 py-2 text-[11px] font-bold text-[#07131a] disabled:cursor-not-allowed disabled:opacity-50">Create edit request</button></div>}
-               {requestStatus && <div role="status" className="mb-3 rounded-lg border border-emerald-300/20 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-200">{requestStatus}</div>}
-               <div className="mb-2 flex items-center gap-1.5 text-[11px] text-stone">
-                 <span className="inline-flex items-center gap-1.5 rounded-full border border-info/20 bg-info/10 px-2 py-1 text-[10px] font-bold text-info"><span className="h-1.5 w-1.5 rounded-full bg-info" /> Grounded mode</span><span className="hidden sm:inline">Press <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[10px] text-steel">Enter</kbd> to send · <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[10px] text-steel">Shift+Enter</kbd> for a new line</span>
+               {requestArticleId && <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-info/20 bg-info/10 px-3 py-2.5 text-xs text-info"><span className="min-w-0 flex-1">Requesting a correction for <strong>{requestArticleTitle}</strong>. Type the exact change, then submit it to an authorized editor.</span><button type="button" onClick={() => void handleCreateEditRequest()} disabled={loading || (question.trim().length < 5 && lastRequestText.trim().length < 5)} className="rounded-lg bg-info px-3 py-2 text-body-sm font-bold text-[#07131a] disabled:cursor-not-allowed disabled:opacity-50">Create edit request</button></div>}
+               {requestStatus && <div role="status" className="mb-3 rounded-lg border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">{requestStatus}</div>}
+               <div className="mb-2 flex items-center gap-1.5 text-body-sm text-stone">
+                 <span className="inline-flex items-center gap-1.5 rounded-full border border-info/20 bg-info/10 px-2 py-1 text-caption font-bold text-info"><span className="h-1.5 w-1.5 rounded-full bg-info" /> Grounded mode</span><span className="hidden sm:inline">Press <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Enter</kbd> to send · <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Shift+Enter</kbd> for a new line</span>
                 <span className="ml-auto tabular-nums">{question.length}/4000</span>
               </div>
                <div className="gradient-border flex items-end gap-2 rounded-2xl border bg-surface p-2 transition-all duration-200 focus-within:shadow-lg focus-within:ring-2 focus-within:ring-minimaxBlue/20">
@@ -887,7 +969,7 @@ export default function AskPage() {
                   disabled={loading}
                   maxLength={4000}
                   placeholder={t('chat.askPlaceholder')}
-                  className="max-h-44 min-h-[28px] flex-1 resize-none overflow-hidden bg-transparent px-2 py-1.5 text-[13px] leading-6 text-ink outline-none placeholder:text-stone"
+                  className="max-h-44 min-h-[28px] flex-1 resize-none overflow-hidden bg-transparent px-2 py-1.5 text-body leading-6 text-ink outline-none placeholder:text-stone"
                 />
                 {loading && (
                   <button
@@ -918,7 +1000,7 @@ export default function AskPage() {
             <button aria-label="Close source" onClick={() => setSelectedSource(null)} className="ask-fade-in fixed inset-0 z-40 bg-black/40 lg:hidden" />
             <aside className={`${sourceCollapsed ? 'w-12' : 'w-full max-w-sm lg:w-80'} ask-slide-in fixed inset-y-0 right-0 z-50 flex flex-col border-l border-hairline bg-surface transition-[width] duration-300 ease-out lg:static lg:shrink-0`}>
               <header className="signal-line flex h-14 shrink-0 items-center gap-2 border-b border-hairline px-3">
-                <span className={`${sourceCollapsed ? 'hidden' : 'flex'} flex-1 items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-info`}><span className="h-1.5 w-1.5 rounded-full bg-info" /> Source evidence</span>
+                <span className={`${sourceCollapsed ? 'hidden' : 'flex'} flex-1 items-center gap-2 text-caption font-bold uppercase tracking-widest text-info`}><span className="h-1.5 w-1.5 rounded-full bg-info" /> Source evidence</span>
                 <button
                   onClick={() => setSourceCollapsed((value) => !value)}
                   className="ask-press rounded-lg p-2 text-steel hover:bg-surface-soft hover:text-ink"
@@ -938,16 +1020,16 @@ export default function AskPage() {
                       <BookOpen size={16} className="mt-0.5 shrink-0 text-minimaxBlue" />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-ink">{selectedSource.title}</p>
-                        <p className="mt-0.5 text-[11px] text-stone">{selectedSource.section_ref || 'General section'}{selectedSource.page_number ? ` · Page ${selectedSource.page_number}` : ''}</p>
+                        <p className="mt-0.5 text-body-sm text-stone">{selectedSource.section_ref || 'General section'}{selectedSource.page_number ? ` · Page ${selectedSource.page_number}` : ''}</p>
                      </div></div>
                     </div>
                     <div className="mt-5">
-                       <p className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-stone"><span className="h-1.5 w-1.5 rounded-full bg-warning" /> Highlighted passage</p>
+                       <p className="mb-2 flex items-center gap-2 text-caption font-bold uppercase tracking-widest text-stone"><span className="h-1.5 w-1.5 rounded-full bg-warning" /> Highlighted passage</p>
                       <blockquote className="rounded-r-md border-l-2 border-minimaxBlue bg-canvas px-4 py-3 text-xs leading-relaxed text-steel transition-colors">
                         <HighlightedSourceText text={selectedSource.excerpt || ''} highlights={selectedSource.highlight_texts} highlight={selectedSource.highlight_text} />
                       </blockquote>
                     </div>
-                    {sourceError && <p className="ask-fade-up mt-3 text-xs text-rose-300">{sourceError}</p>}
+                    {sourceError && <p className="ask-fade-up mt-3 text-xs text-destructive">{sourceError}</p>}
                   </div>
                   <footer className="space-y-2 border-t border-hairline p-4">
                     <button
@@ -970,7 +1052,7 @@ export default function AskPage() {
           </>
         )}
 
-        {viewerSource && <PdfViewer open fileName={viewerSource.citation.title} url={viewerSource.url} page={viewerSource.citation.page_number} onClose={() => setViewerSource(null)} />}
+        {viewerSource && <PdfViewer open fileName={viewerSource.citation.title} url={viewerSource.url} mimeType={viewerSource.type} page={viewerSource.citation.page_number} onClose={() => setViewerSource(null)} />}
       </div>
     </>
   )

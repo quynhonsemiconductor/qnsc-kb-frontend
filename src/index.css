@@ -16,6 +16,7 @@
   --muted: 105 111 137;
   --muted-foreground: 69 76 105;
   --border: 220 222 236;
+  --border-soft: 232 234 244;
   --input: 255 255 255;
   --primary: 91 92 226;
   --primary-strong: 68 68 184;
@@ -48,6 +49,7 @@
   --muted: 133 140 171;
   --muted-foreground: 178 183 207;
   --border: 46 53 84;
+  --border-soft: 33 39 64;
   --input: 12 17 34;
   --primary: 126 116 246;
   --primary-strong: 96 84 214;
@@ -74,10 +76,22 @@
 @layer base {
   :root { font-family: 'DM Sans', Inter, ui-sans-serif, system-ui, sans-serif; font-synthesis: none; }
   h1, h2, h3, h4, .font-display { font-family: 'Manrope', 'DM Sans', Inter, ui-sans-serif, system-ui, sans-serif; }
-  /* General workspace scale: 85% of the browser's default 14px rhythm.
-     Glass panels opt out below so the AI chat and global panel surfaces keep
-     the compact sizing established in the previous pass. */
-  html { font-size: 11.9px; background: rgb(var(--background)); }
+  /* THE WORKSPACE SCALE. Every Tailwind size — spacing, type, radii, control heights —
+     is rem-based, so this single value scales the whole app.
+
+     It was a hard 11.9px against a 16px browser default: a 26% shrink of everything, with
+     no way back up on a large display. That is also why arbitrary `text-[10px]` utilities
+     spread through the app — the token scale had been shrunk below legibility, so
+     individual sites compensated in absolute pixels, which then could not scale at all.
+
+     100% rather than a pixel value, because it honours the reader's own browser font
+     setting instead of overriding it. The steps answer the actual complaint: past 1536px
+     the workspace grows WITH the display instead of staying a small island in the middle
+     of it. */
+  html { font-size: 100%; background: rgb(var(--background)); }
+  @media (min-width: 1536px) { html { font-size: 106.25%; } }
+  @media (min-width: 1920px) { html { font-size: 112.5%; } }
+  @media (min-width: 2560px) { html { font-size: 118.75%; } }
   body { min-width: 320px; background: rgb(var(--background)); color: rgb(var(--foreground)); -webkit-font-smoothing: antialiased; transition: background-color .18s ease, color .18s ease; }
   body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1; opacity: .22; background-image: radial-gradient(rgb(var(--primary) / .10) 1px, transparent 1px); background-size: 24px 24px; mask-image: linear-gradient(to bottom, black, transparent 68%); }
   *, *::before, *::after { box-sizing: border-box; }
@@ -141,7 +155,12 @@
   .ops-sidebar-hover:hover { background: rgb(var(--sidebar-hover)); }
   .ops-elevated { background: rgb(var(--surface-elevated)); }
   .soft-grid { background-image: linear-gradient(rgb(var(--border) / .18) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--border) / .18) 1px, transparent 1px); background-size: 32px 32px; }
-  .glass-panel { background: linear-gradient(135deg, rgb(var(--surface-elevated) / .92), rgb(var(--surface) / .72)); backdrop-filter: blur(18px); box-shadow: 0 24px 70px rgb(var(--shadow) / .16); zoom: .88235294; }
+  /* `zoom: .88235294` removed. It shrank every glass surface — the AI chat among them —
+     by a further 12% ON TOP of the 26% root shrink, so panels rendered at roughly 65% of
+     normal size. `zoom` is also not a layout tool: it rescales a subtree without telling
+     its descendants, so nested fixed/sticky positioning and any px-based hit target
+     silently drift. The workspace scale above is the one place size is decided. */
+  .glass-panel { background: linear-gradient(135deg, rgb(var(--surface-elevated) / .92), rgb(var(--surface) / .72)); backdrop-filter: blur(18px); box-shadow: 0 24px 70px rgb(var(--shadow) / .16); }
   /* Login is the primary entry surface, so it uses the full design scale
      rather than the compact workspace-panel scale. */
   .login-panel { zoom: 1; }
@@ -195,8 +214,6 @@
   .border-minimaxBlue { border-color: rgb(var(--primary)) !important; }
   .bg-\[\#18232f\] { background-color: rgb(var(--surface-elevated)) !important; }
   .border-\[\#354457\] { border-color: rgb(var(--border)) !important; }
-  .hover\:border-\[\#50627a\]:hover { border-color: rgb(var(--primary-muted)) !important; }
-  .hover\:bg-charcoal:hover, .hover\:bg-slate-700:hover { background-color: rgb(var(--primary-strong)) !important; }
   .bg-ink.text-primary-foreground, .bg-brand-500.text-primary-foreground, .bg-brand-600.text-primary-foreground { color: rgb(var(--primary-foreground)) !important; }
   .hover\:bg-slate-800:hover, .hover\:bg-surface:hover { background-color: rgb(var(--surface-muted)) !important; }
   .hover\:bg-white:hover, .hover\:bg-slate-900:hover { background-color: rgb(var(--surface-elevated)) !important; }
@@ -226,7 +243,10 @@
 *::-webkit-scrollbar-thumb:hover { background: rgb(var(--muted-foreground)); }
 
 .markdown-surface { font-size: 1rem; line-height: 1.75; color: rgb(var(--foreground)); }
-.chat-answer { font-size: 13px; line-height: 1.75; }
+/* The AI answer is the main reading surface of the app, so it gets a comfortable
+   reading size and scales with the workspace. It was a flat 13px, which is below the
+   token scale's body size and could not grow on a large display. */
+.chat-answer { font-size: 0.9375rem; line-height: 1.75; }
 .markdown-surface > * + * { margin-top: 1rem; }
 .markdown-surface :is(ul, ol) { margin: 1rem 0; padding-left: 1.5rem; }
 .markdown-surface ul { list-style: disc; }
@@ -249,6 +269,96 @@
 .markdown-surface .hljs-string, .markdown-surface .hljs-attr { color: rgb(var(--success)); }
 .markdown-surface .hljs-number, .markdown-surface .hljs-symbol { color: rgb(var(--warning)); }
 .markdown-surface .hljs-title, .markdown-surface .hljs-function { color: rgb(var(--info)); }
+
+/* A cited passage in the source rail is the same Markdown the article is written in,
+   shown at panel scale. Without this, a `###` lifted from the middle of a document
+   opens at 20px inside a 12px column and one excerpt fills the panel. Sizes only —
+   colour, marks, code and tables all stay with .markdown-surface. */
+.markdown-excerpt { font-size: .75rem; line-height: 1.65; }
+.markdown-excerpt > * + * { margin-top: .625rem; }
+.markdown-excerpt :is(ul, ol) { margin: .5rem 0; padding-left: 1.125rem; }
+.markdown-excerpt li + li { margin-top: .25rem; }
+.markdown-excerpt :is(h1, h2, h3, h4, h5, h6) { font-size: .8125rem; }
+.markdown-excerpt :is(h1, h2, h3, h4, h5, h6) + * { margin-top: .375rem; }
+.markdown-excerpt pre { padding: .625rem; border-radius: .5rem; font-size: .6875rem; }
+.markdown-excerpt blockquote { padding: .5rem .75rem; }
+.markdown-excerpt table { font-size: .6875rem; }
+.markdown-excerpt :is(th, td) { padding: .375rem .5rem; }
+
+/* ---------------------------------------------------------------------------
+   Interaction-state repairs for the compatibility layer.
+
+   The @layer utilities block above paints many base utilities with !important.
+   An !important declaration beats a non-important one regardless of
+   specificity, so `bg-surface hover:bg-info/10` (and friends) silently lose
+   their hover state entirely.
+
+   Two rules for anything in this section:
+     1. Keep it OUT of @layer utilities. Tailwind prunes custom utilities whose
+        class name it also generates itself, which is what silently removed the
+        original hover:bg-slate-700 and hover:border-[#50627a] mappings.
+     2. Prefix every selector with `html`. Tailwind never emits that shape, so
+        these rules cannot be merged into — or deduplicated against — the
+        generated utility of the same class name.
+   --------------------------------------------------------------------------- */
+
+/* Hover backgrounds */
+html .hover\:bg-charcoal:hover,
+html .hover\:bg-slate-700:hover,
+html .hover\:bg-primary-strong:hover,
+html .hover\:bg-ink\/90:hover,
+html .hover\:bg-cyan-800:hover { background-color: rgb(var(--primary-strong)) !important; }
+html .hover\:bg-brand-500:hover { background-color: rgb(var(--primary)) !important; }
+html .hover\:bg-emerald-800:hover { background-color: rgb(var(--success) / .88) !important; }
+html .hover\:bg-emerald-400\/20:hover { background-color: rgb(var(--success) / .2) !important; }
+html .hover\:bg-info\/10:hover { background-color: rgb(var(--info) / .1) !important; }
+html .hover\:bg-destructive\/10:hover,
+html .hover\:bg-rose-500\/10:hover { background-color: rgb(var(--destructive) / .1) !important; }
+html .hover\:bg-surface-soft\/50:hover { background-color: rgb(var(--surface-muted) / .5) !important; }
+
+/* Hover and focus borders */
+html .focus\:border-brand-500:focus { border-color: rgb(var(--primary)) !important; }
+html .hover\:border-brand-500\/50:hover,
+html .hover\:border-brand-500\/70:hover { border-color: rgb(var(--primary) / .6) !important; }
+html .hover\:border-cyan\/50:hover { border-color: rgb(var(--info) / .5) !important; }
+html .hover\:border-\[\#50627a\]:hover { border-color: rgb(var(--primary-muted)) !important; }
+html .hover\:border-amber-300\/30:hover { border-color: rgb(var(--warning) / .3) !important; }
+html .hover\:border-rose-400\/40:hover { border-color: rgb(var(--destructive) / .4) !important; }
+html .focus\:border-amber-300\/50:focus { border-color: rgb(var(--warning) / .5) !important; }
+
+/* Hover text colours */
+html .hover\:text-rose-300:hover,
+html .hover\:text-rose-400:hover { color: rgb(var(--destructive)) !important; }
+html .hover\:text-success:hover { color: rgb(var(--success)) !important; }
+html .hover\:text-info\/75:hover { color: rgb(var(--info) / .75) !important; }
+html .hover\:text-destructive\/80:hover { color: rgb(var(--destructive) / .8) !important; }
+html .group:hover .group-hover\:text-primary { color: rgb(var(--primary)) !important; }
+html .group:hover .group-hover\:text-info { color: rgb(var(--info)) !important; }
+
+/* Pale palette shades were authored against the dark theme only; on the light
+   theme they land as near-white text on a near-white tint. Route them through
+   the semantic tokens so both themes stay readable. */
+html .text-amber-50,
+html .text-amber-100,
+html .text-amber-200,
+html .text-amber-300,
+html .text-amber-400 { color: rgb(var(--warning)) !important; }
+html .text-amber-100\/50 { color: rgb(var(--warning) / .5) !important; }
+html .text-amber-100\/80,
+html .text-amber-200\/80 { color: rgb(var(--warning) / .8) !important; }
+html .text-amber-200\/70 { color: rgb(var(--warning) / .7) !important; }
+html .text-emerald-100,
+html .text-emerald-200,
+html .text-emerald-300,
+html .text-emerald-400 { color: rgb(var(--success)) !important; }
+html .text-rose-50,
+html .text-rose-100,
+html .text-rose-200,
+html .text-rose-300,
+html .text-rose-400 { color: rgb(var(--destructive)) !important; }
+html .text-violet-200,
+html .text-violet-300,
+html .text-blue-300 { color: rgb(var(--info)) !important; }
 
 @media (max-width: 767px) {
   .app-scroll { overscroll-behavior: contain; }

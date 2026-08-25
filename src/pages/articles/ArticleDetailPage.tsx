@@ -100,7 +100,7 @@ export default function ArticleDetailPage() {
   const [following, setFollowing] = useState(false)
   const [history, setHistory] = useState<any[]>([])
   const [showHistory, setShowHistory] = useState(false)
-  const [sourceViewer, setSourceViewer] = useState<{ url: string; name: string } | null>(null)
+  const [sourceViewer, setSourceViewer] = useState<{ url: string; name: string; type: string } | null>(null)
   const [sourceLoading, setSourceLoading] = useState(false)
   const sourceUrlRef = useRef<string | null>(null)
 
@@ -128,7 +128,7 @@ export default function ArticleDetailPage() {
       const uVt = await getUserVote(id)
       setUserVote(uVt.vote)
 
-      const book = await isBookmarked(currentUser.id, id).catch(() => false)
+      const book = currentUser?.id ? await isBookmarked(currentUser.id, id).catch(() => false) : false
       setBookmarked(book)
       const follow = await getFollowStatus(id).catch(() => ({ following: false }))
       setFollowing(Boolean(follow.following))
@@ -180,9 +180,10 @@ export default function ArticleDetailPage() {
     if (!id || sourceLoading) return
     setSourceLoading(true)
     try {
-      const url = await downloadArticleSource(id)
+      const { url, type } = await downloadArticleSource(id)
+      if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current)
       sourceUrlRef.current = url
-      setSourceViewer({ url, name: article?.title || 'Original source' })
+      setSourceViewer({ url, type, name: article?.title || 'Original source' })
     } catch {
       await dialog.alert('The original source is not available for this article.', { title: 'Source unavailable', tone: 'info' })
     } finally {
@@ -249,7 +250,7 @@ export default function ArticleDetailPage() {
     setSubmittingComment(true)
     try {
       const comm = await addComment(id, newComment)
-      setComments([...comments, comm])
+      setComments(current => [...current, comm])
       setNewComment('')
     } catch (err) {
       console.error(err)
@@ -261,7 +262,7 @@ export default function ArticleDetailPage() {
   const handleCommentDelete = async (commId: string) => {
     try {
       await deleteComment(commId)
-      setComments(comments.filter(c => c.id !== commId))
+      setComments(current => current.filter(c => c.id !== commId))
     } catch (err) {
       console.error(err)
     }
@@ -446,7 +447,7 @@ export default function ArticleDetailPage() {
             {/* Comments Thread list */}
             <div className="space-y-4">
               {comments.map((comm) => (
-                <div key={comm.id} className="border-b border-slate-850 pb-4 last:border-0 last:pb-0">
+                <div key={comm.id} className="border-b border-border pb-4 last:border-0 last:pb-0">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2.5">
                       <div className="h-7 w-7 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-300 text-xs">
@@ -454,7 +455,7 @@ export default function ArticleDetailPage() {
                       </div>
                       <div>
                         <span className="text-sm font-semibold text-primary-foreground">{comm.user?.name}</span>
-                        <span className="text-[10px] text-slate-500 ml-2">
+                        <span className="text-caption text-slate-500 ml-2">
                           {new Date(comm.created_at).toLocaleString()}
                         </span>
                       </div>
@@ -476,7 +477,7 @@ export default function ArticleDetailPage() {
             </div>
 
             {/* Comment Form */}
-            <form onSubmit={handleCommentSubmit} className="pt-4 border-t border-slate-800/60">
+            <form onSubmit={handleCommentSubmit} className="pt-4 border-t border-border/60">
               <textarea
                 placeholder="Share your thoughts or suggest corrections..."
                 value={newComment}
@@ -565,19 +566,19 @@ export default function ArticleDetailPage() {
                   >
                     <div className="flex justify-between items-center text-primary-foreground font-bold mb-1">
                       <span>Version {hist.version}</span>
-                      <span className="text-[10px] text-slate-500 font-normal">
+                      <span className="text-caption text-slate-500 font-normal">
                         {new Date(hist.created_at).toLocaleDateString()}
                       </span>
                     </div>
                     <div className="text-slate-400 line-clamp-1">{hist.snapshot.title}</div>
                     <div className="mt-1 flex items-center justify-between gap-2">
-                      <span className="text-[10px] text-slate-500">Edited by: {hist.editor?.name || 'Owner'}</span>
+                      <span className="text-caption text-slate-500">Edited by: {hist.editor?.name || 'Owner'}</span>
                       {hist.version === article.version ? (
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">{t('articles.active')}</span>
+                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-caption font-semibold text-emerald-400">{t('articles.active')}</span>
                       ) : canEdit ? (
                         <button
                           onClick={(event) => { event.stopPropagation(); void handleRestoreVersion(hist) }}
-                          className="rounded-md border border-cyan/30 px-2 py-1 text-[10px] font-semibold text-cyan transition hover:bg-cyan/10"
+                          className="rounded-md border border-cyan/30 px-2 py-1 text-caption font-semibold text-cyan transition hover:bg-cyan/10"
                         >
                           {t('articles.restoreActive')}
                         </button>
@@ -596,6 +597,7 @@ export default function ArticleDetailPage() {
           open
           fileName={sourceViewer.name}
           url={sourceViewer.url}
+          mimeType={sourceViewer.type}
           onClose={() => {
             if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current)
             sourceUrlRef.current = null

@@ -12,7 +12,8 @@ export async function getArticle(id: string) {
 
 export async function downloadArticleSource(id: string) {
   const response = await client.get(`/articles/${id}/source`, { responseType: 'blob' })
-  return URL.createObjectURL(response.data)
+  const type = String(response.data?.type || response.headers?.['content-type'] || '').split(';')[0].trim()
+  return { url: URL.createObjectURL(response.data), type }
 }
 
 export async function getRelatedArticles(id: string, limit = 6) {

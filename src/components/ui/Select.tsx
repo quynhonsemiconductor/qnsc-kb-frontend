@@ -62,12 +62,14 @@ export function Select({ children, value, defaultValue, onChange, disabled = fal
       const roomAbove = rect.top - gap - viewportPadding
       const openAbove = roomBelow < 180 && roomAbove > roomBelow
       const maxHeight = Math.max(96, Math.min(320, openAbove ? roomAbove : roomBelow))
-      setPosition({
+      const next = {
         top: openAbove ? Math.max(viewportPadding, rect.top - gap - maxHeight) : rect.bottom + gap,
         left: Math.min(Math.max(viewportPadding, rect.left), Math.max(viewportPadding, window.innerWidth - rect.width - viewportPadding)),
         width: rect.width,
         maxHeight,
-      })
+      }
+      setPosition(current => current.top === next.top && current.left === next.left
+        && current.width === next.width && current.maxHeight === next.maxHeight ? current : next)
     }
     updatePosition()
     window.addEventListener('resize', updatePosition)
@@ -120,9 +122,16 @@ export function Select({ children, value, defaultValue, onChange, disabled = fal
       if (next >= 0) { setActiveIndex(next); if (!open) emit(options[next].value) }
     }
   }
+  // Keep the keyboard-focused option visible and announced.
+  useEffect(() => {
+    if (!open) return
+    listbox.current?.querySelector(`[data-index="${activeIndex}"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex, open])
+
+  const optionId = (index: number) => `${listboxId}-option-${index}`
   const selectClass = `ui-control ui-control-${size} flex items-center justify-between gap-xs text-left ${className}`
   return <div ref={root} className="relative">
-    <button type="button" id={id} role="combobox" aria-controls={`${listboxId}-listbox`} aria-expanded={open} aria-haspopup="listbox" aria-label={ariaLabel} aria-labelledby={ariaLabelledBy} disabled={disabled} onClick={() => setOpen(current => !current)} onKeyDown={handleKeyDown} className={selectClass}>
+    <button type="button" id={id} role="combobox" aria-controls={`${listboxId}-listbox`} aria-expanded={open} aria-haspopup="listbox" aria-activedescendant={open ? optionId(activeIndex) : undefined} aria-label={ariaLabel} aria-labelledby={ariaLabelledBy} disabled={disabled} onClick={() => setOpen(current => !current)} onKeyDown={handleKeyDown} className={selectClass}>
       <span className="min-w-0 flex-1 truncate">{selected?.label}</span><ChevronDown size={16} aria-hidden="true" className={`shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
     </button>
     {open && typeof document !== 'undefined' && createPortal(
@@ -134,7 +143,7 @@ export function Select({ children, value, defaultValue, onChange, disabled = fal
         className="fixed z-[1000] overflow-y-auto rounded-surface border border-border bg-surface-elevated p-xxs shadow-[0_16px_35px_rgb(var(--shadow)/.25)]"
         style={{ top: position.top, left: position.left, width: position.width, maxHeight: position.maxHeight }}
       >
-        {options.map((option, index) => <button key={option.value} type="button" role="option" aria-selected={option.value === selectedValue} disabled={option.disabled} onMouseEnter={() => setActiveIndex(index)} onClick={() => { emit(option.value); setOpen(false) }} className={`flex w-full min-h-controlSm items-center gap-xs rounded-control px-sm text-left text-body-sm transition ${index === activeIndex ? 'bg-surface-muted text-foreground' : 'text-foreground hover:bg-surface-muted'} disabled:cursor-not-allowed disabled:opacity-50`}><span className="min-w-0 flex-1 truncate">{option.label}</span>{option.value === selectedValue && <Check size={14} className="shrink-0 text-primary" />}</button>)}
+        {options.map((option, index) => <button key={option.value} type="button" role="option" id={optionId(index)} data-index={index} aria-selected={option.value === selectedValue} disabled={option.disabled} onMouseEnter={() => setActiveIndex(index)} onClick={() => { emit(option.value); setOpen(false) }} className={`flex w-full min-h-controlSm items-center gap-xs rounded-control px-sm text-left text-body-sm transition ${index === activeIndex ? 'bg-surface-muted text-foreground' : 'text-foreground hover:bg-surface-soft'} disabled:cursor-not-allowed disabled:opacity-50`}><span className="min-w-0 flex-1 truncate">{option.label}</span>{option.value === selectedValue && <Check size={14} className="shrink-0 text-primary" />}</button>)}
       </div>,
       document.body,
     )}

@@ -52,7 +52,7 @@ export default function GapQueuePage() {
     setShowAssignModal(false)
     try {
       await assignSearchGap(selectedGap.id, assignDept)
-      setGaps(gaps.filter(g => g.id !== selectedGap.id))
+      setGaps(current => current.filter(g => g.id !== selectedGap.id))
     } catch (err) {
       console.error(err)
       await dialog.alert('Failed to assign gap', { title: 'Assignment failed' })
@@ -66,7 +66,7 @@ export default function GapQueuePage() {
     setActingGapId(gapId)
     try {
       await dismissSearchGap(gapId)
-      setGaps(gaps.filter(g => g.id !== gapId))
+      setGaps(current => current.filter(g => g.id !== gapId))
     } catch (err) {
       console.error(err)
       await dialog.alert('Failed to dismiss gap', { title: 'Dismissal failed' })
@@ -90,9 +90,9 @@ export default function GapQueuePage() {
           <span>Analyzing search log queries...</span>
         </div>
       ) : gaps.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-850 p-12 text-center bg-slate-900/5">
+        <div className="rounded-xl border border-dashed border-border p-12 text-center bg-slate-900/5">
           <AlertCircle className="mx-auto text-slate-600 mb-3" size={40} />
-          <h3 className="text-md font-semibold text-primary-foreground">No search gaps logged</h3>
+          <h3 className="text-base font-semibold text-primary-foreground">No search gaps logged</h3>
           <p className="text-slate-500 text-xs mt-1">Excellent! All recent employee queries have successfully resolved to articles in the KB.</p>
         </div>
       ) : (
@@ -104,14 +104,14 @@ export default function GapQueuePage() {
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm font-semibold text-primary-foreground bg-slate-950 px-2.5 py-1 rounded-md border border-slate-850">
+                  <span className="font-mono text-sm font-semibold text-primary-foreground bg-slate-950 px-2.5 py-1 rounded-md border border-border">
                     "{gap.query}"
                   </span>
-                  <span className="bg-brand-500/10 text-brand-400 border border-brand-500/10 px-2 py-0.5 rounded text-[10px] font-semibold">
+                  <span className="bg-brand-500/10 text-brand-400 border border-brand-500/10 px-2 py-0.5 rounded text-caption font-semibold">
                     Misses: {gap.count}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500">First logged on {new Date(gap.created_at).toLocaleDateString()}</p>
+                <p className="text-caption text-slate-500">First logged on {new Date(gap.created_at).toLocaleDateString()}</p>
               </div>
 
               <div className="flex items-center gap-2">

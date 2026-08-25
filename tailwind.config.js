@@ -6,6 +6,17 @@ export default {
   ],
   theme: {
     extend: {
+      // Tailwind stops at 2xl (1536px), so a 1920 or 2560 display had no breakpoint to
+      // aim at and every layout stayed frozen in its 2xl arrangement. These match the two
+      // sizes the workspace scale steps at in index.css, so type and layout grow together.
+      screens: {
+        '3xl': '1920px',
+        '4xl': '2560px',
+      },
+      opacity: {
+        8: '0.08',
+        12: '0.12',
+      },
       spacing: {
         xxs: '0.25rem',
         xs: '0.5rem',
@@ -47,13 +58,17 @@ export default {
         card: 'rgb(var(--surface) / <alpha-value>)',
         surface: 'rgb(var(--surface) / <alpha-value>)',
         'surface-elevated': 'rgb(var(--surface-elevated) / <alpha-value>)',
+        'surface-muted': 'rgb(var(--surface-muted) / <alpha-value>)',
         'surface-soft': 'rgb(var(--surface-muted) / <alpha-value>)',
         muted: 'rgb(var(--muted) / <alpha-value>)',
         'muted-foreground': 'rgb(var(--muted-foreground) / <alpha-value>)',
         border: 'rgb(var(--border) / <alpha-value>)',
+        'border-soft': 'rgb(var(--border-soft) / <alpha-value>)',
         input: 'rgb(var(--input) / <alpha-value>)',
         primary: 'rgb(var(--primary) / <alpha-value>)',
         'primary-foreground': 'rgb(var(--primary-foreground) / <alpha-value>)',
+        'primary-strong': 'rgb(var(--primary-strong) / <alpha-value>)',
+        'primary-muted': 'rgb(var(--primary-muted) / <alpha-value>)',
         secondary: 'rgb(var(--secondary) / <alpha-value>)',
         'secondary-foreground': 'rgb(var(--secondary-foreground) / <alpha-value>)',
         accent: 'rgb(var(--accent) / <alpha-value>)',
@@ -76,7 +91,6 @@ export default {
         minimaxBlue: 'rgb(var(--primary) / <alpha-value>)',
         cyan: 'rgb(var(--info) / <alpha-value>)',
         purple: '#a855f7',
-        success: '#1ba673',
         brand: {
           50: 'rgb(var(--primary-soft) / <alpha-value>)',
           100: 'rgb(var(--primary-soft) / <alpha-value>)',

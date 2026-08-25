@@ -40,7 +40,7 @@ export default function AnswerText({ content, citations = [], onCitationClick }:
             <button
               key={`citation-${offset}`}
               type="button"
-              className="mx-0.5 inline-flex items-center rounded-md border border-minimaxBlue/40 bg-blue-500/15 px-1.5 py-0.5 align-baseline text-[11px] font-semibold text-blue-300 transition hover:bg-blue-500/25"
+              className="mx-0.5 inline-flex items-center rounded-md border border-minimaxBlue/40 bg-blue-500/15 px-1.5 py-0.5 align-baseline text-body-sm font-semibold text-blue-300 transition hover:bg-blue-500/25"
               title={`${citation.title}${citation.page_number ? ` — page ${citation.page_number}` : ''}`}
               onClick={() => onCitationClick(citation)}
             >

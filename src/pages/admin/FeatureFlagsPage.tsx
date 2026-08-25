@@ -59,7 +59,7 @@ export default function FeatureFlagsPage() {
               <div className="min-w-0">
                 <h2 className="text-sm font-semibold text-ink">{flag.label || flag.key}</h2>
                 <p className="mt-1 text-xs leading-5 text-steel">{flag.description || flag.key}</p>
-                <p className="mt-1 text-[10px] uppercase tracking-wider text-stone">{flag.key} · Workspace-wide</p>
+                <p className="mt-1 text-caption uppercase tracking-wider text-stone">{flag.key} · Workspace-wide</p>
               </div>
             </div>
             <button
