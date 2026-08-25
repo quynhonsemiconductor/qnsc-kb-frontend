@@ -46,7 +46,7 @@ jobs:
       contents: read
       security-events: write # SARIF upload
       packages: read
-    uses: QNSC-VN/qnsc-ci/.github/workflows/security.yml@v1.9.0
+    uses: QNSC-VN/qnsc-ci/.github/workflows/security.yml@v1.10.0
     with:
       product: qnsc-kb-frontend
       scan_container: false
