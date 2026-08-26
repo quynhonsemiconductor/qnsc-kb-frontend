@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import AppLayout from '../layouts/AppLayout'
 import ProtectedRoute from './ProtectedRoute'
+import { PageSkeleton } from '../components/ui/Skeleton'
 
 const LoginPage = lazy(() => import('../auth/LoginPage'))
 const HomePage = lazy(() => import('../pages/HomePage'))
@@ -32,7 +33,7 @@ const UiCatalogPage = lazy(() => import('../pages/dev/UiCatalogPage'))
 
 export default function AppRoutes() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-steel">Loading…</div>}><Routes>
+    <Suspense fallback={<PageSkeleton />}><Routes>
       <Route path="/login" element={<LoginPage />} />
       {import.meta.env.DEV && <Route path="/dev/ui" element={<UiCatalogPage />} />}
       <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
