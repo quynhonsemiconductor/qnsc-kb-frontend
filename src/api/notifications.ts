@@ -3,7 +3,7 @@ import client from './client'
 export interface InAppNotification {
   id: string
   type: 'in_app'
-  payload: { event?: string; draft_id?: string; article_id?: string }
+  payload: { event?: string; draft_id?: string; article_id?: string; action_url?: string; article_title?: string; request_text?: string }
   created_at: string
   read_at: string | null
 }

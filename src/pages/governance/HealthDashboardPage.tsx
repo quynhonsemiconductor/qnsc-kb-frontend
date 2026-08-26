@@ -1,24 +1,27 @@
 import React, { useEffect, useState } from 'react'
 import { Activity, Layers, AlertTriangle, ShieldCheck, HelpCircle, BarChart3, TrendingUp, RefreshCw } from 'lucide-react'
-import { getHealthMetrics, getEvalRuns, verifyReviewDeadlines } from '../../api/governance'
+import { getHealthMetrics, getEvalReport, getEvalRuns, verifyReviewDeadlines } from '../../api/governance'
 import PageHeader from '../../components/ui/PageHeader'
 
 export default function HealthDashboardPage() {
   const [metrics, setMetrics] = useState<any>(null)
   const [evalRuns, setEvalRuns] = useState<any[]>([])
+  const [evalReport, setEvalReport] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [verifyingReviews, setVerifyingReviews] = useState(false)
+  const [error, setError] = useState(false)
 
   const fetchDashboardData = async () => {
     setLoading(true)
     try {
-      const m = await getHealthMetrics()
+      const [m, ev, report] = await Promise.all([getHealthMetrics(), getEvalRuns(), getEvalReport()])
       setMetrics(m)
-
-      const ev = await getEvalRuns()
       setEvalRuns(ev)
+      setEvalReport(report)
+      setError(false)
     } catch (err) {
       console.error(err)
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -47,9 +50,20 @@ export default function HealthDashboardPage() {
     )
   }
 
+  if (error && !metrics) {
+    return (
+      <div className="page-shell page-stack">
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <span>Failed to load. Please retry.</span>
+          <button type="button" onClick={() => void fetchDashboardData().catch(() => undefined)} className="text-xs font-bold uppercase tracking-wide hover:underline">Retry</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="page-shell page-stack">
-      <PageHeader eyebrow="System observability" title="KB health dashboard" description="Live metrics, governance audits, and offline RAG evaluation scores." icon={Activity} actions={<button onClick={() => void runReviewScan()} disabled={verifyingReviews} className="mm-secondary flex items-center gap-2 px-3 py-2 text-xs font-semibold disabled:opacity-50">
+      <PageHeader eyebrow="System observability" title="KB health dashboard" description="Live metrics, governance audits, and offline RAG evaluation scores." icon={Activity} actions={<button onClick={() => void runReviewScan().catch(() => undefined)} disabled={verifyingReviews} className="mm-secondary flex items-center gap-2 px-3 py-2 text-xs font-semibold disabled:opacity-50">
             <RefreshCw size={14} className={verifyingReviews ? 'animate-spin' : ''} />
             {verifyingReviews ? 'Checking reviews…' : 'Check review deadlines'}
           </button>} />
@@ -64,7 +78,7 @@ export default function HealthDashboardPage() {
               <Layers size={16} />
             </div>
             <div className="text-2xl font-extrabold text-primary-foreground">{metrics.total_articles}</div>
-            <div className="text-[10px] text-slate-500">Published documents</div>
+            <div className="text-caption text-slate-500">Published documents</div>
           </div>
 
           {/* Card 2 */}
@@ -74,7 +88,7 @@ export default function HealthDashboardPage() {
               <ShieldCheck size={16} className="text-emerald-400" />
             </div>
             <div className="text-2xl font-extrabold text-emerald-400">{metrics.percent_with_owner?.toFixed(0)}%</div>
-            <div className="text-[10px] text-slate-500">Articles with registered owner</div>
+            <div className="text-caption text-slate-500">Articles with registered owner</div>
           </div>
 
           {/* Card 3 */}
@@ -84,7 +98,7 @@ export default function HealthDashboardPage() {
               <AlertTriangle size={16} className="text-rose-400" />
             </div>
             <div className="text-2xl font-extrabold text-rose-400">{metrics.percent_overdue?.toFixed(0)}%</div>
-            <div className="text-[10px] text-slate-500">Awaiting governance review</div>
+            <div className="text-caption text-slate-500">Awaiting governance review</div>
           </div>
 
           {/* Card 4 */}
@@ -94,7 +108,7 @@ export default function HealthDashboardPage() {
               <HelpCircle size={16} className="text-amber-400" />
             </div>
             <div className="text-2xl font-extrabold text-amber-400">{metrics.open_gaps}</div>
-            <div className="text-[10px] text-slate-500">Unanswered search queries</div>
+            <div className="text-caption text-slate-500">Unanswered search queries</div>
           </div>
 
           {/* Card 5 */}
@@ -104,7 +118,7 @@ export default function HealthDashboardPage() {
               <TrendingUp size={16} className="text-brand-400" />
             </div>
             <div className="text-2xl font-extrabold text-brand-400">{metrics.helpful_rate?.toFixed(0)}%</div>
-            <div className="text-[10px] text-slate-500">Thumbs-up feedback ratio</div>
+            <div className="text-caption text-slate-500">Thumbs-up feedback ratio</div>
           </div>
 
           <div className="glass-panel interactive-lift rounded-2xl border border-border p-4 space-y-2">
@@ -113,7 +127,7 @@ export default function HealthDashboardPage() {
               <Activity size={16} className="text-amber-400" />
             </div>
             <div className="text-2xl font-extrabold text-amber-400">{metrics.search_miss_rate?.toFixed(0)}%</div>
-            <div className="text-[10px] text-slate-500">Queries with no authorized results</div>
+            <div className="text-caption text-slate-500">Queries with no authorized results</div>
           </div>
 
           <div className="glass-panel interactive-lift rounded-2xl border border-border p-4 space-y-2">
@@ -122,7 +136,7 @@ export default function HealthDashboardPage() {
               <AlertTriangle size={16} className="text-rose-400" />
             </div>
             <div className="text-2xl font-extrabold text-rose-400">{metrics.api_error_rate?.toFixed(1)}%</div>
-            <div className="text-[10px] text-slate-500">Persisted request telemetry</div>
+            <div className="text-caption text-slate-500">Persisted request telemetry</div>
           </div>
 
           <div className="glass-panel interactive-lift rounded-2xl border border-border p-4 space-y-2">
@@ -131,7 +145,7 @@ export default function HealthDashboardPage() {
               <Activity size={16} className="text-brand-400" />
             </div>
             <div className="text-2xl font-extrabold text-brand-400">{metrics.api_p95_latency_ms?.toFixed(0)}ms</div>
-            <div className="text-[10px] text-slate-500">All recorded API requests</div>
+            <div className="text-caption text-slate-500">All recorded API requests</div>
           </div>
 
           <div className="glass-panel interactive-lift rounded-2xl border border-border p-4 space-y-2">
@@ -140,7 +154,7 @@ export default function HealthDashboardPage() {
               <BarChart3 size={16} className="text-amber-400" />
             </div>
             <div className="text-2xl font-extrabold text-amber-400">{metrics.ai_tokens_total?.toLocaleString()}</div>
-            <div className="text-[10px] text-slate-500">{metrics.ai_requests || 0} logged AI requests</div>
+            <div className="text-caption text-slate-500">{metrics.ai_requests || 0} logged AI requests</div>
           </div>
         </div>
       )}
@@ -149,7 +163,7 @@ export default function HealthDashboardPage() {
         <section className="space-y-4" aria-labelledby="dependency-health-heading">
           <div className="flex items-end justify-between border-b border-slate-800 pb-2">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-brand-300">Dependency health</p>
+              <p className="text-caption font-semibold uppercase tracking-[0.24em] text-brand-300">Dependency health</p>
               <h2 id="dependency-health-heading" className="mt-1 text-lg font-bold text-primary-foreground">Runtime services</h2>
             </div>
             <span className="text-xs text-slate-500">Configuration and queue signals</span>
@@ -200,9 +214,11 @@ export default function HealthDashboardPage() {
           <BarChart3 size={18} className="text-brand-400" />
           <span>Offline RAG Evaluation Runs</span>
         </h2>
+
+        {evalReport && <div className={`rounded-2xl border p-4 ${evalReport.verdict === 'GO' ? 'border-emerald-400/25 bg-emerald-500/10' : 'border-amber-400/25 bg-amber-500/10'}`}><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-caption font-bold uppercase tracking-[.16em] text-slate-400">Current evaluation verdict</p><p className={`mt-1 text-xl font-extrabold ${evalReport.verdict === 'GO' ? 'text-emerald-400' : 'text-amber-400'}`}>{evalReport.verdict}</p></div><div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><span>Samples <strong className="ml-1 text-primary-foreground">{evalReport.sample_count || 0}</strong></span><span>Grounded <strong className="ml-1 text-primary-foreground">{((evalReport.kpis?.groundedness || 0) * 100).toFixed(1)}%</strong></span><span>Latency <strong className="ml-1 text-primary-foreground">{evalReport.kpis?.latency_ms || 0}ms</strong></span><span>Leakage <strong className={`ml-1 ${evalReport.permission_leakage ? 'text-rose-400' : 'text-emerald-400'}`}>{evalReport.permission_leakage || 0}</strong></span></div></div>{evalReport.reason && <p className="mt-3 text-xs text-amber-200">{evalReport.reason}</p>}</div>}
         
         {evalRuns.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-850 p-8 text-center bg-slate-900/5 text-slate-500 text-xs">
+          <div className="rounded-xl border border-dashed border-border p-8 text-center bg-slate-900/5 text-slate-500 text-xs">
             No offline evaluation data found. Trigger eval suites in the background.
           </div>
         ) : (

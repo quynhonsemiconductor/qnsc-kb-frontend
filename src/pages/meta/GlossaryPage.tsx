@@ -47,7 +47,7 @@ export default function GlossaryPage() {
           <span>Syncing terms glossary...</span>
         </div>
       ) : filteredGlossary.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-850 p-12 text-center bg-slate-900/5 text-slate-500 text-xs">
+        <div className="rounded-xl border border-dashed border-border p-12 text-center bg-slate-900/5 text-slate-500 text-xs">
           No matching glossary terms found.
         </div>
       ) : (
@@ -62,7 +62,7 @@ export default function GlossaryPage() {
                   {item.term}
                 </span>
               </div>
-              <p className="text-slate-350 text-sm leading-relaxed leading-normal">
+              <p className="text-charcoal text-sm leading-relaxed leading-normal">
                 {item.definition}
               </p>
             </div>

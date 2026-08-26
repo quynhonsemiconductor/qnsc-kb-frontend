@@ -12,7 +12,8 @@ export async function getArticle(id: string) {
 
 export async function downloadArticleSource(id: string) {
   const response = await client.get(`/articles/${id}/source`, { responseType: 'blob' })
-  return URL.createObjectURL(response.data)
+  const type = String(response.data?.type || response.headers?.['content-type'] || '').split(';')[0].trim()
+  return { url: URL.createObjectURL(response.data), type }
 }
 
 export async function getRelatedArticles(id: string, limit = 6) {
@@ -27,6 +28,11 @@ export async function createArticle(data: any) {
 
 export async function updateArticle(id: string, data: any) {
   const response = await client.put(`/articles/${id}`, data)
+  return response.data
+}
+
+export async function createArticleEditRequest(articleId: string, requestText: string) {
+  const response = await client.post(`/articles/${articleId}/edit-requests`, { request_text: requestText })
   return response.data
 }
 
@@ -116,4 +122,16 @@ export async function isBookmarked(userId: string, articleId: string) {
     console.error(err)
     return false
   }
+}
+
+export async function getFollowStatus(articleId: string) {
+  return (await client.get(`/articles/${articleId}/follow`)).data
+}
+
+export async function followArticle(articleId: string) {
+  return (await client.post(`/articles/${articleId}/follow`)).data
+}
+
+export async function unfollowArticle(articleId: string) {
+  return (await client.delete(`/articles/${articleId}/follow`)).data
 }

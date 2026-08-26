@@ -6,9 +6,10 @@ import PageHeader from '../components/ui/PageHeader'
 
 export default function BookmarksPage() {
   const [items, setItems] = useState<any[] | null>(null)
-  useEffect(() => { void getBookmarks().then(setItems).catch(console.error) }, [])
+  const [loadError, setLoadError] = useState(false)
+  useEffect(() => { void getBookmarks().then((result) => { setItems(result); setLoadError(false) }).catch((err) => { console.error(err); setLoadError(true) }) }, [])
 
-  if (!items) return <div className="mx-auto max-w-6xl p-8 text-muted-foreground">Loading saved documents…</div>
+  if (!items) return loadError ? <div className="page-shell page-stack"><div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">Failed to load. Please retry.</div></div> : <div className="mx-auto max-w-6xl p-8 text-muted-foreground">Loading saved documents…</div>
 
   return (
     <div className="page-shell page-stack">

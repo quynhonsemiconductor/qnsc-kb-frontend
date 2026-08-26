@@ -56,7 +56,7 @@ export default function AuditLogPage() {
           <span>Retrieving security records...</span>
         </div>
       ) : logs.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-850 p-12 text-center bg-slate-900/5 text-slate-500 text-xs">
+        <div className="rounded-xl border border-dashed border-border p-12 text-center bg-slate-900/5 text-slate-500 text-xs">
           No audit logs recorded yet.
         </div>
       ) : (
@@ -71,12 +71,12 @@ export default function AuditLogPage() {
                 <th className="p-3.5 font-semibold">Timestamp</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 text-slate-350">
+            <tbody className="divide-y divide-slate-800/60 text-charcoal">
               {logs.map((log) => (
                 <tr key={log.id} className="hover:bg-slate-900/40 transition-colors">
                   <td className="p-3.5 font-medium text-primary-foreground">{log.user?.name || 'System Worker'}</td>
                   <td className="p-3.5">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${
+                    <span className={`px-2 py-0.5 rounded text-caption font-bold uppercase tracking-wide border ${
                       log.action === 'create' || log.action === 'approve'
                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                         : log.action === 'delete' || log.action === 'reject'
@@ -86,7 +86,7 @@ export default function AuditLogPage() {
                       {log.action}
                     </span>
                   </td>
-                  <td className="p-3.5 uppercase font-semibold text-[10px] text-slate-400">{log.target_type}</td>
+                  <td className="p-3.5 uppercase font-semibold text-caption text-slate-400">{log.target_type}</td>
                   <td className="p-3.5 font-mono text-slate-500">{log.target_id || 'N/A'}</td>
                   <td className="p-3.5 text-slate-500">
                     {new Date(log.created_at).toLocaleString()}
