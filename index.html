@@ -11,6 +11,13 @@
          the theme the boot script above has already chosen. -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F5F7" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0B1020" />
+    <!-- Fonts, moved out of index.css. preconnect opens the DNS/TCP/TLS handshake to
+         both Google origins while the HTML is still parsing, so the font CSS and the
+         font files themselves are not each paying a cold connection. gstatic needs
+         crossorigin because font files are fetched in CORS mode. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Manrope:wght@500;600;700;800&display=swap" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>QNSC Knowledge Base</title>
     <script>

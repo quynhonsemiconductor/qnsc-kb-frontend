@@ -172,12 +172,21 @@ export default function ConnectorsPage() {
     else setLoading(true)
     try {
       const listed: Connector[] = await listConnectors()
-      const enriched = await Promise.all(listed.map(async item => {
-        try { return { ...item, health: await getConnectorHealth(item.id) } }
-        catch { return item }
-      }))
-      setItems(enriched)
+      // Paint the list as soon as it arrives, then fold each connector's health in as it
+      // answers. This used to `await Promise.all(...)` over one /health call per
+      // connector before rendering ANYTHING, so the page showed a spinner for as long as
+      // the SLOWEST health check took — and health is the endpoint that talks to the
+      // provider, so it is the slow one by construction. One unreachable connector held
+      // the whole screen.
+      setItems(listed)
       setError('')
+      listed.forEach(item => {
+        void getConnectorHealth(item.id)
+          .then(health => setItems(current => current.map(row => row.id === item.id ? { ...row, health } : row)))
+          // A connector whose health cannot be read still belongs in the list; it simply
+          // renders without the health strip rather than taking the page down with it.
+          .catch(() => undefined)
+      })
     } catch (requestError: any) {
       setError(getErrorMessage(requestError, 'Could not load source connectors'))
     } finally {
