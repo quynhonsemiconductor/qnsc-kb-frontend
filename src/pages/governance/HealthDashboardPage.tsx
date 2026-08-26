@@ -43,9 +43,9 @@ export default function HealthDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64 text-slate-400">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-500 mr-3" />
-        <span>Compiling performance benchmarks...</span>
+      <div className="page-shell page-stack">
+        <div className="rounded-panel border border-border bg-card p-6"><div className="animate-pulse space-y-4"><div className="h-8 w-2/5 rounded bg-muted/50" /><div className="h-4 w-3/5 rounded bg-muted/40" /></div></div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }, (_, i) => <div key={i} className="animate-pulse rounded-2xl border border-border bg-card p-5"><div className="h-4 w-1/2 rounded bg-muted/50 mb-3" /><div className="h-8 w-1/3 rounded bg-muted/50 mb-2" /><div className="h-3 w-2/3 rounded bg-muted/40" /></div>)}</div>
       </div>
     )
   }

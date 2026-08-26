@@ -142,7 +142,7 @@ export function Select({ children, value, defaultValue, onChange, disabled = fal
         id={`${listboxId}-listbox`}
         role="listbox"
         aria-labelledby={id}
-        className="fixed z-[1000] overflow-y-auto rounded-surface border border-border bg-surface-elevated p-xxs shadow-[0_16px_35px_rgb(var(--shadow)/.25)]"
+        className="fixed z-[1000] overflow-y-auto rounded-surface border border-border bg-surface-elevated p-xxs shadow-[0_16px_35px_rgb(var(--shadow)/.25)] animate-in fade-in zoom-in-95 duration-150"
         style={{ top: position.top, left: position.left, width: position.width, maxHeight: position.maxHeight }}
       >
         {options.map((option, index) => <button key={option.value} type="button" role="option" id={optionId(index)} data-index={index} aria-selected={option.value === selectedValue} disabled={option.disabled} onMouseEnter={() => setActiveIndex(index)} onClick={() => { emit(option.value); setOpen(false) }} className={`flex w-full min-h-controlSm items-center gap-xs rounded-control px-sm text-left text-body-sm transition ${index === activeIndex ? 'bg-surface-muted text-foreground' : 'text-foreground hover:bg-surface-soft'} disabled:cursor-not-allowed disabled:opacity-50`}><span className="min-w-0 flex-1 truncate">{option.label}</span>{option.value === selectedValue && <Check size={14} className="shrink-0 text-primary" />}</button>)}
