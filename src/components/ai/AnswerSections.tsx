@@ -1,3 +1,4 @@
+import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -11,7 +12,7 @@ interface AnswerSectionsProps {
   onCitationClick: (citation: AnswerCitation) => void
 }
 
-export default function AnswerSections({ grounded, extended = '', citations = [], onCitationClick }: AnswerSectionsProps) {
+function AnswerSections({ grounded, extended = '', citations = [], onCitationClick }: AnswerSectionsProps) {
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-info/20 bg-info/[0.045] p-4 shadow-[0_10px_28px_rgb(var(--shadow)/.06)]">
@@ -29,3 +30,13 @@ export default function AnswerSections({ grounded, extended = '', citations = []
     </div>
   )
 }
+
+/* Memoised because the AI page keeps the composer's text in the SAME component that
+   renders the message list. Every keystroke therefore re-rendered every answer on
+   screen, and each answer re-runs ReactMarkdown with remark-gfm and rehype-highlight —
+   a full parse and syntax-highlight pass per character typed. The props here are
+   already stable across those renders (`content` is a string off the message,
+   `citations` is the array held in state, and `onCitationClick` is a useState setter,
+   which React guarantees is identity-stable), so the default shallow comparison is
+   enough to skip the work entirely. */
+export default React.memo(AnswerSections)

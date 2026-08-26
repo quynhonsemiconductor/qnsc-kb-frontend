@@ -82,7 +82,7 @@ export default function SearchResultsPage() {
       <PageHeader eyebrow="Discovery engine" title={t('search.hybrid')} description={t('search.subtitle')} icon={SearchIcon} actions={<span className="flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground"><Sparkles size={13} className="text-info" /> Hybrid retrieval</span>} />
 
       {/* Search Input and Filters Form */}
-      <form onSubmit={handleSearch} className="glass-panel soft-grid space-y-4 rounded-2xl border border-border p-5 backdrop-blur-md sm:p-6">
+      <form onSubmit={handleSearch} className="glass-panel soft-grid space-y-4 rounded-2xl border border-border p-5 sm:p-6">
         <div className="flex gap-2">
           <input
             type="text"

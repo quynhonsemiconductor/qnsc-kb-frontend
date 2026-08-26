@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Manrope:wght@500;600;700;800&display=swap');
+/* The webfonts are linked from index.html, NOT imported here. A CSS `@import` of a
+   remote stylesheet serialises what should be parallel: the browser has to fetch
+   this file, parse it, discover the import, open a connection to a second origin,
+   fetch that CSS, parse it, and only then request the font files — four hops before
+   text can render in the right face, all of it render-blocking. In the HTML the
+   preload scanner sees the stylesheet in the first bytes and fetches it alongside
+   the app's own CSS and JS. */
 
 @tailwind base;
 @tailwind components;
@@ -149,7 +155,11 @@
   .mm-secondary { @apply mm-pill border border-border bg-surface text-foreground transition hover:bg-surface-soft; }
   .theme-select { @apply cursor-pointer rounded-control border border-border bg-surface px-sm text-body-sm font-semibold text-foreground outline-none transition hover:bg-surface-soft focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20; }
   .ops-shell-glow { background: radial-gradient(ellipse at top, rgb(var(--primary) / .16), transparent 66%); }
-  .ops-header { background: linear-gradient(90deg, rgb(var(--header) / .96), rgb(var(--surface) / .78)); }
+  /* The header sits on every route and used to carry `backdrop-blur-xl`. A blurred
+     backdrop is re-computed whenever anything behind it moves, and the whole page
+     scrolls behind this one — so it was re-blurring the viewport continuously for a
+     translucency of .78 at its far end. Raised to .94 and the blur dropped. */
+  .ops-header { background: linear-gradient(90deg, rgb(var(--header) / .98), rgb(var(--surface) / .94)); }
   .ops-sidebar { background: rgb(var(--sidebar)); }
   .ops-sidebar-active { background: rgb(var(--sidebar-active)); }
   .ops-sidebar-hover:hover { background: rgb(var(--sidebar-hover)); }
@@ -160,7 +170,18 @@
      normal size. `zoom` is also not a layout tool: it rescales a subtree without telling
      its descendants, so nested fixed/sticky positioning and any px-based hit target
      silently drift. The workspace scale above is the one place size is decided. */
-  .glass-panel { background: linear-gradient(135deg, rgb(var(--surface-elevated) / .92), rgb(var(--surface) / .72)); backdrop-filter: blur(18px); box-shadow: 0 24px 70px rgb(var(--shadow) / .16); }
+  /* No `backdrop-filter`, deliberately. It was the single most expensive thing on the
+     page: it forces the element onto its own compositing layer AND re-blurs everything
+     behind it whenever the page scrolls or anything underneath repaints — on a panel
+     that wraps the main content of nearly every route. What it bought was close to
+     nothing. The backdrop here is a near-uniform page background, and blurring a
+     uniform surface returns the same pixels you started with, so the cost was paid for
+     a visual difference you cannot see. The gradient's low end is raised from .72 to
+     .88 to keep the panel reading as glass without it.
+     The shadow's blur radius comes down with it: a 70px spread over a full-width panel
+     is a large, repeatedly rasterised area for a shadow that is barely perceptible past
+     ~30px. */
+  .glass-panel { background: linear-gradient(135deg, rgb(var(--surface-elevated) / .96), rgb(var(--surface) / .88)); box-shadow: 0 12px 30px rgb(var(--shadow) / .14); }
   /* Login is the primary entry surface, so it uses the full design scale
      rather than the compact workspace-panel scale. */
   .login-panel { zoom: 1; }
@@ -174,11 +195,20 @@
     background:
       radial-gradient(circle at 100% 0%, rgb(var(--info) / .08), transparent 28%),
       linear-gradient(145deg, rgb(var(--surface-elevated) / .94), rgb(var(--surface) / .78) 58%, rgb(var(--background) / .82));
-    backdrop-filter: blur(22px) saturate(120%);
-    box-shadow: 0 16px 44px rgb(var(--shadow) / .13), inset 0 1px 0 rgb(255 255 255 / .1);
+    /* This element carries `glass-panel` too, so it used to stack a SECOND
+       backdrop-filter on top of that one — two full-viewport-width blurs on the AI
+       chat, the most interactive surface in the app, and both sat under an opaque
+       `bg-canvas` that made neither of them visible in the first place. The saturate()
+       is kept as a plain filter-free gradient adjustment instead. */
+    box-shadow: 0 10px 26px rgb(var(--shadow) / .13), inset 0 1px 0 rgb(255 255 255 / .1);
   }
-  .interactive-lift { transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease, background-color .2s ease; }
-  .interactive-lift:hover { transform: translateY(-2px); box-shadow: 0 20px 48px rgb(var(--shadow) / .18); }
+  /* `transform` is the only property here the compositor can animate on its own.
+     box-shadow cannot be: every frame of the transition repaints the element and its
+     48px shadow, and these sit on list items — the health dashboard alone has nine, so
+     moving the pointer across a list repainted a large blurred area per frame. The
+     shadow still changes on hover, it just arrives in one step instead of sixty. */
+  .interactive-lift { transition: transform .2s ease, border-color .2s ease, background-color .2s ease; }
+  .interactive-lift:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgb(var(--shadow) / .18); }
 }
 
 /* Compatibility mappings progressively bring existing feature pages into the
