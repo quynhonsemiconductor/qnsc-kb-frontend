@@ -14,7 +14,7 @@ import {
 } from '../../api/ai'
 import { createArticleEditRequest } from '../../api/articles'
 import PdfViewer from '../../components/ai/PdfViewer'
-import AnswerText from '../../components/ai/AnswerText'
+import AnswerText, { type AnswerCitation } from '../../components/ai/AnswerText'
 import AnswerSections from '../../components/ai/AnswerSections'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
@@ -208,6 +208,10 @@ const MOTION_STYLES = `
   .ask-press:active { transform: none; }
 }
 `
+
+// Module-level, so it is the same array on every render. An inline `[]` is a new
+// reference each time and would defeat AnswerText's memo for these two branches.
+const NO_CITATIONS: AnswerCitation[] = []
 
 export default function AskPage() {
   const navigate = useNavigate()
@@ -610,7 +614,7 @@ export default function AskPage() {
           />
         )}
 
-        <aside className={`absolute inset-y-0 left-0 z-30 flex w-[min(88vw,20rem)] shrink-0 flex-col overflow-hidden border-r border-hairline bg-surface/95 shadow-2xl backdrop-blur-xl transition-[width,transform] duration-300 ease-out lg:static lg:shadow-none ${sidebarOpen ? 'translate-x-0 lg:w-72' : '-translate-x-full lg:translate-x-0 lg:w-14'}`}>
+        <aside className={`absolute inset-y-0 left-0 z-30 flex w-[min(88vw,20rem)] shrink-0 flex-col overflow-hidden border-r border-hairline bg-surface/[.98] shadow-2xl transition-[width,transform] duration-300 ease-out lg:static lg:shadow-none ${sidebarOpen ? 'translate-x-0 lg:w-72' : '-translate-x-full lg:translate-x-0 lg:w-14'}`}>
           {sidebarOpen ? (
             <>
               <div className="flex shrink-0 items-center gap-2 border-b border-hairline p-4">
@@ -867,9 +871,9 @@ export default function AskPage() {
                                   </div>
                                 </div>
                               ) : message.action === 'edit_target_required' ? (
-                                <div className="rounded-xl border border-warning/20 bg-warning/10 px-3 py-3 text-warning"><p className="mb-2 text-caption font-bold uppercase tracking-widest text-warning">Article not found</p><AnswerText content={message.text} citations={[]} onCitationClick={setSelectedSource} /></div>
+                                <div className="rounded-xl border border-warning/20 bg-warning/10 px-3 py-3 text-warning"><p className="mb-2 text-caption font-bold uppercase tracking-widest text-warning">Article not found</p><AnswerText content={message.text} citations={NO_CITATIONS} onCitationClick={setSelectedSource} /></div>
                               ) : message.action ? (
-                                <div className="rounded-xl border border-success/20 bg-success/10 px-3 py-3 text-success"><p className="mb-2 text-caption font-bold uppercase tracking-widest text-success">AI action completed</p><AnswerText content={message.text} citations={[]} onCitationClick={setSelectedSource} /></div>
+                                <div className="rounded-xl border border-success/20 bg-success/10 px-3 py-3 text-success"><p className="mb-2 text-caption font-bold uppercase tracking-widest text-success">AI action completed</p><AnswerText content={message.text} citations={NO_CITATIONS} onCitationClick={setSelectedSource} /></div>
                               ) : message.answerGrounded !== undefined ? (
                                 <AnswerSections grounded={message.answerGrounded} extended={message.answerExtended} citations={message.citations} onCitationClick={setSelectedSource} />
                               ) : (

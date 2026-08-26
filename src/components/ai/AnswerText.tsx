@@ -23,7 +23,7 @@ interface AnswerTextProps {
 const CITATION_REGEX = /\[(?:Source ID:\s*)?(?:C)?(\d+)\]/gi
 
 /** Render grounded answers like DocNexus while making every citation interactive. */
-export default function AnswerText({ content, citations = [], onCitationClick }: AnswerTextProps) {
+function AnswerText({ content, citations = [], onCitationClick }: AnswerTextProps) {
   const findCitation = (number: number) => citations.find((citation) => citation.source_index === number)
     || (citations.every((citation) => citation.source_index == null) ? citations[number > 0 ? number - 1 : 0] : undefined)
 
@@ -86,3 +86,13 @@ export default function AnswerText({ content, citations = [], onCitationClick }:
     </div>
   )
 }
+
+/* Memoised because the AI page keeps the composer's text in the SAME component that
+   renders the message list. Every keystroke therefore re-rendered every answer on
+   screen, and each answer re-runs ReactMarkdown with remark-gfm and rehype-highlight —
+   a full parse and syntax-highlight pass per character typed. The props here are
+   already stable across those renders (`content` is a string off the message,
+   `citations` is the array held in state, and `onCitationClick` is a useState setter,
+   which React guarantees is identity-stable), so the default shallow comparison is
+   enough to skip the work entirely. */
+export default React.memo(AnswerText)

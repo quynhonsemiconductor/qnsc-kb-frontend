@@ -51,7 +51,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
   // pressed into each other. flex-wrap is the guarantee — a row of non-shrinking controls
   // that cannot wrap has nowhere to go but on top of itself.
   return (
-    <header className="ops-header relative z-10 flex min-h-[3.5rem] flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border px-3 py-2 backdrop-blur-xl md:min-h-[3.75rem] md:px-5">
+    <header className="ops-header relative z-10 flex min-h-[3.5rem] flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border px-3 py-2 md:min-h-[3.75rem] md:px-5">
       <button type="button" onClick={onMenuClick} aria-label="Open navigation" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-border bg-surface text-steel transition hover:bg-surface-soft hover:text-ink md:hidden"><Menu size={16} /></button>
       <div className="hidden min-w-[9.375rem] lg:block"><p className="text-caption font-bold uppercase tracking-[.16em] text-stone">QNSC / Workspace</p></div>
       <div className="ml-auto flex items-center gap-1.5 md:gap-2">
