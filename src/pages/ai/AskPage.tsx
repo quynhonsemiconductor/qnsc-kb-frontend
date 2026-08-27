@@ -18,6 +18,9 @@ import AnswerText, { type AnswerCitation } from '../../components/ai/AnswerText'
 import AnswerSections from '../../components/ai/AnswerSections'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
+import { Button } from '../../components/ui/Button'
+import { Badge } from '../../components/ui/Badge'
+import { Tooltip } from '../../components/ui/Tooltip'
 
 interface Citation {
   source_index?: number
@@ -551,7 +554,7 @@ export default function AskPage() {
 
   const handleDelete = async (id: string) => {
     const conversation = conversations.find((item) => item.id === id)
-    if (!(await dialog.confirm(`Delete “${conversation?.title || 'this chat'}”? The conversation history will be removed.`, { title: 'Delete conversation', confirmLabel: 'Delete chat', tone: 'danger' }))) return
+    if (!(await dialog.confirm(`Delete "${conversation?.title || 'this chat'}"? The conversation history will be removed.`, { title: 'Delete conversation', confirmLabel: 'Delete chat', tone: 'danger' }))) return
     try {
       await deleteConversation(id)
       const remaining = await refreshConversations()
@@ -618,19 +621,25 @@ export default function AskPage() {
           {sidebarOpen ? (
             <>
               <div className="flex shrink-0 items-center gap-2 border-b border-hairline p-4">
-                <button
+                <Button
+                  variant="primary"
+                  size="md"
+                  icon={<Plus size={16} />}
                   onClick={startNewChat}
-                  className="ask-press flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-bold text-primary-foreground shadow-[0_8px_18px_rgb(var(--primary)/.2)] hover:bg-primary/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="flex-1 rounded-xl font-bold shadow-[0_8px_18px_rgb(var(--primary)/.2)]"
                 >
-                  <Plus size={16} className="transition-transform duration-200 group-hover:rotate-90" /> {t('chat.new')}
-                </button>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="ask-press rounded-lg p-2 text-steel hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-minimaxBlue/40"
-                  title="Close sidebar"
-                >
-                  <ChevronLeft size={16} />
-                </button>
+                  {t('chat.new')}
+                </Button>
+                <Tooltip content="Close sidebar" position="bottom">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<ChevronLeft size={16} />}
+                    onClick={() => setSidebarOpen(false)}
+                    aria-label="Close sidebar"
+                    className="rounded-lg"
+                  />
+                </Tooltip>
               </div>
               <div className="ask-scroll flex-1 space-y-1 overflow-y-auto p-2">
                 <div className="mb-2 flex items-center justify-between px-3 pt-2">
@@ -684,54 +693,66 @@ export default function AskPage() {
                       )}
                       {!editing && (
                         <span className="absolute right-2 hidden items-center gap-1 bg-inherit pl-1 opacity-0 transition-opacity duration-150 group-hover:flex group-hover:opacity-100">
-                          <button
-                            onClick={(event) => { event.stopPropagation(); setEditingId(conversation.id); setEditTitle(conversation.title) }}
-                            className="ask-press rounded p-1 text-stone hover:bg-surface-soft hover:text-ink"
-                            title="Rename chat"
-                          >
-                            <Pencil size={12} />
-                          </button>
-                          <button
-                            onClick={(event) => { event.stopPropagation(); void handleDelete(conversation.id) }}
-                            className="ask-press rounded p-1 text-stone hover:bg-destructive/15 hover:text-destructive"
-                            title="Delete chat"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          <Tooltip content="Rename chat" position="top">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              icon={<Pencil size={12} />}
+                              onClick={(event) => { event.stopPropagation(); setEditingId(conversation.id); setEditTitle(conversation.title) }}
+                              aria-label="Rename chat"
+                              className="h-6 w-6 !p-1 rounded text-stone hover:text-ink"
+                            />
+                          </Tooltip>
+                          <Tooltip content="Delete chat" position="top">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              icon={<Trash2 size={13} />}
+                              onClick={(event) => { event.stopPropagation(); void handleDelete(conversation.id) }}
+                              aria-label="Delete chat"
+                              className="h-6 w-6 !p-1 rounded text-stone hover:bg-destructive/15 hover:text-destructive"
+                            />
+                          </Tooltip>
                         </span>
                       )}
                     </div>
                   )
                 })}
                 {!historyQuery.trim() && visibleConversations.length > 8 && (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     type="button"
                     onClick={() => setShowAllHistory((current) => !current)}
-                    className="mt-1 w-full rounded-lg px-3 py-2 text-left text-body font-semibold text-minimaxBlue transition hover:bg-surface hover:text-ink"
+                    className="mt-1 w-full justify-start rounded-lg px-3 py-2 text-left font-semibold text-minimaxBlue hover:text-ink"
                   >
                     {showAllHistory ? t('chat.showLess') : t('chat.showMore', { count: visibleConversations.length - 8 })}
-                  </button>
+                  </Button>
                 )}
               </div>
             </>
           ) : (
             <div className="flex h-full flex-col items-center gap-2 pt-3">
-              <button
-                onClick={startNewChat}
-                className="ask-press rounded-lg p-2 text-steel hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-minimaxBlue/40"
-                title="New chat"
-                aria-label="New chat"
-              >
-                <Plus size={17} />
-              </button>
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="ask-press rounded-lg p-2 text-steel hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-minimaxBlue/40"
-                title="Open chat history"
-                aria-label="Open chat history"
-              >
-                <List size={17} />
-              </button>
+              <Tooltip content="New chat" position="right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<Plus size={17} />}
+                  onClick={startNewChat}
+                  aria-label="New chat"
+                  className="rounded-lg"
+                />
+              </Tooltip>
+              <Tooltip content="Open chat history" position="right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<List size={17} />}
+                  onClick={() => setSidebarOpen(true)}
+                  aria-label="Open chat history"
+                  className="rounded-lg"
+                />
+              </Tooltip>
             </div>
           )}
         </aside>
@@ -739,7 +760,14 @@ export default function AskPage() {
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-canvas">
            <div className="signal-line flex shrink-0 items-center justify-between border-b border-hairline bg-surface/45 px-4 py-3.5 sm:px-5 sm:py-4 lg:px-8">
              <div className="flex min-w-0 items-center gap-3">
-              <button onClick={() => setSidebarOpen(true)} className="ask-press grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-hairline bg-surface text-steel hover:bg-surface-soft hover:text-ink lg:hidden" title="Open chat history" aria-label="Open chat history"><List size={16} /></button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<List size={16} />}
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Open chat history"
+                className="ask-press grid h-9 w-9 shrink-0 place-items-center rounded-xl lg:hidden"
+              />
               <div className={`grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-[0_8px_18px_rgb(var(--primary)/.2)] transition-shadow ${loading ? 'ask-avatar-live' : ''}`}>
                 <Bot size={19} />
               </div>
@@ -749,8 +777,8 @@ export default function AskPage() {
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden items-center gap-2 sm:flex">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-info/20 bg-info/10 px-2.5 py-1 text-caption font-bold uppercase tracking-[.12em] text-info"><span className="h-1.5 w-1.5 rounded-full bg-info shadow-[0_0_8px_currentColor]" /> RAG online</span>
-                <span className="rounded-full border border-hairline bg-canvas px-2.5 py-1 text-caption font-semibold text-stone">{messages.length ? `${messages.length} turns` : 'New session'}</span>
+                <Badge variant="info" size="md" dot className="font-bold uppercase tracking-[.12em]">RAG online</Badge>
+                <Badge variant="default" size="md" className="font-semibold">{messages.length ? `${messages.length} turns` : 'New session'}</Badge>
               </div>
               <span className="hidden items-center gap-1.5 text-body-sm text-stone sm:flex">
                 <span className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${loading ? 'animate-pulse bg-warning' : 'bg-success'}`} />
@@ -786,7 +814,11 @@ export default function AskPage() {
                       </button>
                     ))}
                   </div>
-                  <div className="mt-7 flex flex-wrap justify-center gap-2 text-caption font-semibold uppercase tracking-[.12em] text-stone"><span className="rounded-full border border-hairline bg-surface px-2.5 py-1.5">Authorized sources only</span><span className="rounded-full border border-hairline bg-surface px-2.5 py-1.5">Clickable citations</span><span className="rounded-full border border-hairline bg-surface px-2.5 py-1.5">Department aware</span></div>
+                  <div className="mt-7 flex flex-wrap justify-center gap-2 text-caption font-semibold uppercase tracking-[.12em] text-stone">
+                    <Badge variant="default" size="sm">Authorized sources only</Badge>
+                    <Badge variant="default" size="sm">Clickable citations</Badge>
+                    <Badge variant="default" size="sm">Department aware</Badge>
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col gap-5">
@@ -797,13 +829,16 @@ export default function AskPage() {
                       <div key={messageId} className="ask-fade-up group flex justify-end">
                         <div className="flex w-full max-w-[96%] flex-col items-end gap-1">
                           <p className="whitespace-pre-wrap rounded-2xl border border-hairline bg-surface px-4 py-2.5 text-body leading-6 text-ink transition-shadow duration-200 group-hover:shadow-sm">{message.text}</p>
-                          <button
-                            onClick={() => void copyMessage(message, index)}
-                            className="ask-press mr-2 p-1 text-stone opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-ink"
-                            title="Copy question"
-                          >
-                            {copiedId === messageId ? <Check size={13} className="text-success" /> : <Copy size={13} />}
-                          </button>
+                          <Tooltip content="Copy question" position="bottom">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              icon={copiedId === messageId ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+                              onClick={() => void copyMessage(message, index)}
+                              aria-label="Copy question"
+                              className="mr-2 !p-1 text-stone opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-ink"
+                            />
+                          </Tooltip>
                         </div>
                         <div className="ml-2 mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-soft text-steel">
                           <UserIcon size={14} />
@@ -835,12 +870,16 @@ export default function AskPage() {
                                   <AlertCircle size={15} className="mt-0.5 shrink-0 text-destructive" />
                                   <span>{message.text}</span>
                                 </div>
-                                <button
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  icon={<ArrowUp size={12} />}
+                                  iconPosition="right"
                                   onClick={() => void handleAsk(message.retryQuestion || '')}
-                                  className="ask-press mt-2 inline-flex items-center gap-1.5 rounded-md border border-destructive/25 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/20"
+                                  className="mt-2 rounded-md border border-destructive/25 bg-destructive/10 text-xs font-medium text-destructive hover:bg-destructive/20"
                                 >
-                                  Try again <ArrowUp size={12} />
-                                </button>
+                                  Try again
+                                </Button>
                               </div>
                             ) : isNoAnswer ? (
                               <p className="text-body italic leading-6 text-stone">{message.text}</p>
@@ -852,22 +891,26 @@ export default function AskPage() {
                                   <div className="mt-3 rounded-lg border border-warning/20 bg-black/10 px-3 py-2"><p className="text-caption font-bold uppercase tracking-widest text-warning">Original information</p><p className="mt-1 text-xs leading-5 text-warning/80">{message.originalInformation || message.articlePreview || 'The matched source passage is unavailable.'}</p></div>
                                   <div className="mt-3"><label className="text-caption font-bold uppercase tracking-widest text-warning" htmlFor={`edit-instruction-${messageId}`}>Will update</label><textarea id={`edit-instruction-${messageId}`} value={editDraft} onChange={(event) => updatePendingEditInstruction(event.target.value)} rows={4} className="mt-1 w-full resize-y rounded-lg border border-warning/20 bg-black/10 px-3 py-2 text-xs leading-5 text-warning outline-none placeholder:text-warning/50 focus:border-warning/50" placeholder="Describe the corrected information" /></div>
                                   <div className="mt-3 flex flex-wrap gap-2">
-                                    <button
+                                    <Button
+                                      variant="primary"
+                                      size="sm"
                                       type="button"
                                       disabled={loading || !message.articleId || !editDraft.trim()}
                                       onClick={() => void handleAsk('Yes, update this article', { confirmEdit: true, articleId: message.articleId, editInstruction: editDraft })}
-                                      className="ask-press rounded-lg bg-success px-3 py-2 text-body-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                      className="rounded-lg bg-success font-bold text-white hover:bg-success/90"
                                     >
                                       Yes, update this article
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
                                       type="button"
                                       disabled={loading}
                                       onClick={cancelPendingEdit}
-                                      className="ask-press rounded-lg border border-warning/25 px-3 py-2 text-body-sm font-bold text-warning hover:bg-warning/10 disabled:opacity-50"
+                                      className="rounded-lg border-warning/25 font-bold text-warning hover:bg-warning/10"
                                     >
                                       No
-                                    </button>
+                                    </Button>
                                   </div>
                                 </div>
                               ) : message.action === 'edit_target_required' ? (
@@ -914,18 +957,41 @@ export default function AskPage() {
                           </div>
                         )}
                         <div className="mt-4 flex items-center gap-2 border-t border-hairline/70 pt-3 pl-10">
-                          <button
-                            onClick={() => void copyMessage(message, index)}
-                            className="ask-press flex items-center gap-1.5 rounded-md border border-hairline bg-canvas px-2 py-1 text-xs text-steel transition-[background-color,color,border-color] duration-150 hover:border-[#50627a] hover:bg-surface-soft hover:text-ink"
-                            title="Copy answer"
-                          >
-                            {copiedId === messageId ? <><Check size={13} className="text-success" /> Copied</> : <><Copy size={13} /> Copy answer</>}
-                          </button>
+                          <Tooltip content={copiedId === messageId ? 'Copied!' : 'Copy answer'} position="top">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              icon={copiedId === messageId ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+                              onClick={() => void copyMessage(message, index)}
+                              aria-label="Copy answer"
+                              className="ask-press rounded-md text-xs text-steel hover:text-ink"
+                            >
+                              {copiedId === messageId ? 'Copied' : 'Copy answer'}
+                            </Button>
+                          </Tooltip>
                           {message.logId && !message.feedbackSubmitted && (
                             <>
                               <span className="ml-2 text-xs text-stone">Helpful?</span>
-                              <button onClick={() => void handleFeedback(index, 1)} className="ask-press rounded-full p-1 text-stone hover:bg-success/10 hover:text-success"><ThumbsUp size={13} /></button>
-                              <button onClick={() => void handleFeedback(index, -1)} className="ask-press rounded-full p-1 text-stone hover:bg-destructive/10 hover:text-destructive"><ThumbsDown size={13} /></button>
+                              <Tooltip content="Helpful" position="top">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  icon={<ThumbsUp size={13} />}
+                                  onClick={() => void handleFeedback(index, 1)}
+                                  aria-label="Helpful"
+                                  className="ask-press rounded-full !p-1 text-stone hover:bg-success/10 hover:text-success"
+                                />
+                              </Tooltip>
+                              <Tooltip content="Not helpful" position="top">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  icon={<ThumbsDown size={13} />}
+                                  onClick={() => void handleFeedback(index, -1)}
+                                  aria-label="Not helpful"
+                                  className="ask-press rounded-full !p-1 text-stone hover:bg-destructive/10 hover:text-destructive"
+                                />
+                              </Tooltip>
                             </>
                           )}
                         </div>
@@ -954,13 +1020,35 @@ export default function AskPage() {
                 <div className="ask-fade-up mb-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
                   <AlertCircle size={15} className="mt-0.5 shrink-0" />
                   <span className="flex-1">{error}</span>
-                  <button onClick={() => setError('')} className="ask-press underline hover:text-destructive">Dismiss</button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setError('')}
+                    className="ask-press text-xs text-destructive underline hover:text-destructive"
+                  >
+                    Dismiss
+                  </Button>
                 </div>
               )}
-               {requestArticleId && <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-info/20 bg-info/10 px-3 py-2.5 text-xs text-info"><span className="min-w-0 flex-1">Requesting a correction for <strong>{requestArticleTitle}</strong>. Type the exact change, then submit it to an authorized editor.</span><button type="button" onClick={() => void handleCreateEditRequest()} disabled={loading || (question.trim().length < 5 && lastRequestText.trim().length < 5)} className="rounded-lg bg-info px-3 py-2 text-body-sm font-bold text-[#07131a] disabled:cursor-not-allowed disabled:opacity-50">Create edit request</button></div>}
+               {requestArticleId && (
+                 <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-info/20 bg-info/10 px-3 py-2.5 text-xs text-info">
+                   <span className="min-w-0 flex-1">Requesting a correction for <strong>{requestArticleTitle}</strong>. Type the exact change, then submit it to an authorized editor.</span>
+                   <Button
+                     variant="primary"
+                     size="sm"
+                     type="button"
+                     onClick={() => void handleCreateEditRequest()}
+                     disabled={loading || (question.trim().length < 5 && lastRequestText.trim().length < 5)}
+                     className="rounded-lg bg-info font-bold text-[#07131a]"
+                   >
+                     Create edit request
+                   </Button>
+                 </div>
+               )}
                {requestStatus && <div role="status" className="mb-3 rounded-lg border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">{requestStatus}</div>}
                <div className="mb-2 flex items-center gap-1.5 text-body-sm text-stone">
-                 <span className="inline-flex items-center gap-1.5 rounded-full border border-info/20 bg-info/10 px-2 py-1 text-caption font-bold text-info"><span className="h-1.5 w-1.5 rounded-full bg-info" /> Grounded mode</span><span className="hidden sm:inline">Press <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Enter</kbd> to send · <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Shift+Enter</kbd> for a new line</span>
+                 <Badge variant="info" size="sm" dot className="font-bold">Grounded mode</Badge>
+                 <span className="hidden sm:inline">Press <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Enter</kbd> to send · <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Shift+Enter</kbd> for a new line</span>
                 <span className="ml-auto tabular-nums">{question.length}/4000</span>
               </div>
                <div className="gradient-border flex items-end gap-2 rounded-2xl border bg-surface p-2 transition-all duration-200 focus-within:shadow-lg focus-within:ring-2 focus-within:ring-minimaxBlue/20">
@@ -976,24 +1064,29 @@ export default function AskPage() {
                   className="max-h-44 min-h-[28px] flex-1 resize-none overflow-hidden bg-transparent px-2 py-1.5 text-body leading-6 text-ink outline-none placeholder:text-stone"
                 />
                 {loading && (
-                  <button
-                    type="button"
-                    onClick={() => abortRef.current?.abort()}
-                    aria-label="Stop generating"
-                    title="Stop generating"
-                    className="ask-press grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-hairline bg-surface text-steel transition hover:bg-surface-soft hover:text-ink"
-                  >
-                    <Square size={14} />
-                  </button>
+                  <Tooltip content="Stop generating" position="top">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      type="button"
+                      icon={<Square size={14} />}
+                      onClick={() => abortRef.current?.abort()}
+                      aria-label="Stop generating"
+                      className="ask-press grid h-10 w-10 shrink-0 place-items-center rounded-xl"
+                    />
+                  </Tooltip>
                 )}
-                <button
-                  onClick={() => void handleAsk()}
-                  disabled={!question.trim() || loading}
-                  aria-label="Send question"
-                   className="ask-press grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-[0_8px_18px_rgb(var(--primary)/.24)] transition-all hover:scale-105 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
-                >
-                  <ArrowUp size={17} />
-                </button>
+                <Tooltip content="Send question" position="top">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<ArrowUp size={17} />}
+                    onClick={() => void handleAsk()}
+                    disabled={!question.trim() || loading}
+                    aria-label="Send question"
+                    className="ask-press grid h-10 w-10 shrink-0 place-items-center rounded-xl shadow-[0_8px_18px_rgb(var(--primary)/.24)] hover:scale-105 disabled:hover:scale-100"
+                  />
+                </Tooltip>
               </div>
             </div>
           </div>
@@ -1005,16 +1098,26 @@ export default function AskPage() {
             <aside className={`${sourceCollapsed ? 'w-12' : 'w-full max-w-sm lg:w-80'} ask-slide-in fixed inset-y-0 right-0 z-50 flex flex-col border-l border-hairline bg-surface transition-[width] duration-300 ease-out lg:static lg:shrink-0`}>
               <header className="signal-line flex h-14 shrink-0 items-center gap-2 border-b border-hairline px-3">
                 <span className={`${sourceCollapsed ? 'hidden' : 'flex'} flex-1 items-center gap-2 text-caption font-bold uppercase tracking-widest text-info`}><span className="h-1.5 w-1.5 rounded-full bg-info" /> Source evidence</span>
-                <button
-                  onClick={() => setSourceCollapsed((value) => !value)}
-                  className="ask-press rounded-lg p-2 text-steel hover:bg-surface-soft hover:text-ink"
-                  title={sourceCollapsed ? 'Expand source' : 'Collapse source'}
-                >
-                  {sourceCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-                </button>
-                <button onClick={() => setSelectedSource(null)} className="ask-press rounded-lg p-2 text-steel hover:bg-surface-soft hover:text-ink">
-                  <X size={16} />
-                </button>
+                <Tooltip content={sourceCollapsed ? 'Expand source' : 'Collapse source'} position="left">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={sourceCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                    onClick={() => setSourceCollapsed((value) => !value)}
+                    aria-label={sourceCollapsed ? 'Expand source' : 'Collapse source'}
+                    className="ask-press rounded-lg text-steel hover:text-ink"
+                  />
+                </Tooltip>
+                <Tooltip content="Close source panel" position="left">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<X size={16} />}
+                    onClick={() => setSelectedSource(null)}
+                    aria-label="Close source panel"
+                    className="ask-press rounded-lg text-steel hover:text-ink"
+                  />
+                </Tooltip>
               </header>
               {!sourceCollapsed && (
                 <>
@@ -1036,19 +1139,27 @@ export default function AskPage() {
                     {sourceError && <p className="ask-fade-up mt-3 text-xs text-destructive">{sourceError}</p>}
                   </div>
                   <footer className="space-y-2 border-t border-hairline p-4">
-                    <button
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={<BookOpen size={13} />}
+                      iconPosition="right"
                       disabled={sourceLoading || !sourceUrl}
                       onClick={() => openSourceViewer(selectedSource)}
-                      className="ask-press flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-primary-foreground transition-all hover:bg-charcoal hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none"
+                      className="ask-press w-full rounded-lg bg-ink text-primary-foreground hover:bg-charcoal hover:shadow-md"
                     >
-                      {sourceLoading ? 'Loading source…' : selectedSource.page_number ? `View PDF · page ${selectedSource.page_number}` : 'View original source'} <BookOpen size={13} />
-                    </button>
-                    <button
+                      {sourceLoading ? 'Loading source…' : selectedSource.page_number ? `View PDF · page ${selectedSource.page_number}` : 'View original source'}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<ExternalLink size={13} />}
+                      iconPosition="right"
                       onClick={() => navigate(`/articles/${selectedSource.article_id}`)}
-                      className="ask-press flex w-full items-center justify-center gap-2 rounded-lg border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink transition-all hover:bg-surface-soft hover:shadow-sm"
+                      className="ask-press w-full rounded-lg"
                     >
-                      Open article <ExternalLink size={13} />
-                    </button>
+                      Open article
+                    </Button>
                   </footer>
                 </>
               )}

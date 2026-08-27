@@ -7,6 +7,9 @@ import { useAuth } from '../../auth/useAuth'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { Select } from '../../components/ui/Select'
 import { FloatingPanel } from '../../components/ui/FloatingPanel'
+import { Button } from '../../components/ui/Button'
+import { Input } from '../../components/ui/Input'
+import { Badge } from '../../components/ui/Badge'
 
 const ARTICLE_TEMPLATE = '# Purpose\n\n## Summary\n\n## Procedure or details\n\n## Ownership and review\n'
 type Department = { id: string; name: string; company_domain: string; active: boolean }
@@ -30,7 +33,7 @@ function DepartmentPicker({ value, options, onChange }: { value: string[]; optio
     <FloatingPanel anchorRef={anchorRef} open={open} onClose={() => setOpen(false)} className="border-slate-700 bg-slate-900 p-1.5 shadow-2xl shadow-black/40">
       <div className="flex items-center justify-between border-b border-slate-800 px-2.5 py-2">
         <span className="text-caption font-bold uppercase tracking-[.14em] text-slate-500">Article visibility</span>
-        {selected.length > 0 && <button type="button" onClick={() => onChange([])} className="text-caption font-semibold text-brand-400 hover:text-brand-300">Clear all</button>}
+        {selected.length > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])} className="text-caption font-semibold text-brand-400 hover:text-brand-300">Clear all</Button>}
       </div>
       <div className="py-1">
         {options.length ? options.map(item => { const checked = value.includes(item.id); return <button key={item.id} type="button" onClick={() => toggle(item.id)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-xs text-slate-200 transition hover:bg-slate-800">
@@ -40,10 +43,10 @@ function DepartmentPicker({ value, options, onChange }: { value: string[]; optio
         </button> }) : <p className="px-2.5 py-3 text-xs text-slate-500">No departments available.</p>}
       </div>
     </FloatingPanel>
-    {selected.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{selected.map((item, index) => <span key={item.id} className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-caption font-semibold ${index === 0 ? 'border-brand-500/30 bg-brand-500/10 text-brand-300' : 'border-slate-700 bg-slate-800 text-slate-300'}`}>
+    {selected.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{selected.map((item, index) => <Badge key={item.id} variant={index === 0 ? 'primary' : 'default'} size="sm" className="gap-1">
       {item.name}{index === 0 && <span className="text-caption uppercase tracking-wide opacity-70">primary</span>}
       <button type="button" aria-label={`Remove ${item.name}`} onClick={() => toggle(item.id)} className="rounded-full p-0.5 hover:bg-white/10"><X size={11} /></button>
-    </span>)}</div>}
+    </Badge>)}</div>}
   </div>
 }
 
@@ -185,13 +188,14 @@ export default function ArticleEditPage() {
   return (
     <div className="page-shell page-stack">
       <div className="page-hero glass-panel soft-grid relative flex items-center justify-between overflow-hidden rounded-panel border border-border px-4 py-4 sm:px-6 sm:py-5">
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => navigate(-1)}
-          className="mm-secondary flex items-center gap-1.5 px-3 py-2 text-sm"
+          icon={<ArrowLeft size={16} />}
         >
-          <ArrowLeft size={16} />
-          <span>Back</span>
-        </button>
+          Back
+        </Button>
         <h1 className="font-display text-xl font-extrabold text-foreground">
           {isEditMode ? 'Modify Article' : 'Submit New Article'}
         </h1>
@@ -208,25 +212,23 @@ export default function ArticleEditPage() {
         {/* Editor Body */}
         <div className="lg:col-span-2 space-y-5">
           {/* Title */}
-          <div className="space-y-1.5">
-            <label className="block text-sm font-semibold text-slate-300">Document Title</label>
-            <input
-              type="text"
-              placeholder="e.g., Incident Response Playbook: Database Outages"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="field py-3"
-              required
-            />
-          </div>
+          <Input
+            label="Document Title"
+            type="text"
+            placeholder="e.g., Incident Response Playbook: Database Outages"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="py-3"
+            required
+          />
 
           {/* Markdown Content */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="block text-sm font-semibold text-slate-300">Body Markdown</label>
-              <button type="button" onClick={insertTemplate} className="text-xs font-semibold text-brand-400 hover:text-brand-300">
+              <Button type="button" variant="ghost" size="sm" onClick={insertTemplate}>
                 Insert basic template
-              </button>
+              </Button>
             </div>
             <textarea
               placeholder="# Introduction&#10;Write details about procedures, policies, or decision log references here..."
@@ -239,17 +241,15 @@ export default function ArticleEditPage() {
           </div>
 
           {/* Tags */}
-          <div className="space-y-1.5">
-            <label className="block text-sm font-semibold text-slate-300">Tags</label>
-            <input
-              type="text"
-              placeholder="incident, database, runbook (comma separated)"
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
-              className="field py-2.5"
-            />
-            <p className="text-body-sm leading-5 text-slate-500">Tags become topics in the library. Add the primary topic first, then any secondary topics.</p>
-          </div>
+          <Input
+            label="Tags"
+            type="text"
+            placeholder="incident, database, runbook (comma separated)"
+            value={tagsInput}
+            onChange={(e) => setTagsInput(e.target.value)}
+            hint="Tags become topics in the library. Add the primary topic first, then any secondary topics."
+            className="py-2.5"
+          />
         </div>
 
         {/* Sidebar attributes */}
@@ -292,8 +292,8 @@ export default function ArticleEditPage() {
                       const denied = deniedUserIds.includes(employee.id)
                       return <div key={employee.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-slate-900">
                         <span className="min-w-0 flex-1 truncate text-slate-200">{employee.name} <span className="text-slate-500">({employee.email})</span></span>
-                        <button type="button" onClick={() => { setExplicitUserIds(current => allowed ? current.filter(item => item !== employee.id) : [...current, employee.id]); setDeniedUserIds(current => current.filter(item => item !== employee.id)) }} className={`rounded-md border px-2 py-1 text-caption font-semibold ${allowed ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300' : 'border-slate-700 text-slate-500'}`}>Allow</button>
-                        <button type="button" onClick={() => { setDeniedUserIds(current => denied ? current.filter(item => item !== employee.id) : [...current, employee.id]); setExplicitUserIds(current => current.filter(item => item !== employee.id)) }} className={`rounded-md border px-2 py-1 text-caption font-semibold ${denied ? 'border-rose-500/50 bg-rose-500/15 text-rose-300' : 'border-slate-700 text-slate-500'}`}>Deny</button>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => { setExplicitUserIds(current => allowed ? current.filter(item => item !== employee.id) : [...current, employee.id]); setDeniedUserIds(current => current.filter(item => item !== employee.id)) }} className={`rounded-md border px-2 py-1 text-caption font-semibold ${allowed ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300' : 'border-slate-700 text-slate-500'}`}>Allow</Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => { setDeniedUserIds(current => denied ? current.filter(item => item !== employee.id) : [...current, employee.id]); setExplicitUserIds(current => current.filter(item => item !== employee.id)) }} className={`rounded-md border px-2 py-1 text-caption font-semibold ${denied ? 'border-rose-500/50 bg-rose-500/15 text-rose-300' : 'border-slate-700 text-slate-500'}`}>Deny</Button>
                       </div>
                     }) : <p className="py-2 text-body-sm text-slate-500">No company users are available.</p>}
                   </div>
@@ -331,26 +331,29 @@ export default function ArticleEditPage() {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Next Review Date</label>
-                <input
+                <Input
+                  label="Next Review Date"
                   type="date"
                   value={nextReview}
                   onChange={(e) => setNextReview(e.target.value)}
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-primary-foreground outline-none focus:border-brand-500"
+                  className="text-xs"
                 />
               </div>
             </div>
           </div>
 
           {/* Save button */}
-          <button
+          <Button
             type="submit"
+            variant="primary"
+            size="lg"
             disabled={saving}
-            className="w-full bg-brand-600 hover:bg-brand-500 text-primary-foreground font-semibold text-sm py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20 hover:shadow-brand-500/35 transition-all disabled:opacity-50"
+            loading={saving}
+            icon={<Save size={16} />}
+            className="w-full shadow-lg shadow-brand-600/20 hover:shadow-brand-500/35"
           >
-            <Save size={16} />
-            <span>{saving ? 'Saving...' : 'Submit for approval'}</span>
-          </button>
+            {saving ? 'Saving...' : 'Submit for approval'}
+          </Button>
         </div>
 
       </form>

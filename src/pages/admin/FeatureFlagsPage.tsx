@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Check, Settings2, Sparkles } from 'lucide-react'
 import { getFeatureFlags, updateFeatureFlag } from '../../api/governance'
 import PageHeader from '../../components/ui/PageHeader'
+import { Button } from '../../components/ui/Button'
 
 type FeatureFlag = {
   key: string
@@ -62,17 +63,20 @@ export default function FeatureFlagsPage() {
                 <p className="mt-1 text-caption uppercase tracking-wider text-stone">{flag.key} · Workspace-wide</p>
               </div>
             </div>
-            <button
+            <Button
               type="button"
               role="switch"
               aria-checked={flag.enabled}
               disabled={savingKey === flag.key}
               onClick={() => void toggle(flag)}
-              className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${flag.enabled ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20' : 'border-hairline bg-canvas text-stone hover:bg-surface-soft hover:text-ink'} disabled:cursor-wait disabled:opacity-60`}
+              variant={flag.enabled ? 'primary' : 'secondary'}
+              size="sm"
+              loading={savingKey === flag.key}
+              icon={!savingKey || savingKey !== flag.key ? <span className={`grid h-4 w-4 place-items-center rounded-full ${flag.enabled ? 'bg-emerald-400 text-[#102017]' : 'bg-surface-soft'}`}>{flag.enabled && <Check size={11} />}</span> : undefined}
+              className={flag.enabled ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20' : ''}
             >
-              <span className={`grid h-4 w-4 place-items-center rounded-full ${flag.enabled ? 'bg-emerald-400 text-[#102017]' : 'bg-surface-soft'}`}>{flag.enabled && <Check size={11} />}</span>
               {savingKey === flag.key ? 'Saving…' : flag.enabled ? 'Enabled' : 'Disabled'}
-            </button>
+            </Button>
           </article>
         ))}
       </section>

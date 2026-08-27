@@ -40,6 +40,9 @@ import { usePermission } from '../../hooks/usePermission'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
 import { canEditArticleForUser } from '../../utils/articlePermissions'
+import { Button } from '../../components/ui/Button'
+import { Badge } from '../../components/ui/Badge'
+import { Tooltip } from '../../components/ui/Tooltip'
 
 function normalizeWikiTarget(value: string) {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
@@ -283,7 +286,7 @@ export default function ArticleDetailPage() {
         <div className="page-shell page-stack">
           <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             <span>Failed to load. Please retry.</span>
-            <button type="button" onClick={() => void loadArticleDetails()} className="text-xs font-bold uppercase tracking-wide hover:underline">Retry</button>
+            <Button type="button" variant="danger" size="sm" onClick={() => void loadArticleDetails()}>Retry</Button>
           </div>
         </div>
       )
@@ -310,49 +313,66 @@ export default function ArticleDetailPage() {
         </Link>
         
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleBookmarkToggle}
-                 className={`rounded-xl border p-2 transition-all ${
-              bookmarked 
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
-                : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
-            }`}
-            title={bookmarked ? "Bookmarked" : "Bookmark article"}
-          >
-            <Bookmark size={18} fill={bookmarked ? "currentColor" : "none"} />
-          </button>
-          <button type="button" onClick={() => void handleFollowToggle()} className={`rounded-xl border p-2 transition-all ${following ? 'border-info/30 bg-info/10 text-info' : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'}`} title={following ? 'Unfollow article' : 'Follow article'}>
-            <Bell size={18} fill={following ? 'currentColor' : 'none'} />
-          </button>
+          <Tooltip content={bookmarked ? "Bookmarked" : "Bookmark article"}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBookmarkToggle}
+              aria-label={bookmarked ? "Bookmarked" : "Bookmark article"}
+              className={`rounded-xl border p-2 ${
+                bookmarked 
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
+                  : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
+              }`}
+              icon={<Bookmark size={18} fill={bookmarked ? "currentColor" : "none"} />}
+            />
+          </Tooltip>
+          <Tooltip content={following ? "Unfollow article" : "Follow article"}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void handleFollowToggle()}
+              aria-label={following ? "Unfollow article" : "Follow article"}
+              className={`rounded-xl border p-2 ${following ? 'border-info/30 bg-info/10 text-info' : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'}`}
+              icon={<Bell size={18} fill={following ? 'currentColor' : 'none'} />}
+            />
+          </Tooltip>
           
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-               className={`rounded-xl border p-2 transition-all ${
-              showHistory 
-                ? 'bg-brand-500/10 border-brand-500/30 text-brand-400' 
-                : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
-            }`}
-            title="Version History"
-          >
-            <History size={18} />
-          </button>
+          <Tooltip content="Version History">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowHistory(!showHistory)}
+              aria-label="Version History"
+              className={`rounded-xl border p-2 ${
+                showHistory 
+                  ? 'bg-brand-500/10 border-brand-500/30 text-brand-400' 
+                  : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
+              }`}
+              icon={<History size={18} />}
+            />
+          </Tooltip>
 
           {canEdit && (
             <>
-              <Link
-                to={`/articles/${article.id}/edit`}
-                 className="rounded-xl border border-border bg-surface px-3 py-2 text-muted-foreground transition-all hover:bg-surface-soft hover:text-foreground"
-                title="Edit Article"
-              >
-                <Edit size={18} />
-              </Link>
-              <button
-                onClick={handleDelete}
-                 className="rounded-xl border border-destructive/20 bg-surface px-3 py-2 text-destructive transition-all hover:bg-destructive/10"
-                title="Soft Delete"
-              >
-                <Trash2 size={18} />
-              </button>
+              <Tooltip content="Edit Article">
+                <Link
+                  to={`/articles/${article.id}/edit`}
+                  className="rounded-xl border border-border bg-surface px-3 py-2 text-muted-foreground transition-all hover:bg-surface-soft hover:text-foreground"
+                >
+                  <Edit size={18} />
+                </Link>
+              </Tooltip>
+              <Tooltip content="Soft Delete">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDelete}
+                  aria-label="Soft Delete"
+                  className="rounded-xl border border-destructive/20 bg-surface px-3 py-2 text-destructive hover:bg-destructive/10"
+                  icon={<Trash2 size={18} />}
+                />
+              </Tooltip>
             </>
           )}
           {!canEdit && has('ai.ask') && (
@@ -361,14 +381,15 @@ export default function ArticleDetailPage() {
             </Link>
           )}
           {article.source_available && (
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => void handleOpenSource()}
               disabled={sourceLoading}
-               className="mm-secondary flex items-center gap-1.5 px-3 py-2 text-xs font-semibold disabled:cursor-wait disabled:opacity-60"
-              title="Review original source"
+              loading={sourceLoading}
             >
               {sourceLoading ? 'Loading source…' : 'Review source'}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -394,11 +415,11 @@ export default function ArticleDetailPage() {
                   <Calendar size={14} />
                   <span>Created {new Date(article.created_at).toLocaleDateString()}</span>
                 </span>
-                <span className="bg-slate-800/60 text-slate-400 px-2 py-0.5 rounded uppercase font-semibold">
+                <Badge variant="default" size="sm" className="uppercase">
                   v{article.version}
-                </span>
-                {article.self_approved && <span className="rounded-full bg-warning/10 px-2 py-0.5 font-semibold text-warning">Self-approved</span>}
-                {article.source_changed && <span className="rounded-full bg-rose-500/10 px-2 py-0.5 font-semibold text-rose-400">Source changed</span>}
+                </Badge>
+                {article.self_approved && <Badge variant="warning" size="sm">Self-approved</Badge>}
+                {article.source_changed && <Badge variant="danger" size="sm">Source changed</Badge>}
               </div>
             </div>
 
@@ -411,28 +432,34 @@ export default function ArticleDetailPage() {
             <div className="flex items-center gap-4 border-t border-slate-800/40 pt-5">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Was this helpful?</span>
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleVote(1)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all text-xs ${
+                  aria-label="Vote up"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs ${
                     userVote === 1
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-md'
                       : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
                   }`}
+                  icon={<ThumbsUp size={14} />}
                 >
-                  <ThumbsUp size={14} />
-                  <span>{votes.upvotes}</span>
-                </button>
-                <button
+                  {votes.upvotes}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleVote(-1)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all text-xs ${
+                  aria-label="Vote down"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs ${
                     userVote === -1
                       ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 shadow-md'
                       : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
                   }`}
+                  icon={<ThumbsDown size={14} />}
                 >
-                  <ThumbsDown size={14} />
-                  <span>{votes.downvotes}</span>
-                </button>
+                  {votes.downvotes}
+                </Button>
               </div>
             </div>
           </div>
@@ -461,12 +488,14 @@ export default function ArticleDetailPage() {
                       </div>
                     </div>
                     {currentUser && currentUser.id === comm.user_id && (
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleCommentDelete(comm.id)}
                         className="text-xs text-rose-400 hover:underline hover:text-rose-300"
                       >
                         Delete
-                      </button>
+                      </Button>
                     )}
                   </div>
                   <p className="text-slate-300 text-sm mt-2 pl-9 whitespace-pre-wrap leading-relaxed">
@@ -486,13 +515,15 @@ export default function ArticleDetailPage() {
                 required
               />
               <div className="flex justify-end mt-2">
-                <button
+                <Button
                   type="submit"
+                  variant="primary"
+                  size="sm"
                   disabled={submittingComment}
-                  className="bg-brand-600 hover:bg-brand-500 text-primary-foreground font-semibold text-xs px-4 py-2 rounded-lg transition-all"
+                  loading={submittingComment}
                 >
                   {submittingComment ? 'Posting...' : 'Post Comment'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -574,14 +605,16 @@ export default function ArticleDetailPage() {
                     <div className="mt-1 flex items-center justify-between gap-2">
                       <span className="text-caption text-slate-500">Edited by: {hist.editor?.name || 'Owner'}</span>
                       {hist.version === article.version ? (
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-caption font-semibold text-emerald-400">{t('articles.active')}</span>
+                        <Badge variant="success" size="sm">{t('articles.active')}</Badge>
                       ) : canEdit ? (
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={(event) => { event.stopPropagation(); void handleRestoreVersion(hist) }}
-                          className="rounded-md border border-cyan/30 px-2 py-1 text-caption font-semibold text-cyan transition hover:bg-cyan/10"
+                          className="rounded-md border border-cyan/30 px-2 py-1 text-caption font-semibold text-cyan hover:bg-cyan/10"
                         >
                           {t('articles.restoreActive')}
-                        </button>
+                        </Button>
                       ) : null}
                     </div>
                   </div>
