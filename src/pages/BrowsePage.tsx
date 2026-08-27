@@ -7,6 +7,7 @@ import type { ArticleCard } from '../types/article'
 import PageHeader from '../components/ui/PageHeader'
 import { useAuth } from '../auth/useAuth'
 import { canEditArticleForUser } from '../utils/articlePermissions'
+import { PageTransition } from '../components/ui/PageTransition'
 
 const PAGE_SIZE = 24
 
@@ -118,9 +119,9 @@ export default function BrowsePage() {
 
   if (!data || !catalog) return loadError
     ? <div className="page-shell page-stack"><div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">Failed to load the knowledge library. <button className="ml-2 font-bold underline" onClick={() => void loadPage()}>Retry</button></div></div>
-    : <div className="mx-auto max-w-6xl p-8 text-muted-foreground">Loading knowledge library…</div>
+    : <div className="page-shell page-stack"><div className="rounded-panel border border-border bg-card p-6"><div className="animate-pulse space-y-4"><div className="h-8 w-2/5 rounded bg-muted/50" /><div className="h-4 w-4/5 rounded bg-muted/40" /><div className="h-4 w-3/5 rounded bg-muted/40" /></div></div><div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 6 }, (_, i) => <div key={i} className="animate-pulse rounded-2xl border border-border bg-card p-5"><div className="h-10 w-10 rounded-xl bg-muted/50 mb-4" /><div className="h-5 w-3/4 rounded bg-muted/50 mb-2" /><div className="h-3 w-1/2 rounded bg-muted/40" /></div>)}</div></div>
 
-  return <div className="page-shell page-stack">
+  return <PageTransition className="page-shell page-stack">
     <PageHeader eyebrow="Wiki-style knowledge" title={heading} description={description} icon={topic ? Hash : dept ? FolderTree : Library} actions={<div className="flex flex-wrap items-center justify-end gap-2">
       <form onSubmit={event => { event.preventDefault(); updateParams({ q: searchInput.trim() || undefined, offset: undefined }) }} className="flex items-center rounded-full border border-border bg-surface/70 pl-3 focus-within:border-primary/50">
         <Search size={14} className="text-muted" /><input aria-label="Search documents" value={searchInput} onChange={event => setSearchInput(event.target.value)} placeholder="Search titles…" className="w-36 bg-transparent px-2 py-1.5 text-xs text-foreground outline-none placeholder:text-muted sm:w-48" /><button type="submit" className="rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">Search</button>
@@ -144,5 +145,5 @@ export default function BrowsePage() {
     </section>}
 
     {(dept || topic || query) && <Link to={topic ? browsePath(basePath, dept, undefined, query) : dept ? browsePath(basePath, undefined, undefined, query) : basePath} className="inline-flex w-fit items-center gap-2 text-sm font-bold text-primary hover:text-info"><ArrowLeft size={15} /> Back one level</Link>}
-  </div>
+  </PageTransition>
 }

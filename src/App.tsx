@@ -5,11 +5,12 @@ import { AuthProvider } from './auth/AuthProvider'
 import DialogProvider from './components/ui/DialogProvider'
 import { LanguageProvider } from './i18n/LanguageProvider'
 import { ThemeProvider } from './theme/ThemeProvider'
+import { ToastProvider } from './components/ui/Toast'
 
 function App() {
   return (
     <ThemeProvider><BrowserRouter>
-      <LanguageProvider><AuthProvider><DialogProvider><AppRoutes /></DialogProvider></AuthProvider></LanguageProvider>
+      <LanguageProvider><AuthProvider><ToastProvider><DialogProvider><AppRoutes /></DialogProvider></ToastProvider></AuthProvider></LanguageProvider>
     </BrowserRouter></ThemeProvider>
   )
 }

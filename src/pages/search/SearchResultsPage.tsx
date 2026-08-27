@@ -9,6 +9,7 @@ import { requestContent } from '../../api/knowledge'
 import { safeExternalUrl } from '../../lib/formatters'
 import PageHeader from '../../components/ui/PageHeader'
 import { Select } from '../../components/ui/Select'
+import { PageTransition } from '../../components/ui/PageTransition'
 
 export default function SearchResultsPage() {
   const [query, setQuery] = useState('')
@@ -78,7 +79,7 @@ export default function SearchResultsPage() {
   }
 
   return (
-    <div className="page-shell page-stack">
+    <PageTransition className="page-shell page-stack">
       <PageHeader eyebrow="Discovery engine" title={t('search.hybrid')} description={t('search.subtitle')} icon={SearchIcon} actions={<span className="flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground"><Sparkles size={13} className="text-info" /> Hybrid retrieval</span>} />
 
       {/* Search Input and Filters Form */}
@@ -159,10 +160,7 @@ export default function SearchResultsPage() {
 
       {/* Results listing */}
       {loading ? (
-        <div className="glass-panel flex h-48 items-center justify-center rounded-2xl border border-border text-muted-foreground">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-500 mr-3" />
-          <span>{t('search.loadingDetails')}</span>
-        </div>
+        <div className="space-y-4">{Array.from({ length: 3 }, (_, i) => <div key={i} className="animate-pulse rounded-2xl border border-border bg-card p-5"><div className="flex items-center gap-2 mb-3"><div className="h-5 w-20 rounded-full bg-muted/50" /><div className="h-5 w-24 rounded-full bg-muted/40" /></div><div className="h-5 w-3/4 rounded bg-muted/50 mb-3" /><div className="h-16 w-full rounded bg-muted/30 border-l-2 border-muted/50 pl-4" /></div>)}</div>
       ) : searched && error ? (
         <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <span>Failed to load. Please retry.</span>
@@ -230,6 +228,6 @@ export default function SearchResultsPage() {
           })}
         </div>
       )}
-    </div>
+    </PageTransition>
   )
 }

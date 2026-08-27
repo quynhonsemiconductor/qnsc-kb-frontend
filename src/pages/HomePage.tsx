@@ -7,6 +7,7 @@ import { usePermission } from '../hooks/usePermission'
 import { useAuth } from '../auth/useAuth'
 import { useLanguage } from '../i18n/LanguageProvider'
 import { useAsyncResource } from '../hooks/useAsyncResource'
+import { PageTransition } from '../components/ui/PageTransition'
 
 function Metric({ label, value, detail, Icon, tone }: { label: string; value: number | string; detail: string; Icon: React.ElementType; tone: 'primary' | 'warning' | 'info' | 'success' }) {
   const tones = {
@@ -31,7 +32,7 @@ export default function HomePage() {
 
   if (!summary) return loadError ? <div className="page-shell-wide page-stack"><div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">Failed to load. Please retry.</div></div> : <div className="grid min-h-[65vh] place-items-center"><div className="flex items-center gap-3 text-base text-muted-foreground"><Activity size={17} className="animate-pulse text-info" />Loading the control room…</div></div>
 
-  return <div className="page-shell-wide page-stack pb-8">
+  return <PageTransition className="page-shell-wide page-stack pb-8">
     <header className="page-hero glass-panel soft-grid relative overflow-hidden rounded-panel border border-border px-5 py-6 pb-8 md:px-7 md:py-7">
       <div className="pointer-events-none absolute -right-20 -top-32 h-80 w-80 rounded-full bg-primary/20 blur-3xl" /><div className="pointer-events-none absolute bottom-[-10rem] right-[28%] h-64 w-64 rounded-full bg-info/10 blur-3xl" /><div className="pointer-events-none absolute right-8 top-8 hidden h-44 w-44 opacity-60 xl:block"><div className="hero-orb h-full w-full"><div className="orbit-ring" /><div className="orb-core text-2xl">Q</div></div></div>
       <div className="relative flex flex-col gap-6 2xl:flex-row 2xl:flex-wrap 2xl:items-end">
@@ -61,5 +62,5 @@ export default function HomePage() {
     </section>
 
     <footer className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted"><span className="inline-flex items-center gap-2"><CheckCircle2 size={14} className="text-success" /> Source storage secured</span><span className="inline-flex items-center gap-2"><ShieldCheck size={14} className="text-primary" /> Department-aware access active</span><span className="inline-flex items-center gap-2"><Activity size={14} className="text-info" /> Workflow monitoring enabled</span></footer>
-  </div>
+  </PageTransition>
 }
