@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { BookOpen, Compass, Search, RefreshCw } from 'lucide-react'
 import { getGlossary } from '../../api/search'
 import PageHeader from '../../components/ui/PageHeader'
+import { Input } from '../../components/ui/Input'
+import { Badge } from '../../components/ui/Badge'
 
 export default function GlossaryPage() {
   const [glossary, setGlossary] = useState<any[]>([])
@@ -31,13 +33,14 @@ export default function GlossaryPage() {
 
   return (
     <div className="page-shell page-stack">
-      <PageHeader eyebrow="Shared language" title="Glossary terms" description="Definitions of standardized company acronyms and domain language." icon={Compass} actions={<div className="relative w-64"><span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted"><Search size={14} /></span>
-          <input
+      <PageHeader eyebrow="Shared language" title="Glossary terms" description="Definitions of standardized company acronyms and domain language." icon={Compass} actions={<div className="w-64">
+          <Input
             type="text"
             placeholder="Search glossary..."
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
-            className="field pl-9 text-xs"
+            leftIcon={<Search size={14} />}
+            className="text-xs"
           />
         </div>} />
 
@@ -58,9 +61,9 @@ export default function GlossaryPage() {
               className="glass-panel interactive-lift rounded-2xl border border-border p-5 space-y-2.5 shadow-sm"
             >
               <div className="flex items-center gap-2">
-                <span className="bg-brand-500/10 text-brand-400 border border-brand-500/10 px-3 py-1 rounded-lg text-xs font-extrabold uppercase">
+                <Badge variant="primary" size="md" className="uppercase font-extrabold">
                   {item.term}
-                </span>
+                </Badge>
               </div>
               <p className="text-charcoal text-sm leading-relaxed leading-normal">
                 {item.definition}

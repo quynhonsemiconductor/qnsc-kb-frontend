@@ -7,6 +7,8 @@ import { getMicrosoftLoginUrl, getOidcConfig, login as loginApi } from '../api/a
 import { useLanguage } from '../i18n/LanguageProvider'
 import { useTheme, type ThemePreference } from '../theme/ThemeProvider'
 import { Select } from '../components/ui/Select'
+import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -76,10 +78,10 @@ export default function LoginPage() {
         {error && <div className="mb-5 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-destructive">{error}</div>}
         <div className="space-y-4">
           {ssoAvailable && <>
-            <button type="button" onClick={() => void handleMicrosoftLogin()} disabled={ssoLoading} className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface py-3.5 text-sm font-bold text-foreground transition hover:bg-surface-soft disabled:cursor-wait disabled:opacity-50"><span className="grid h-4 w-4 grid-cols-2 gap-0.5"><span className="bg-[#f25022]" /><span className="bg-[#7fba00]" /><span className="bg-[#00a4ef]" /><span className="bg-[#ffb900]" /></span>{ssoLoading ? 'Redirecting…' : t('auth.signInMicrosoft')}</button>
+            <Button type="button" variant="secondary" size="lg" onClick={() => void handleMicrosoftLogin()} disabled={ssoLoading} loading={ssoLoading} icon={!ssoLoading ? <span className="grid h-4 w-4 grid-cols-2 gap-0.5"><span className="bg-[#f25022]" /><span className="bg-[#7fba00]" /><span className="bg-[#00a4ef]" /><span className="bg-[#ffb900]" /></span> : undefined} className="w-full rounded-xl py-3.5">{ssoLoading ? 'Redirecting…' : t('auth.signInMicrosoft')}</Button>
             <div className="flex items-center gap-3 text-caption font-bold uppercase tracking-[.14em] text-stone"><span className="h-px flex-1 bg-border" />{t('auth.or')}<span className="h-px flex-1 bg-border" /></div>
           </>}
-          <label className="block text-xs font-bold uppercase tracking-[.12em] text-muted-foreground">{t('auth.email')}<input type="email" value={email} onChange={e => setEmail(e.target.value)} className="field mt-2" placeholder="name@company.com" required /></label><label className="block text-xs font-bold uppercase tracking-[.12em] text-muted-foreground">{t('auth.password')}<input type="password" value={password} onChange={e => setPassword(e.target.value)} className="field mt-2" required /></label><button disabled={loading} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-primary-foreground shadow-[0_10px_22px_rgb(var(--primary)/.24)] transition hover:-translate-y-0.5 hover:bg-primary/90 disabled:opacity-50"><Mail size={15} />{loading ? t('auth.signingIn') : t('auth.signInEmail')}</button>
+          <Input type="email" label={t('auth.email')} value={email} onChange={e => setEmail(e.target.value)} placeholder="name@company.com" required leftIcon={<Mail size={15} />} /><Input type="password" label={t('auth.password')} value={password} onChange={e => setPassword(e.target.value)} required /><Button type="submit" variant="primary" size="lg" disabled={loading} loading={loading} icon={!loading ? <Mail size={15} /> : undefined} className="mt-3 w-full rounded-xl shadow-[0_10px_22px_rgb(var(--primary)/.24)] hover:-translate-y-0.5">{loading ? t('auth.signingIn') : t('auth.signInEmail')}</Button>
         </div>
         <p className="mt-7 border-t border-border pt-5 text-center text-xs leading-relaxed text-muted">Accounts are created by an Admin or CEO. Microsoft SSO will appear here when Entra ID is configured.</p>
       </form>

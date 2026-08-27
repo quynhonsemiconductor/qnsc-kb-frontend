@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Activity, Layers, AlertTriangle, ShieldCheck, HelpCircle, BarChart3, TrendingUp, RefreshCw } from 'lucide-react'
 import { getHealthMetrics, getEvalReport, getEvalRuns, verifyReviewDeadlines } from '../../api/governance'
 import PageHeader from '../../components/ui/PageHeader'
+import { Button } from '../../components/ui/Button'
 
 export default function HealthDashboardPage() {
   const [metrics, setMetrics] = useState<any>(null)
@@ -55,7 +56,7 @@ export default function HealthDashboardPage() {
       <div className="page-shell page-stack">
         <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <span>Failed to load. Please retry.</span>
-          <button type="button" onClick={() => void fetchDashboardData().catch(() => undefined)} className="text-xs font-bold uppercase tracking-wide hover:underline">Retry</button>
+          <Button variant="ghost" size="sm" onClick={() => void fetchDashboardData().catch(() => undefined)}>Retry</Button>
         </div>
       </div>
     )
@@ -63,10 +64,9 @@ export default function HealthDashboardPage() {
 
   return (
     <div className="page-shell page-stack">
-      <PageHeader eyebrow="System observability" title="KB health dashboard" description="Live metrics, governance audits, and offline RAG evaluation scores." icon={Activity} actions={<button onClick={() => void runReviewScan().catch(() => undefined)} disabled={verifyingReviews} className="mm-secondary flex items-center gap-2 px-3 py-2 text-xs font-semibold disabled:opacity-50">
-            <RefreshCw size={14} className={verifyingReviews ? 'animate-spin' : ''} />
+      <PageHeader eyebrow="System observability" title="KB health dashboard" description="Live metrics, governance audits, and offline RAG evaluation scores." icon={Activity} actions={<Button variant="secondary" size="sm" onClick={() => void runReviewScan().catch(() => undefined)} disabled={verifyingReviews} icon={<RefreshCw size={14} className={verifyingReviews ? 'animate-spin' : ''} />}>
             {verifyingReviews ? 'Checking reviews…' : 'Check review deadlines'}
-          </button>} />
+          </Button>} />
 
       {/* Grid of stats */}
       {metrics && (
