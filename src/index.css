@@ -246,7 +246,9 @@
   .border-\[\#354457\] { border-color: rgb(var(--border)) !important; }
   .bg-ink.text-primary-foreground, .bg-brand-500.text-primary-foreground, .bg-brand-600.text-primary-foreground { color: rgb(var(--primary-foreground)) !important; }
   .hover\:bg-slate-800:hover, .hover\:bg-surface:hover { background-color: rgb(var(--surface-muted)) !important; }
-  .hover\:bg-white:hover, .hover\:bg-slate-900:hover { background-color: rgb(var(--surface-elevated)) !important; }
+  /* Route bare white/near-white hovers to the muted surface tint so hover feedback
+     never flashes a harsh pure-white block (--surface-elevated is #fff in light mode). */
+  .hover\:bg-white:hover, .hover\:bg-slate-900:hover { background-color: rgb(var(--surface-muted)) !important; }
   .bg-cyan-50, .bg-cyan-50\/60, .bg-cyan-50\/70 { background-color: rgb(var(--info) / .10) !important; }
   .bg-emerald-50 { background-color: rgb(var(--success) / .10) !important; }
   .bg-amber-50 { background-color: rgb(var(--warning) / .10) !important; }
