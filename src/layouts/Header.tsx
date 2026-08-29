@@ -7,7 +7,6 @@ import { useTheme, type ThemePreference } from '../theme/ThemeProvider'
 import { listNotifications, markNotificationRead, type InAppNotification } from '../api/notifications'
 import { Select } from '../components/ui/Select'
 import { Button } from '../components/ui/Button'
-import { Tooltip } from '../components/ui/Tooltip'
 import { FloatingPanel } from '../components/ui/FloatingPanel'
 
 export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
@@ -58,10 +57,10 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
       <div className="ml-auto flex items-center gap-1.5 md:gap-2">
         {has('article.create') && <Button type="button" variant="primary" size="sm" onClick={() => navigate('/articles/new')} icon={<Plus size={13} />} className="hidden shadow-[0_5px_12px_rgb(var(--primary)/.18)] sm:inline-flex">New article</Button>}
         <div className="relative">
-          <Tooltip content="Notifications"><button ref={notificationAnchor} type="button" onClick={() => setNotificationsOpen((open) => !open)} aria-label="Notifications" aria-expanded={notificationsOpen} className="ui-button relative inline-flex h-8 items-center justify-center rounded-control border border-border bg-surface px-3 text-body-sm font-semibold text-foreground transition-all duration-200 hover:bg-surface-soft hover:border-primary/30 active:scale-[0.97]">
+          <button ref={notificationAnchor} type="button" onClick={() => setNotificationsOpen((open) => !open)} aria-label="Notifications" aria-expanded={notificationsOpen} className="ui-button relative inline-flex h-8 items-center justify-center rounded-control border border-border bg-surface px-3 text-body-sm font-semibold text-foreground transition-all duration-200 hover:bg-surface-soft hover:border-primary/30 active:scale-[0.97]">
             <Bell size={15} />
             {unreadCount > 0 && <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-caption font-bold text-primary-foreground ring-2 ring-surface">{unreadCount > 9 ? '9+' : unreadCount}</span>}
-          </button></Tooltip>
+          </button>
           <FloatingPanel anchorRef={notificationAnchor} open={notificationsOpen} onClose={() => setNotificationsOpen(false)} widthRem={20} className="rounded-2xl p-0">
             <div className="flex items-center justify-between border-b border-border px-4 py-3"><span className="text-sm font-bold text-ink">Notifications</span>{unreadCount > 0 && <span className="rounded-full bg-primary/10 px-2 py-1 text-caption font-bold text-primary">{unreadCount} unread</span>}</div>
             <div className="max-h-80 overflow-y-auto">

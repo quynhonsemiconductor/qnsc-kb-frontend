@@ -42,7 +42,6 @@ import { useLanguage } from '../../i18n/LanguageProvider'
 import { canEditArticleForUser } from '../../utils/articlePermissions'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
-import { Tooltip } from '../../components/ui/Tooltip'
 
 function normalizeWikiTarget(value: string) {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
@@ -313,66 +312,62 @@ export default function ArticleDetailPage() {
         </Link>
         
         <div className="flex items-center gap-3">
-          <Tooltip content={bookmarked ? "Bookmarked" : "Bookmark article"}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleBookmarkToggle}
-              aria-label={bookmarked ? "Bookmarked" : "Bookmark article"}
-              className={`rounded-xl border p-2 ${
-                bookmarked 
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
-                  : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
-              }`}
-              icon={<Bookmark size={18} fill={bookmarked ? "currentColor" : "none"} />}
-            />
-          </Tooltip>
-          <Tooltip content={following ? "Unfollow article" : "Follow article"}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void handleFollowToggle()}
-              aria-label={following ? "Unfollow article" : "Follow article"}
-              className={`rounded-xl border p-2 ${following ? 'border-info/30 bg-info/10 text-info' : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'}`}
-              icon={<Bell size={18} fill={following ? 'currentColor' : 'none'} />}
-            />
-          </Tooltip>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBookmarkToggle}
+            aria-label={bookmarked ? "Bookmarked" : "Bookmark article"}
+            className={`rounded-xl border p-2 ${
+              bookmarked 
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
+                : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
+            }`}
+            icon={<Bookmark size={18} fill={bookmarked ? "currentColor" : "none"} />}
+          />
+        
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void handleFollowToggle()}
+            aria-label={following ? "Unfollow article" : "Follow article"}
+            className={`rounded-xl border p-2 ${following ? 'border-info/30 bg-info/10 text-info' : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'}`}
+            icon={<Bell size={18} fill={following ? 'currentColor' : 'none'} />}
+          />
+        
           
-          <Tooltip content="Version History">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowHistory(!showHistory)}
-              aria-label="Version History"
-              className={`rounded-xl border p-2 ${
-                showHistory 
-                  ? 'bg-brand-500/10 border-brand-500/30 text-brand-400' 
-                  : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
-              }`}
-              icon={<History size={18} />}
-            />
-          </Tooltip>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowHistory(!showHistory)}
+            aria-label="Version History"
+            className={`rounded-xl border p-2 ${
+              showHistory 
+                ? 'bg-brand-500/10 border-brand-500/30 text-brand-400' 
+                : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
+            }`}
+            icon={<History size={18} />}
+          />
+        
 
           {canEdit && (
             <>
-              <Tooltip content="Edit Article">
-                <Link
-                  to={`/articles/${article.id}/edit`}
-                  className="rounded-xl border border-border bg-surface px-3 py-2 text-muted-foreground transition-all hover:bg-surface-soft hover:text-foreground"
-                >
-                  <Edit size={18} />
-                </Link>
-              </Tooltip>
-              <Tooltip content="Soft Delete">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDelete}
-                  aria-label="Soft Delete"
-                  className="rounded-xl border border-destructive/20 bg-surface px-3 py-2 text-destructive hover:bg-destructive/10"
-                  icon={<Trash2 size={18} />}
-                />
-              </Tooltip>
+              <Link
+                to={`/articles/${article.id}/edit`}
+                aria-label="Edit article"
+                className="rounded-xl border border-border bg-surface px-3 py-2 text-muted-foreground transition-all hover:bg-surface-soft hover:text-foreground"
+              >
+                <Edit size={18} />
+              </Link>
+            
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDelete}
+                aria-label="Soft Delete"
+                className="rounded-xl border border-destructive/20 bg-surface px-3 py-2 text-destructive hover:bg-destructive/10"
+                icon={<Trash2 size={18} />}
+              />
+            
             </>
           )}
           {!canEdit && has('ai.ask') && (
