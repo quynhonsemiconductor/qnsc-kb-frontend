@@ -274,7 +274,22 @@ export default function PendingDraftsPage() {
       const message = typeof detail === 'string'
         ? detail
         : detail?.message || 'The draft could not be approved. Check the update decision and try again.'
-      await dialog.alert(message, { title: 'Approval failed' })
+      // The ACL guard names the exact principals it is waiting on, and where they are
+      // fixed. Showing only its one-line message left the reviewer with an instruction
+      // and no way to carry it out: nothing said which principal, or that the answer is
+      // behind Review ACL on the source that delivered the document.
+      const principals: string[] = Array.isArray(detail?.principals) ? detail.principals : []
+      const guidance = principals.length
+        ? [
+            '',
+            'Waiting on:',
+            ...principals.slice(0, 10).map(name => `  • ${name}`),
+            ...(principals.length > 10 ? [`  …and ${principals.length - 10} more`] : []),
+            '',
+            'Map these in Sources → the connector that delivered this document → Review ACL.',
+          ].join('\n')
+        : ''
+      await dialog.alert(`${message}${guidance}`, { title: 'Approval failed' })
     } finally { setActingDraftId(null) }
   }
 
