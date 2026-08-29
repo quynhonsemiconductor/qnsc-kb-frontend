@@ -10,6 +10,7 @@ import { FloatingPanel } from '../../components/ui/FloatingPanel'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
+import { toDateInputValue } from '../../lib/formatters'
 
 const ARTICLE_TEMPLATE = '# Purpose\n\n## Summary\n\n## Procedure or details\n\n## Ownership and review\n'
 type Department = { id: string; name: string; company_domain: string; active: boolean }
@@ -105,7 +106,7 @@ export default function ArticleEditPage() {
           setDeniedUserIds((art.explicit_denied_user_ids || []).map((item: string) => String(item)))
           setTagsInput(art.tags ? art.tags.map((t: any) => t.tag).join(', ') : '')
           if (art.next_review) {
-            setNextReview(new Date(art.next_review).toISOString().split('T')[0])
+            setNextReview(toDateInputValue(art.next_review))
           }
         } else {
           const defaultDepartment = departmentData.find(item => item.active && item.company_domain === user?.company_domain && item.name === user?.dept)

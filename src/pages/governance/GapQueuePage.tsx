@@ -9,6 +9,7 @@ import { Select } from '../../components/ui/Select'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Modal } from '../../components/ui/Modal'
+import { formatDay } from '../../lib/formatters'
 
 export default function GapQueuePage() {
   const dialog = useDialog()
@@ -109,7 +110,7 @@ export default function GapQueuePage() {
                     Misses: {gap.count}
                   </Badge>
                 </div>
-                <p className="text-caption text-slate-500">First logged on {new Date(gap.created_at).toLocaleDateString()}</p>
+                <p className="text-caption text-slate-500">First logged on {formatDay(gap.created_at)}</p>
               </div>
 
               <div className="flex items-center gap-2">

@@ -3,6 +3,7 @@ import { Activity, Layers, AlertTriangle, ShieldCheck, HelpCircle, BarChart3, Tr
 import { getHealthMetrics, getEvalReport, getEvalRuns, verifyReviewDeadlines } from '../../api/governance'
 import PageHeader from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
+import { formatDay } from '../../lib/formatters'
 
 export default function HealthDashboardPage() {
   const [metrics, setMetrics] = useState<any>(null)
@@ -249,7 +250,7 @@ export default function HealthDashboardPage() {
                       {(run.answer_correctness * 100).toFixed(0)}%
                     </td>
                     <td className="p-3.5 text-slate-500">
-                      {new Date(run.created_at).toLocaleDateString()}
+                      {formatDay(run.created_at)}
                     </td>
                   </tr>
                 ))}
