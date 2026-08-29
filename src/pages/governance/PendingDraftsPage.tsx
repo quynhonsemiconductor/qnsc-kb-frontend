@@ -13,6 +13,7 @@ import {
 import { listDepartments } from '../../api/auth'
 import { useAuth } from '../../auth/useAuth'
 import { useDialog } from '../../components/ui/DialogProvider'
+import { usePolling } from '../../hooks/usePolling'
 import { Select } from '../../components/ui/Select'
 import { FloatingPanel } from '../../components/ui/FloatingPanel'
 import { getArticle } from '../../api/articles'
@@ -158,11 +159,7 @@ export default function PendingDraftsPage() {
     [drafts],
   )
 
-  useEffect(() => {
-    if (!hasRestructureInFlight) return
-    const timer = window.setInterval(() => void fetchDrafts(false), 4000)
-    return () => window.clearInterval(timer)
-  }, [hasRestructureInFlight])
+  usePolling(() => fetchDrafts(false), 4000, hasRestructureInFlight)
 
   useEffect(() => {
     if (reviewOpen && selectedDraft && !docDepartmentIds.length && visibleDepartments.length) {

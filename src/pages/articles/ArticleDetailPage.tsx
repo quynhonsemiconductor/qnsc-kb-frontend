@@ -37,6 +37,7 @@ import { getArticles } from '../../api/articles'
 import PdfViewer from '../../components/ai/PdfViewer'
 import { useAuth } from '../../auth/useAuth'
 import { usePermission } from '../../hooks/usePermission'
+import { usePolling } from '../../hooks/usePolling'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
 import { canEditArticleForUser } from '../../utils/articlePermissions'
@@ -148,6 +149,21 @@ export default function ArticleDetailPage() {
   useEffect(() => {
     loadArticleDetails()
   }, [id])
+
+  // The banner below reports an indexing job running in a background worker, so it is
+  // stale the moment it is rendered. Poll the article alone rather than calling
+  // loadArticleDetails: that reloads eight endpoints and flips the page into its
+  // full-page loading state, which would blank the article every few seconds.
+  const indexing =
+    article?.status === 'published' &&
+    !!article.index_status &&
+    !['ready', 'failed'].includes(article.index_status)
+  usePolling(async () => {
+    if (!id) return
+    const fresh = await getArticle(id)
+    // Replace only on a real change, so a poll never re-renders the body mid-read.
+    setArticle((current: any) => (current && current.index_status === fresh.index_status ? current : fresh))
+  }, 5_000, indexing)
 
   useEffect(() => {
     if (!article?.body_md) return

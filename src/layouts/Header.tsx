@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Bell, Command, Globe, Menu, Monitor, Plus } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageProvider'
 import { usePermission } from '../hooks/usePermission'
+import { usePolling } from '../hooks/usePolling'
 import { useTheme, type ThemePreference } from '../theme/ThemeProvider'
 import { listNotifications, markNotificationRead, type InAppNotification } from '../api/notifications'
 import { Select } from '../components/ui/Select'
@@ -18,21 +19,20 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const notificationAnchor = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => {
-    let active = true
-    const load = async () => {
-      try {
-        const items = await listNotifications()
-        if (active) setNotifications(items)
-      } catch {
-        // Notifications are supplementary; an unavailable endpoint must not
-        // prevent primary navigation from rendering.
-      }
+  const loadNotifications = async () => {
+    try {
+      setNotifications(await listNotifications())
+    } catch {
+      // Notifications are supplementary; an unavailable endpoint must not
+      // prevent primary navigation from rendering.
     }
-    void load()
-    const timer = window.setInterval(() => void load(), 60_000)
-    return () => { active = false; window.clearInterval(timer) }
-  }, [])
+  }
+
+  useEffect(() => { void loadNotifications() }, [])
+  // The bell is on every screen, so this is the one poll that always runs. Kept slow
+  // deliberately: usePolling pauses it in a background tab and refreshes the moment the
+  // tab is looked at again, which is what actually makes the count feel current.
+  usePolling(loadNotifications, 60_000)
 
   const unreadCount = notifications.filter((item) => !item.read_at).length
   const openNotification = async (item: InAppNotification) => {
