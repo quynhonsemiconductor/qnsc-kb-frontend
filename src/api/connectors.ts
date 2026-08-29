@@ -3,6 +3,7 @@ import client from './client'
 export type ConnectorAclPrincipal = {
   principal_type: string
   principal_id: string
+  principal_name?: string | null
   roles: string[]
   mapping_status: 'mapped' | 'unmapped'
   external_group_name?: string | null
