@@ -6,6 +6,7 @@ import { ArrowLeft, Building2, Check, CheckCircle2, FileText, GitMerge, Lightbul
 import { commitDraftCandidates, getDraftCandidates, getPendingDrafts, reviewDraftCandidate } from '../../api/governance'
 import { createDepartment, listDepartments } from '../../api/auth'
 import { useDialog } from '../../components/ui/DialogProvider'
+import { usePolling } from '../../hooks/usePolling'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 
@@ -42,7 +43,7 @@ export default function BatchReviewPage() {
     finally { if (showLoading) setLoading(false) }
   }
   useEffect(() => { void load() }, [id])
-  useEffect(() => { if (!formatting) return; const timer = window.setInterval(() => void load(false), 4000); return () => window.clearInterval(timer) }, [formatting, id])
+  usePolling(() => load(false), 4000, formatting)
   const operate = async (payload: Parameters<typeof reviewDraftCandidate>[1]) => {
     setBusy(true)
     try { setCandidates(normalizeCandidates(await reviewDraftCandidate(id, payload))) }

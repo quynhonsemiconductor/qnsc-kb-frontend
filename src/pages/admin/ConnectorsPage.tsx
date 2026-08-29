@@ -46,6 +46,7 @@ import {
 } from '../../api/connectors'
 import { listAccessGroups, listDepartments } from '../../api/auth'
 import { safeExternalUrl } from '../../lib/formatters'
+import { usePolling } from '../../hooks/usePolling'
 import { Select } from '../../components/ui/Select'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -193,6 +194,15 @@ export default function ConnectorsPage() {
   useEffect(() => {
     void refreshConnectors()
   }, [])
+
+  // Sync runs on a worker, so status, queue depth and last activity all move while this
+  // page sits open. Until now it showed whatever had been true at load, which is why an
+  // authorization or a finished sync only appeared after a manual reload.
+  //
+  // Paused while a mutation is in flight: refreshConnectors replaces the whole list, and
+  // dropping server state on top of a half-made change would revert the schedule select
+  // under the hand of whoever was changing it.
+  usePolling(() => refreshConnectors(true), 10_000, !busy)
 
   useEffect(() => {
     void listDepartments().then((result: Department[]) => setDepartments(result.filter(item => item.active))).catch(() => setDepartments([]))
