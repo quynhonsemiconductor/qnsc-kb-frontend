@@ -20,7 +20,6 @@ import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
-import { Tooltip } from '../../components/ui/Tooltip'
 
 interface Citation {
   source_index?: number
@@ -630,16 +629,15 @@ export default function AskPage() {
                 >
                   {t('chat.new')}
                 </Button>
-                <Tooltip content="Close sidebar" position="bottom">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon={<ChevronLeft size={16} />}
-                    onClick={() => setSidebarOpen(false)}
-                    aria-label="Close sidebar"
-                    className="rounded-lg"
-                  />
-                </Tooltip>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<ChevronLeft size={16} />}
+                  onClick={() => setSidebarOpen(false)}
+                  aria-label="Close sidebar"
+                  className="rounded-lg"
+                />
+              
               </div>
               <div className="ask-scroll flex-1 space-y-1 overflow-y-auto p-2">
                 <div className="mb-2 flex items-center justify-between px-3 pt-2">
@@ -693,26 +691,24 @@ export default function AskPage() {
                       )}
                       {!editing && (
                         <span className="absolute right-2 hidden items-center gap-1 bg-inherit pl-1 opacity-0 transition-opacity duration-150 group-hover:flex group-hover:opacity-100">
-                          <Tooltip content="Rename chat" position="top">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              icon={<Pencil size={12} />}
-                              onClick={(event) => { event.stopPropagation(); setEditingId(conversation.id); setEditTitle(conversation.title) }}
-                              aria-label="Rename chat"
-                              className="h-6 w-6 !p-1 rounded text-stone hover:text-ink"
-                            />
-                          </Tooltip>
-                          <Tooltip content="Delete chat" position="top">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              icon={<Trash2 size={13} />}
-                              onClick={(event) => { event.stopPropagation(); void handleDelete(conversation.id) }}
-                              aria-label="Delete chat"
-                              className="h-6 w-6 !p-1 rounded text-stone hover:bg-destructive/15 hover:text-destructive"
-                            />
-                          </Tooltip>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={<Pencil size={12} />}
+                            onClick={(event) => { event.stopPropagation(); setEditingId(conversation.id); setEditTitle(conversation.title) }}
+                            aria-label="Rename chat"
+                            className="h-6 w-6 !p-1 rounded text-stone hover:text-ink"
+                          />
+                        
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={<Trash2 size={13} />}
+                            onClick={(event) => { event.stopPropagation(); void handleDelete(conversation.id) }}
+                            aria-label="Delete chat"
+                            className="h-6 w-6 !p-1 rounded text-stone hover:bg-destructive/15 hover:text-destructive"
+                          />
+                        
                         </span>
                       )}
                     </div>
@@ -733,26 +729,24 @@ export default function AskPage() {
             </>
           ) : (
             <div className="flex h-full flex-col items-center gap-2 pt-3">
-              <Tooltip content="New chat" position="right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={<Plus size={17} />}
-                  onClick={startNewChat}
-                  aria-label="New chat"
-                  className="rounded-lg"
-                />
-              </Tooltip>
-              <Tooltip content="Open chat history" position="right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={<List size={17} />}
-                  onClick={() => setSidebarOpen(true)}
-                  aria-label="Open chat history"
-                  className="rounded-lg"
-                />
-              </Tooltip>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Plus size={17} />}
+                onClick={startNewChat}
+                aria-label="New chat"
+                className="rounded-lg"
+              />
+            
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<List size={17} />}
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Open chat history"
+                className="rounded-lg"
+              />
+            
             </div>
           )}
         </aside>
@@ -829,16 +823,15 @@ export default function AskPage() {
                       <div key={messageId} className="ask-fade-up group flex justify-end">
                         <div className="flex w-full max-w-[96%] flex-col items-end gap-1">
                           <p className="whitespace-pre-wrap rounded-2xl border border-hairline bg-surface px-4 py-2.5 text-body leading-6 text-ink transition-shadow duration-200 group-hover:shadow-sm">{message.text}</p>
-                          <Tooltip content="Copy question" position="bottom">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              icon={copiedId === messageId ? <Check size={13} className="text-success" /> : <Copy size={13} />}
-                              onClick={() => void copyMessage(message, index)}
-                              aria-label="Copy question"
-                              className="mr-2 !p-1 text-stone opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-ink"
-                            />
-                          </Tooltip>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={copiedId === messageId ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+                            onClick={() => void copyMessage(message, index)}
+                            aria-label="Copy question"
+                            className="mr-2 !p-1 text-stone opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-ink"
+                          />
+                        
                         </div>
                         <div className="ml-2 mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-soft text-steel">
                           <UserIcon size={14} />
@@ -957,41 +950,38 @@ export default function AskPage() {
                           </div>
                         )}
                         <div className="mt-4 flex items-center gap-2 border-t border-hairline/70 pt-3 pl-10">
-                          <Tooltip content={copiedId === messageId ? 'Copied!' : 'Copy answer'} position="top">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              icon={copiedId === messageId ? <Check size={13} className="text-success" /> : <Copy size={13} />}
-                              onClick={() => void copyMessage(message, index)}
-                              aria-label="Copy answer"
-                              className="ask-press rounded-md text-xs text-steel hover:text-ink"
-                            >
-                              {copiedId === messageId ? 'Copied' : 'Copy answer'}
-                            </Button>
-                          </Tooltip>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={copiedId === messageId ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+                            onClick={() => void copyMessage(message, index)}
+                            aria-label="Copy answer"
+                            className="ask-press rounded-md text-xs text-steel hover:text-ink"
+                          >
+                            {copiedId === messageId ? 'Copied' : 'Copy answer'}
+                          </Button>
+                        
                           {message.logId && !message.feedbackSubmitted && (
                             <>
                               <span className="ml-2 text-xs text-stone">Helpful?</span>
-                              <Tooltip content="Helpful" position="top">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  icon={<ThumbsUp size={13} />}
-                                  onClick={() => void handleFeedback(index, 1)}
-                                  aria-label="Helpful"
-                                  className="ask-press rounded-full !p-1 text-stone hover:bg-success/10 hover:text-success"
-                                />
-                              </Tooltip>
-                              <Tooltip content="Not helpful" position="top">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  icon={<ThumbsDown size={13} />}
-                                  onClick={() => void handleFeedback(index, -1)}
-                                  aria-label="Not helpful"
-                                  className="ask-press rounded-full !p-1 text-stone hover:bg-destructive/10 hover:text-destructive"
-                                />
-                              </Tooltip>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                icon={<ThumbsUp size={13} />}
+                                onClick={() => void handleFeedback(index, 1)}
+                                aria-label="Helpful"
+                                className="ask-press rounded-full !p-1 text-stone hover:bg-success/10 hover:text-success"
+                              />
+                            
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                icon={<ThumbsDown size={13} />}
+                                onClick={() => void handleFeedback(index, -1)}
+                                aria-label="Not helpful"
+                                className="ask-press rounded-full !p-1 text-stone hover:bg-destructive/10 hover:text-destructive"
+                              />
+                            
                             </>
                           )}
                         </div>
@@ -1064,29 +1054,27 @@ export default function AskPage() {
                   className="max-h-44 min-h-[28px] flex-1 resize-none overflow-hidden bg-transparent px-2 py-1.5 text-body leading-6 text-ink outline-none placeholder:text-stone"
                 />
                 {loading && (
-                  <Tooltip content="Stop generating" position="top">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      type="button"
-                      icon={<Square size={14} />}
-                      onClick={() => abortRef.current?.abort()}
-                      aria-label="Stop generating"
-                      className="ask-press grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-                    />
-                  </Tooltip>
-                )}
-                <Tooltip content="Send question" position="top">
                   <Button
-                    variant="primary"
+                    variant="secondary"
                     size="sm"
-                    icon={<ArrowUp size={17} />}
-                    onClick={() => void handleAsk()}
-                    disabled={!question.trim() || loading}
-                    aria-label="Send question"
-                    className="ask-press grid h-10 w-10 shrink-0 place-items-center rounded-xl shadow-[0_8px_18px_rgb(var(--primary)/.24)] hover:scale-105 disabled:hover:scale-100"
+                    type="button"
+                    icon={<Square size={14} />}
+                    onClick={() => abortRef.current?.abort()}
+                    aria-label="Stop generating"
+                    className="ask-press grid h-10 w-10 shrink-0 place-items-center rounded-xl"
                   />
-                </Tooltip>
+                
+                )}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={<ArrowUp size={17} />}
+                  onClick={() => void handleAsk()}
+                  disabled={!question.trim() || loading}
+                  aria-label="Send question"
+                  className="ask-press grid h-10 w-10 shrink-0 place-items-center rounded-xl shadow-[0_8px_18px_rgb(var(--primary)/.24)] hover:scale-105 disabled:hover:scale-100"
+                />
+              
               </div>
             </div>
           </div>
@@ -1098,26 +1086,24 @@ export default function AskPage() {
             <aside className={`${sourceCollapsed ? 'w-12' : 'w-full max-w-sm lg:w-80'} ask-slide-in fixed inset-y-0 right-0 z-50 flex flex-col border-l border-hairline bg-surface transition-[width] duration-300 ease-out lg:static lg:shrink-0`}>
               <header className="signal-line flex h-14 shrink-0 items-center gap-2 border-b border-hairline px-3">
                 <span className={`${sourceCollapsed ? 'hidden' : 'flex'} flex-1 items-center gap-2 text-caption font-bold uppercase tracking-widest text-info`}><span className="h-1.5 w-1.5 rounded-full bg-info" /> Source evidence</span>
-                <Tooltip content={sourceCollapsed ? 'Expand source' : 'Collapse source'} position="left">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon={sourceCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-                    onClick={() => setSourceCollapsed((value) => !value)}
-                    aria-label={sourceCollapsed ? 'Expand source' : 'Collapse source'}
-                    className="ask-press rounded-lg text-steel hover:text-ink"
-                  />
-                </Tooltip>
-                <Tooltip content="Close source panel" position="left">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon={<X size={16} />}
-                    onClick={() => setSelectedSource(null)}
-                    aria-label="Close source panel"
-                    className="ask-press rounded-lg text-steel hover:text-ink"
-                  />
-                </Tooltip>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={sourceCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                  onClick={() => setSourceCollapsed((value) => !value)}
+                  aria-label={sourceCollapsed ? 'Expand source' : 'Collapse source'}
+                  className="ask-press rounded-lg text-steel hover:text-ink"
+                />
+              
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<X size={16} />}
+                  onClick={() => setSelectedSource(null)}
+                  aria-label="Close source panel"
+                  className="ask-press rounded-lg text-steel hover:text-ink"
+                />
+              
               </header>
               {!sourceCollapsed && (
                 <>
