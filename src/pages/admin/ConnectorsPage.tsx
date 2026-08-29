@@ -50,6 +50,7 @@ import { Select } from '../../components/ui/Select'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
+import { formatDateTime } from '../../lib/formatters'
 
 type Connector = {
   id: string
@@ -133,12 +134,10 @@ const stateInfo: Record<ConnectorState, { label: string; description: string; cl
   },
 }
 
-const formatDate = (value?: string) => {
-  if (!value) return 'Never synced'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
+// Shown in the reader's own timezone. The API sends naive UTC, which the browser
+// would otherwise read as local time -- that is what made a sync started at 16:58 in
+// Vietnam display as "Started 09:58".
+const formatDate = (value?: string) => formatDateTime(value, 'Never synced')
 
 const getErrorMessage = (requestError: any, fallback: string) => requestError?.response?.data?.detail || fallback
 
@@ -645,7 +644,7 @@ function ConnectorCard({ item, provider, state, open, scopes, jobs, preview, sou
 function SourceMapPanel({ tree, readme, loading }: { tree?: SourceTree; readme?: ConnectorReadme; loading: boolean }) {
   if (loading && !tree) return <div className="border-t border-info/15 bg-info/5 px-5 py-5 sm:px-6"><div className="h-28 animate-pulse rounded-xl bg-surface-soft" /></div>
   if (!tree) return <div className="border-t border-info/15 bg-info/5 px-5 py-5 text-xs text-muted-foreground sm:px-6">No source map is available yet. Run a sync after selecting a location.</div>
-  return <div className="border-t border-info/15 bg-gradient-to-b from-info/5 to-surface px-5 py-5 sm:px-6"><div className="flex flex-col gap-4 lg:flex-row"><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-3"><div><h4 className="flex items-center gap-2 text-sm font-bold text-foreground"><FolderTree size={16} className="text-info" />Source map</h4><p className="mt-1 text-xs text-muted-foreground">{tree.files_indexed} active file{tree.files_indexed === 1 ? '' : 's'} observed in the selected source locations.</p></div><Badge variant="info" size="md">Read only</Badge></div><div className="mt-4 space-y-3">{tree.scopes.map(scope => <div key={scope.id} className="rounded-xl border border-border bg-surface p-3"><div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-foreground">{scope.display_name}</span><span className="text-caption text-muted-foreground">{scope.nodes.length} item{scope.nodes.length === 1 ? '' : 's'}</span></div>{scope.nodes.length ? <div className="mt-2 space-y-1">{scope.nodes.slice(0, 80).map(node => <div key={node.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-body-sm hover:bg-surface-soft"><span className={node.is_folder ? 'text-info' : 'text-muted-foreground'}>{node.is_folder ? '▸' : '•'}</span><span className="min-w-0 flex-1 truncate">{node.name}</span><span className="shrink-0 text-caption text-muted-foreground">{node.state}</span></div>)}{scope.nodes.length > 80 && <p className="pt-1 text-caption text-muted-foreground">Showing the first 80 of {scope.nodes.length} items.</p>}</div> : <p className="mt-2 text-body-sm text-muted-foreground">No synced items observed yet.</p>}</div>)}</div></div>{readme && <aside className="min-w-0 rounded-xl border border-border bg-canvas p-3 lg:w-[24rem]"><div className="flex items-center justify-between gap-2"><h4 className="text-xs font-bold text-foreground">Generated README</h4><span className="text-caption text-muted-foreground">{new Date(readme.generated_at).toLocaleString()}</span></div><pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-body-sm leading-5 text-muted-foreground">{readme.markdown}</pre></aside>}</div></div>
+  return <div className="border-t border-info/15 bg-gradient-to-b from-info/5 to-surface px-5 py-5 sm:px-6"><div className="flex flex-col gap-4 lg:flex-row"><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-3"><div><h4 className="flex items-center gap-2 text-sm font-bold text-foreground"><FolderTree size={16} className="text-info" />Source map</h4><p className="mt-1 text-xs text-muted-foreground">{tree.files_indexed} active file{tree.files_indexed === 1 ? '' : 's'} observed in the selected source locations.</p></div><Badge variant="info" size="md">Read only</Badge></div><div className="mt-4 space-y-3">{tree.scopes.map(scope => <div key={scope.id} className="rounded-xl border border-border bg-surface p-3"><div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-foreground">{scope.display_name}</span><span className="text-caption text-muted-foreground">{scope.nodes.length} item{scope.nodes.length === 1 ? '' : 's'}</span></div>{scope.nodes.length ? <div className="mt-2 space-y-1">{scope.nodes.slice(0, 80).map(node => <div key={node.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-body-sm hover:bg-surface-soft"><span className={node.is_folder ? 'text-info' : 'text-muted-foreground'}>{node.is_folder ? '▸' : '•'}</span><span className="min-w-0 flex-1 truncate">{node.name}</span><span className="shrink-0 text-caption text-muted-foreground">{node.state}</span></div>)}{scope.nodes.length > 80 && <p className="pt-1 text-caption text-muted-foreground">Showing the first 80 of {scope.nodes.length} items.</p>}</div> : <p className="mt-2 text-body-sm text-muted-foreground">No synced items observed yet.</p>}</div>)}</div></div>{readme && <aside className="min-w-0 rounded-xl border border-border bg-canvas p-3 lg:w-[24rem]"><div className="flex items-center justify-between gap-2"><h4 className="text-xs font-bold text-foreground">Generated README</h4><span className="text-caption text-muted-foreground">{formatDateTime(readme.generated_at)}</span></div><pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-body-sm leading-5 text-muted-foreground">{readme.markdown}</pre></aside>}</div></div>
 }
 
 function AclMappingPanel({ item, principals, groups, loading, busy, onSave }: { item: Connector; principals: ConnectorAclPrincipal[]; groups: AccessGroup[]; loading: boolean; busy: string | null; onSave: (principal: ConnectorAclPrincipal, accessGroupId: string) => void }) {

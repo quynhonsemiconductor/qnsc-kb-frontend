@@ -8,6 +8,7 @@ import { listNotifications, markNotificationRead, type InAppNotification } from 
 import { Select } from '../components/ui/Select'
 import { Button } from '../components/ui/Button'
 import { FloatingPanel } from '../components/ui/FloatingPanel'
+import { formatDateTime } from '../lib/formatters'
 
 export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const navigate = useNavigate()
@@ -67,7 +68,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
               {notifications.length === 0 ? <p className="px-3 py-6 text-center text-sm text-stone">You’re all caught up.</p> : notifications.map((item) => <button type="button" key={item.id} onClick={() => void openNotification(item)} className={`block w-full border-b border-border px-3 py-3 text-left transition hover:bg-surface-soft ${item.read_at ? 'text-stone' : 'bg-primary/5 text-ink'}`}>
                 <span className="block text-sm font-semibold">{item.payload.event === 'article_edit_request' ? `Edit requested: ${item.payload.article_title || 'article'}` : item.payload.event === 'draft_assigned' ? 'Draft assigned for review' : item.payload.event === 'draft_rejected' ? 'Draft needs changes' : 'Draft approved'}</span>
                 {item.payload.event === 'article_edit_request' && item.payload.request_text && <span className="mt-1 block line-clamp-2 text-xs text-steel">{item.payload.request_text}</span>}
-                <span className="mt-0.5 block text-xs">{new Date(item.created_at).toLocaleString()}</span>
+                <span className="mt-0.5 block text-xs">{formatDateTime(item.created_at)}</span>
               </button>)}
             </div>
           </FloatingPanel>

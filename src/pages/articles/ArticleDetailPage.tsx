@@ -42,6 +42,7 @@ import { useLanguage } from '../../i18n/LanguageProvider'
 import { canEditArticleForUser } from '../../utils/articlePermissions'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
+import { formatDateTime, formatDay } from '../../lib/formatters'
 
 function normalizeWikiTarget(value: string) {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
@@ -408,7 +409,7 @@ export default function ArticleDetailPage() {
                 </span>
                 <span className="flex items-center gap-1">
                   <Calendar size={14} />
-                  <span>Created {new Date(article.created_at).toLocaleDateString()}</span>
+                  <span>Created {formatDay(article.created_at)}</span>
                 </span>
                 <Badge variant="default" size="sm" className="uppercase">
                   v{article.version}
@@ -478,7 +479,7 @@ export default function ArticleDetailPage() {
                       <div>
                         <span className="text-sm font-semibold text-primary-foreground">{comm.user?.name}</span>
                         <span className="text-caption text-slate-500 ml-2">
-                          {new Date(comm.created_at).toLocaleString()}
+                          {formatDateTime(comm.created_at)}
                         </span>
                       </div>
                     </div>
@@ -569,7 +570,7 @@ export default function ArticleDetailPage() {
               <div>
                 <label className="text-slate-500 text-xs block mb-0.5">Next Review Schedule</label>
                 <span className="text-primary-foreground font-semibold">
-                  {article.next_review ? new Date(article.next_review).toLocaleDateString() : 'No schedule set'}
+                  {formatDay(article.next_review, 'No schedule set')}
                 </span>
               </div>
             </div>
@@ -593,7 +594,7 @@ export default function ArticleDetailPage() {
                     <div className="flex justify-between items-center text-primary-foreground font-bold mb-1">
                       <span>Version {hist.version}</span>
                       <span className="text-caption text-slate-500 font-normal">
-                        {new Date(hist.created_at).toLocaleDateString()}
+                        {formatDay(hist.created_at)}
                       </span>
                     </div>
                     <div className="text-slate-400 line-clamp-1">{hist.snapshot.title}</div>

@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  test: {
+    // A UTC runner cannot tell "parsed as UTC" from "parsed as local" -- the timezone
+    // tests would pass either way. See tests/setup-timezone.ts.
+    setupFiles: ['./tests/setup-timezone.ts'],
+  },
   server: {
     proxy: {
       '/api': {

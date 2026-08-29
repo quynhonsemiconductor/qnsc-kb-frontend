@@ -5,6 +5,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
+import { formatDateTime } from '../../lib/formatters'
 
 export default function AuditLogPage() {
   const [logs, setLogs] = useState<any[]>([])
@@ -81,7 +82,7 @@ export default function AuditLogPage() {
                   <td className="p-3.5 uppercase font-semibold text-caption text-slate-400">{log.target_type}</td>
                   <td className="p-3.5 font-mono text-slate-500">{log.target_id || 'N/A'}</td>
                   <td className="p-3.5 text-slate-500">
-                    {new Date(log.created_at).toLocaleString()}
+                    {formatDateTime(log.created_at)}
                   </td>
                 </tr>
               ))}
