@@ -2,15 +2,17 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, AlertTriangle, ArrowLeftRight, Check, CheckCircle2, ChevronDown, Clock3, Edit3, Eye,
   FileCheck2, FileText, Hash, Layers3, RefreshCw, Search, ShieldCheck, Sparkles, X,
-  MessageSquare,
+  MessageSquare, ListChecks, Minus,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useNavigate } from 'react-router-dom'
 import {
-  approveDraft, assignDraftApprover, decideRestructure, getDraftComparison, getEligibleApprovers, getPendingDrafts, rejectDraft, restructureDraft,
+  approveDraft, assignDraftApprover, bulkDecideDrafts, decideRestructure, getDraftComparison, getEligibleApprovers, getPendingDrafts, rejectDraft, restructureDraft,
+  type BulkDecideResult,
 } from '../../api/governance'
 import { listDepartments } from '../../api/auth'
+import { useLanguage } from '../../i18n/LanguageProvider'
 import { useAuth } from '../../auth/useAuth'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { usePolling } from '../../hooks/usePolling'
@@ -27,6 +29,30 @@ const similarityStyles: Record<string, string> = {
   very_high: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
   partial: 'border-cyan/30 bg-cyan/10 text-cyan',
   exact: 'border-rose-400/30 bg-rose-400/10 text-rose-300',
+}
+
+/** `blocked[].code` → the i18n key naming the one thing the reviewer must still do. */
+const blockedActionKeys: Record<string, string> = {
+  batch_review_required: 'bulk.blocked.batchReview',
+  update_confirmation_required: 'bulk.blocked.updateConfirmation',
+  external_acl_mapping_required: 'bulk.blocked.aclMapping',
+}
+
+/**
+ * Axios error payloads arrive as `unknown`; FastAPI puts either a string or a
+ * `{ code, message }` object in `detail`. Narrowed once here so callers branch on `code`.
+ */
+function extractErrorDetail(error: unknown): { code?: string; message?: string } {
+  const response = error && typeof error === 'object' && 'response' in error ? error.response : undefined
+  const data = response && typeof response === 'object' && 'data' in response ? response.data : undefined
+  const detail = data && typeof data === 'object' && 'detail' in data ? data.detail : undefined
+  if (typeof detail === 'string') return { message: detail }
+  if (detail && typeof detail === 'object') {
+    const code = 'code' in detail && typeof detail.code === 'string' ? detail.code : undefined
+    const message = 'message' in detail && typeof detail.message === 'string' ? detail.message : undefined
+    return { code, message }
+  }
+  return {}
 }
 
 type Draft = {
@@ -130,6 +156,12 @@ export default function PendingDraftsPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [departments, setDepartments] = useState<{ id: string; name: string; company_domain: string; active: boolean }[]>([])
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkDept, setBulkDept] = useState('')
+  const [bulkRunning, setBulkRunning] = useState(false)
+  const [bulkResult, setBulkResult] = useState<(BulkDecideResult & { titles: Record<string, string> }) | null>(null)
+  const [focusedDraftId, setFocusedDraftId] = useState<string | null>(null)
+  const { t } = useLanguage()
   const dialog = useDialog()
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -143,6 +175,9 @@ export default function PendingDraftsPage() {
     try {
       const nextDrafts: Draft[] = await getPendingDrafts('pending')
       setDrafts(nextDrafts)
+      // Decided drafts leave the queue; keep only ids that still need a decision so the
+      // action bar count never promises work that is already published.
+      setSelectedIds(current => current.filter(id => nextDrafts.some(item => item.id === id)))
       setSelectedDraft(current => current ? nextDrafts.find(item => item.id === current.id) || current : current)
       setError('')
     } catch { setError('Could not load the review queue.') } finally {
@@ -176,6 +211,27 @@ export default function PendingDraftsPage() {
     const haystack = `${draft.title} ${draft.source_ref} ${draft.summary || ''}`.toLowerCase()
     return !query.trim() || haystack.includes(query.toLowerCase())
   }), [drafts, query])
+  const selectedDrafts = useMemo(() => drafts.filter(draft => selectedIds.includes(draft.id)), [drafts, selectedIds])
+  const visibleSelectedCount = filteredDrafts.filter(draft => selectedIds.includes(draft.id)).length
+  const allVisibleSelected = filteredDrafts.length > 0 && visibleSelectedCount === filteredDrafts.length
+  const someVisibleSelected = visibleSelectedCount > 0 && !allVisibleSelected
+  // The reviewer's own pick wins; otherwise the batch inherits a department ONLY when every
+  // selected draft already agrees on one. A mixed batch leaves this empty so the bar has to
+  // ask instead of silently publishing documents into a department nobody chose.
+  const agreedDept = useMemo(() => {
+    const names = new Set(selectedDrafts.map(draft => (draft.dept || '').trim()).filter(Boolean))
+    if (names.size !== 1) return ''
+    const only = [...names][0]
+    return visibleDepartments.some(item => item.name === only) ? only : ''
+  }, [selectedDrafts, visibleDepartments])
+  const effectiveBulkDept = bulkDept || agreedDept
+  const bulkDeptAmbiguous = !effectiveBulkDept
+  // The single-draft flow sends department_ids alongside dept; the batch mirrors that with
+  // the one department the bar resolved, so bulk publishing lands in the same place.
+  const bulkDepartmentIds = useMemo(() => {
+    const match = visibleDepartments.find(item => item.name === effectiveBulkDept)
+    return match ? [match.id] : []
+  }, [effectiveBulkDept, visibleDepartments])
   const updateCount = drafts.filter(draft => draft.requires_update_confirmation).length
   const relatedCount = drafts.filter(draft => draft.similarity_level === 'partial').length
   const matches = selectedDraft?.similarity_matches || []
@@ -331,6 +387,113 @@ export default function PendingDraftsPage() {
     } catch { await dialog.alert('The draft could not be rejected.', { title: 'Rejection failed' }) } finally { setActingDraftId(null) }
   }
 
+  const toggleDraftSelection = (draftId: string) => {
+    setSelectedIds(current => current.includes(draftId) ? current.filter(id => id !== draftId) : [...current, draftId])
+  }
+
+  const toggleAllVisible = () => {
+    setSelectedIds(current => allVisibleSelected
+      ? current.filter(id => !filteredDrafts.some(draft => draft.id === id))
+      : [...new Set([...current, ...filteredDrafts.map(draft => draft.id)])])
+  }
+
+  const clearSelection = () => {
+    setSelectedIds([])
+    setBulkDept('')
+  }
+
+  // Cheap triage keys, matching the Gmail/Stripe convention reviewers already know:
+  // `x` toggles the focused card, Escape drops the whole selection. Deliberately not a
+  // keyboard-nav system — Tab already moves between cards.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (reviewOpen || event.ctrlKey || event.metaKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      // Never steal keys from the search field or any other text entry.
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
+      if (event.key === 'Escape' && selectedIds.length) {
+        event.preventDefault()
+        clearSelection()
+        return
+      }
+      if ((event.key === 'x' || event.key === 'X') && focusedDraftId) {
+        event.preventDefault()
+        toggleDraftSelection(focusedDraftId)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [focusedDraftId, reviewOpen, selectedIds.length])
+
+  const runBulkDecision = async (decision: 'approve' | 'reject') => {
+    if (!selectedIds.length || bulkRunning) return
+    const count = selectedIds.length
+    // The endpoint caps a batch at 100 ids; refusing here explains the limit instead of
+    // letting the reviewer read a 422 they cannot act on.
+    if (count > 100) {
+      await dialog.alert(t('bulk.tooMany', { count }), { title: t('bulk.tooManyTitle') })
+      return
+    }
+
+    let reviewNote: string | undefined
+    if (decision === 'reject') {
+      // Mandatory server-side (422 review_note_required); asked for once here so a whole
+      // batch is never spent discovering that.
+      const note = (await dialog.prompt(t('bulk.rejectNotePrompt', { count }), {
+        title: t('bulk.rejectTitle'), confirmLabel: t('bulk.rejectConfirm'), tone: 'danger', multiline: true,
+        placeholder: t('bulk.rejectNotePlaceholder'),
+        validate: value => value ? undefined : t('bulk.rejectNoteRequired'),
+      }))?.trim()
+      if (!note) return
+      reviewNote = note
+    } else if (bulkDeptAmbiguous) {
+      await dialog.alert(t('bulk.deptRequired'), { title: t('bulk.deptRequiredTitle') })
+      return
+    }
+
+    // Publishing is irreversible, so the count is stated and confirmed before dispatch.
+    const confirmed = await dialog.confirm(
+      decision === 'approve'
+        ? t('bulk.confirmApprove', { count, dept: effectiveBulkDept })
+        : t('bulk.confirmReject', { count }),
+      {
+        title: decision === 'approve' ? t('bulk.confirmApproveTitle', { count }) : t('bulk.confirmRejectTitle', { count }),
+        confirmLabel: decision === 'approve' ? t('bulk.confirmApproveLabel', { count }) : t('bulk.confirmRejectLabel', { count }),
+        tone: 'danger',
+      },
+    )
+    if (!confirmed) return
+
+    // Titles are captured BEFORE the refresh: `blocked[]` returns ids only, and the drafts
+    // list is about to change underneath us, so the results panel would lose the names.
+    const titles: Record<string, string> = {}
+    selectedDrafts.forEach(draft => { titles[draft.id] = draft.title })
+
+    setBulkRunning(true)
+    setBulkResult(null)
+    try {
+      const result = await bulkDecideDrafts({
+        draft_ids: selectedIds,
+        decision,
+        ...(decision === 'approve' ? { dept: effectiveBulkDept, department_ids: bulkDepartmentIds } : {}),
+        ...(reviewNote ? { review_note: reviewNote } : {}),
+      })
+      setBulkResult({ ...result, titles })
+      // Keep only the blocked ids selected: those are exactly the drafts still needing work.
+      setSelectedIds(result.blocked.map(item => item.draft_id))
+      setMessage(result.blocked_count
+        ? t('bulk.partialMessage', { decided: result.decided_count, blocked: result.blocked_count })
+        : t('bulk.successMessage', { decided: result.decided_count }))
+      await fetchDrafts(false)
+    } catch (requestError: unknown) {
+      const { code, message: failureMessage } = extractErrorDetail(requestError)
+      await dialog.alert(
+        code === 'review_note_required' ? t('bulk.rejectNoteRequired') : failureMessage || t('bulk.requestFailed'),
+        { title: t('bulk.requestFailedTitle') },
+      )
+    } finally { setBulkRunning(false) }
+  }
+
   const handleRestructure = async (draft: Draft) => {
     setRestructuringDraftId(draft.id)
     try {
@@ -397,13 +560,81 @@ export default function PendingDraftsPage() {
 
       <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search drafts, filenames, or extracted text…" leftIcon={<Search size={15} />} />
 
+      {bulkResult && <section className="rounded-xl border border-border bg-surface p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${bulkResult.blocked_count ? 'bg-warning/10 text-warning' : 'bg-emerald-400/10 text-emerald-300'}`}>{bulkResult.blocked_count ? <AlertTriangle size={17} /> : <CheckCircle2 size={17} />}</div>
+            <div>
+              <h2 className="text-sm font-semibold text-ink">{bulkResult.decision === 'approve' ? t('bulk.resultsTitleApprove') : t('bulk.resultsTitleReject')}</h2>
+              <p className="mt-1 text-body-sm text-steel">{t('bulk.resultsSummary', { decided: bulkResult.decided_count, requested: bulkResult.requested, blocked: bulkResult.blocked_count })}</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setBulkResult(null)} icon={<X size={14} />}>{t('common.close')}</Button>
+        </div>
+        {bulkResult.blocked_count > 0 && <div className="mt-4 space-y-2">
+          <p className="text-caption font-semibold uppercase tracking-widest text-warning">{t('bulk.stillNeedYou', { count: bulkResult.blocked_count })}</p>
+          {bulkResult.blocked.map(item => {
+            const actionKey = item.code ? blockedActionKeys[item.code] : undefined
+            return <div key={item.draft_id} className="rounded-lg border border-warning/25 bg-warning/[0.06] px-3 py-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="min-w-0 truncate text-xs font-semibold text-ink">{bulkResult.titles[item.draft_id] || item.draft_id}</p>
+                {item.code && <Badge variant="warning" size="sm" className="uppercase tracking-wide">{item.code}</Badge>}
+              </div>
+              <p className="mt-1 text-body-sm leading-5 text-amber-200">{actionKey ? t(actionKey) : item.reason || t('bulk.blocked.unknown')}</p>
+              {actionKey && item.reason && <p className="mt-0.5 text-caption text-stone">{item.reason}</p>}
+              {item.code === 'batch_review_required' && <Button variant="secondary" size="sm" className="mt-2" onClick={() => navigate(`/governance/pending-drafts/${item.draft_id}/batch-review`)} icon={<Layers3 size={13} />}>{t('bulk.openBatchReview')}</Button>}
+              {item.code === 'update_confirmation_required' && drafts.some(draft => draft.id === item.draft_id) && <Button variant="secondary" size="sm" className="mt-2" onClick={() => { const draft = drafts.find(entry => entry.id === item.draft_id); if (draft) openReview(draft) }} icon={<Eye size={13} />}>{t('bulk.openFullReview')}</Button>}
+            </div>
+          })}
+        </div>}
+      </section>}
+
+      {filteredDrafts.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-steel">
+          <input type="checkbox" className="sr-only" checked={allVisibleSelected} onChange={toggleAllVisible} />
+          <span className={`grid h-4 w-4 place-items-center rounded border ${allVisibleSelected || someVisibleSelected ? 'border-cyan bg-cyan text-canvas' : 'border-muted bg-input'}`}>{allVisibleSelected ? <Check size={11} strokeWidth={3} /> : someVisibleSelected ? <Minus size={11} strokeWidth={3} /> : null}</span>
+          {t('bulk.selectAllVisible', { count: filteredDrafts.length })}
+        </label>
+        <p className="text-caption text-stone">{t('bulk.keyboardHint')}</p>
+      </div>}
+
+      {selectedIds.length > 0 && <section className="sticky top-2 z-40 rounded-xl border border-cyan/30 bg-[#17212b]/95 p-4 shadow-lg shadow-black/30 backdrop-blur">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan/10 text-cyan"><ListChecks size={17} /></div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink">{t('bulk.selectedCount', { count: selectedIds.length })}</p>
+              <p className="mt-0.5 text-body-sm text-stone">{bulkDeptAmbiguous ? t('bulk.deptMixed') : t('bulk.deptResolved', { dept: effectiveBulkDept })}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Select value={bulkDept} onChange={event => setBulkDept(event.target.value)} className="min-w-52 text-xs" aria-label={t('bulk.deptLabel')}>
+              <option value="">{agreedDept ? t('bulk.deptInherited', { dept: agreedDept }) : t('bulk.deptChoose')}</option>
+              {visibleDepartments.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}
+            </Select>
+            <Button variant="primary" size="sm" onClick={() => void runBulkDecision('approve')} disabled={bulkRunning || bulkDeptAmbiguous} icon={<Check size={14} />}>{bulkRunning ? t('bulk.working') : t('bulk.approveSelected', { count: selectedIds.length })}</Button>
+            <Button variant="danger" size="sm" onClick={() => void runBulkDecision('reject')} disabled={bulkRunning}>{t('bulk.rejectSelected', { count: selectedIds.length })}</Button>
+            <Button variant="ghost" size="sm" onClick={clearSelection} disabled={bulkRunning}>{t('bulk.clearSelection')}</Button>
+          </div>
+        </div>
+        {bulkDeptAmbiguous && <p className="mt-2 text-body-sm text-amber-200">{t('bulk.deptRequired')}</p>}
+      </section>}
+
       {loading ? <div className="grid min-h-56 place-items-center rounded-xl border border-hairline bg-surface text-sm text-steel"><RefreshCw size={16} className="mr-2 animate-spin" /> Loading review queue…</div> : filteredDrafts.length === 0 ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-hairline bg-surface/50 p-8 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-emerald-400/10 text-emerald-300"><Check size={24} /></div><h2 className="mt-4 text-base font-semibold">{drafts.length ? 'No drafts match your search' : 'Review queue is clear'}</h2><p className="mt-2 text-sm text-steel">{drafts.length ? 'Try a different title or filename.' : 'New uploads will appear here when they are ready for review.'}</p></div></div> : <div className="space-y-3">{filteredDrafts.map(draft => {
         const similarity = draft.similarity_level && draft.similarity_level !== 'none' ? draft.similarity_level : null
         const firstMatch = draft.similarity_matches?.[0]
-        return <article key={draft.id} className="rounded-xl border border-[#344354] bg-[#17212b] p-5 shadow-sm transition hover:border-cyan/40 hover:bg-[#1b2733] hover:shadow-lg hover:shadow-black/20">
+        const selected = selectedIds.includes(draft.id)
+        return <article key={draft.id} tabIndex={0} onFocus={() => setFocusedDraftId(draft.id)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedDraftId(current => current === draft.id ? null : current) }} className={`rounded-xl border bg-[#17212b] p-5 shadow-sm outline-none transition hover:border-cyan/40 hover:bg-[#1b2733] hover:shadow-lg hover:shadow-black/20 ${selected ? 'border-cyan/50 bg-[#1b2733]' : 'border-[#344354]'} ${focusedDraftId === draft.id ? 'ring-1 ring-cyan/40' : ''}`}>
+          <div className="flex items-start gap-3">
+          <label className="mt-0.5 inline-flex cursor-pointer items-center" title={t('bulk.selectDraft')}>
+            <input type="checkbox" className="sr-only" checked={selected} onChange={() => toggleDraftSelection(draft.id)} aria-label={t('bulk.selectDraftNamed', { title: draft.title })} />
+            <span className={`grid h-4 w-4 place-items-center rounded border ${selected ? 'border-cyan bg-cyan text-canvas' : 'border-muted bg-input'}`}>{selected && <Check size={11} strokeWidth={3} />}</span>
+          </label>
+          <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-soft text-cyan"><FileText size={18} /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-sm font-semibold text-ink">{draft.title}</h2>{similarity && <Badge variant={similarity === 'very_high' ? 'warning' : 'info'} size="sm" className="uppercase tracking-wide">{similarity === 'very_high' ? 'Possible update' : 'Related content'}</Badge>}{(draft.candidate_count || 0) > 1 && <Badge variant="primary" size="sm" className="uppercase tracking-wide">{draft.candidate_count} split candidates</Badge>}</div><p className="mt-1 truncate text-xs text-stone">{draft.source_ref} · {formatDay(draft.created_at)}</p></div></div><div className="flex flex-wrap justify-end gap-2">{(draft.candidate_count || 0) > 1 && <Button variant="secondary" size="sm" onClick={() => navigate(`/governance/pending-drafts/${draft.id}/batch-review`)} icon={<Layers3 size={14} />}>Batch review</Button>}<Button variant="primary" size="sm" onClick={() => openReview(draft)} icon={<Eye size={14} />}>Open full review</Button>{isAiBusy(draft) ? <Badge variant="info" size="sm" dot>{draft.restructure_status === 'queued' ? 'AI queued' : 'AI formatting…'}</Badge> : draft.restructure_status !== 'llm' && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(draft)} disabled={restructuringDraftId === draft.id} icon={<Sparkles size={14} />}>{restructuringDraftId === draft.id ? 'Formatting…' : 'Retry AI format'}</Button>}<Button variant="ghost" size="sm" onClick={() => void handleReject(draft.id)} disabled={actingDraftId === draft.id} className="hover:text-rose-300">Reject</Button></div></div>
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-steel">{draft.content_metadata?.submission_kind === 'manual' && <Badge variant="info" size="sm" className="uppercase tracking-wide">Manual submission</Badge>}{draft.content_metadata?.submission_kind === 'manual_update' && <Badge variant="warning" size="sm" className="uppercase tracking-wide">Manual update</Badge>}{firstMatch ? <><ArrowLeftRight size={13} className="text-amber-300" /><span>{Math.round(firstMatch.score * 100)}% similar to <strong className="font-medium text-amber-200">{firstMatch.title}</strong></span></> : <span>No significant overlap detected</span>}<span className="text-stone">·</span><span className={draft.restructure_status === 'llm' ? 'text-emerald-300' : isAiBusy(draft) ? 'text-cyan' : hasReadingView(draft) ? 'text-cyan' : 'text-amber-300'}>{aiStatusLabel(draft)}</span></div>
           {draft.restructure_error && <p className="mt-2 line-clamp-2 text-xs text-amber-200/80">{draft.restructure_error}</p>}
+          </div></div>
         </article>
       })}</div>}
 
