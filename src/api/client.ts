@@ -67,8 +67,12 @@ client.interceptors.response.use(
   async (error) => {
     const request = error.config as (typeof error.config & { _authRetry?: boolean }) | undefined
     const requestUrl = String(request?.url || '')
-    const isAuthBootstrapRequest = ['/auth/login', '/auth/register', '/auth/oidc', '/auth/entra'].some((path) => requestUrl.includes(path))
-    if (error.response?.status === 401 && request && !request._authRetry && !requestUrl.includes('/auth/refresh') && !requestUrl.includes('/auth/logout') && !isAuthBootstrapRequest) {
+    // A 401 from a credential endpoint is the ANSWER, not an expired session: /auth/login
+    // rejects bad credentials and /auth/password/change rejects a wrong current password.
+    // Refreshing and retrying those would hide the real message and, on failure, sign the
+    // user out for mistyping a field.
+    const isCredentialRequest = ['/auth/login', '/auth/register', '/auth/oidc', '/auth/entra', '/auth/password/'].some((path) => requestUrl.includes(path))
+    if (error.response?.status === 401 && request && !request._authRetry && !requestUrl.includes('/auth/refresh') && !requestUrl.includes('/auth/logout') && !isCredentialRequest) {
       request._authRetry = true
       if (await refreshSession()) {
         request.headers = request.headers || {}
