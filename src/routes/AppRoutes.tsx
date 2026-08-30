@@ -5,6 +5,9 @@ import ProtectedRoute from './ProtectedRoute'
 import { PageSkeleton } from '../components/ui/Skeleton'
 
 const LoginPage = lazy(() => import('../auth/LoginPage'))
+const AcceptInvitePage = lazy(() => import('../auth/AcceptInvitePage'))
+const ForgotPasswordPage = lazy(() => import('../auth/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('../auth/ResetPasswordPage'))
 const HomePage = lazy(() => import('../pages/HomePage'))
 const BrowsePage = lazy(() => import('../pages/BrowsePage'))
 const BookmarksPage = lazy(() => import('../pages/BookmarksPage'))
@@ -35,6 +38,9 @@ export default function AppRoutes() {
   return (
     <Suspense fallback={<PageSkeleton />}><Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/accept-invite" element={<AcceptInvitePage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       {import.meta.env.DEV && <Route path="/dev/ui" element={<UiCatalogPage />} />}
       <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route index element={<HomePage />} />

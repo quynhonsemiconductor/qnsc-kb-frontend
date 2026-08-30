@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowUpRight, Mail, Monitor, ShieldCheck, Sparkles } from 'lucide-react'
 import { useAuth } from './useAuth'
 import { BrandMarkGlyph } from '../components/ui/BrandMark'
@@ -82,6 +82,7 @@ export default function LoginPage() {
             <div className="flex items-center gap-3 text-caption font-bold uppercase tracking-[.14em] text-stone"><span className="h-px flex-1 bg-border" />{t('auth.or')}<span className="h-px flex-1 bg-border" /></div>
           </>}
           <Input type="email" label={t('auth.email')} value={email} onChange={e => setEmail(e.target.value)} placeholder="name@company.com" required leftIcon={<Mail size={15} />} /><Input type="password" label={t('auth.password')} value={password} onChange={e => setPassword(e.target.value)} required /><Button type="submit" variant="primary" size="lg" disabled={loading} loading={loading} icon={!loading ? <Mail size={15} /> : undefined} className="mt-3 w-full rounded-xl shadow-[0_10px_22px_rgb(var(--primary)/.24)] hover:-translate-y-0.5">{loading ? t('auth.signingIn') : t('auth.signInEmail')}</Button>
+          <p className="text-center"><Link to="/forgot-password" className="text-sm font-semibold text-primary no-underline hover:underline">{t('auth.forgotPassword')}</Link></p>
         </div>
         <p className="mt-7 border-t border-border pt-5 text-center text-xs leading-relaxed text-muted">Accounts are created by an Admin or CEO. Microsoft SSO will appear here when Entra ID is configured.</p>
       </form>
