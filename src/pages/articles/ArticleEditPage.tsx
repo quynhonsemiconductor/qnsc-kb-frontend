@@ -156,8 +156,12 @@ export default function ArticleEditPage() {
 
     try {
       if (isEditMode && id) {
-        await updateArticle(id, payload)
-        navigate('/governance/pending-drafts')
+        // The backend now answers with `workflow`: an editor who may approve their own
+        // submission has the change published in the same request, so sending them to the
+        // review queue would show an empty list and imply the edit was lost. Only a draft
+        // that genuinely awaits review goes to the queue.
+        const result = await updateArticle(id, payload)
+        navigate(result?.workflow === 'published' ? `/articles/${id}` : '/governance/pending-drafts')
       } else {
         await createArticle(payload)
         navigate('/governance/pending-drafts')
