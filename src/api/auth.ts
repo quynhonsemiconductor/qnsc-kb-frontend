@@ -97,6 +97,39 @@ export async function revokeInvitation(id: string) {
   return (await client.post(`/auth/invitations/${id}/revoke`)).data
 }
 
+export type InvitationPreview = {
+  email: string
+  name: string
+  role: string
+  company_domain: string
+  expires_at: string
+}
+
+/** Public: resolves an invitation token so the accept screen can name who it is for. */
+export async function previewInvitation(token: string) {
+  return (await client.get('/auth/invitations/preview', { params: { token } })).data as InvitationPreview
+}
+
+/** Public: returns the same payload as `login`, and sets the auth cookies too. */
+export async function acceptInvitation(data: { token: string; password: string }) {
+  return (await client.post('/auth/invitations/accept', data)).data
+}
+
+/** Public: always 202, even for an unknown address, so callers must not branch on it. */
+export async function requestPasswordReset(email: string) {
+  return (await client.post('/auth/password/forgot', { email })).data as { status: string }
+}
+
+/** Public: invalidates every session, so the user has to sign in again afterwards. */
+export async function resetPassword(data: { token: string; password: string }) {
+  return (await client.post('/auth/password/reset', data)).data as { status: string }
+}
+
+/** Authenticated: revokes other sessions and re-issues cookies for the caller. */
+export async function changePassword(data: { current_password: string; new_password: string }) {
+  return (await client.post('/auth/password/change', data)).data as { status: string }
+}
+
 export async function deactivateUser(userId: string) {
   const response = await client.delete(`/auth/users/${userId}`)
   return response.data

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity, AlertTriangle, BookOpen, Bookmark, Bot, ChevronDown, ClipboardList,
-  Compass, FileArchive, FileText, FolderTree, Home, LogOut,
+  Compass, FileArchive, FileText, FolderTree, Home, KeyRound, LogOut,
   Search, Settings2, Tag, Users, Shield, ShieldCheck, Sparkles, X, Building2, PanelLeftClose, PanelLeftOpen,
   type LucideIcon,
 } from 'lucide-react'
@@ -11,6 +11,7 @@ import { Button } from '../components/ui/Button'
 import { useAuth } from '../auth/useAuth'
 import { useLanguage } from '../i18n/LanguageProvider'
 import { usePermission } from '../hooks/usePermission'
+import { ChangePasswordModal } from '../auth/ChangePasswordModal'
 
 type SectionKey = 'knowledge' | 'governance' | 'admin' | 'metadata'
 type IconType = LucideIcon
@@ -53,6 +54,7 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem('qnsc-sidebar-collapsed') === 'true' } catch { return false }
   })
+  const [passwordOpen, setPasswordOpen] = useState(false)
 
   useEffect(() => { localStorage.setItem('qnsc-sidebar-sections', JSON.stringify(expanded)) }, [expanded])
   useEffect(() => { localStorage.setItem('qnsc-sidebar-collapsed', String(collapsed)) }, [collapsed])
@@ -82,7 +84,8 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
         </NavSection>
       </nav>
 
-      <div className={`border-t border-border p-3 ${collapsed ? 'md:p-2' : ''}`}><div className={`mb-2 flex items-center gap-2.5 rounded-2xl border border-border bg-gradient-to-br from-surface-elevated to-surface px-3 py-3 shadow-[0_10px_24px_rgb(var(--shadow)/.12)] ${collapsed ? 'md:justify-center md:px-1' : ''}`} title={collapsed ? `${user?.name || 'User'} · ${user?.role || 'Staff'}` : undefined}><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary-muted to-primary text-body-sm font-extrabold text-primary-foreground">{user?.name?.substring(0, 2).toUpperCase() || 'US'}</div><div className={collapsed ? 'md:hidden' : 'min-w-0'}><div className="truncate text-xs font-bold text-ink">{user?.name || 'User'}</div><div className="mt-0.5 flex items-center gap-1.5 text-caption font-medium text-stone"><span className="h-1.5 w-1.5 rounded-full bg-success" />{user?.role || 'Staff'}</div></div></div><Button onClick={logout} variant="ghost" size="sm" icon={<LogOut size={14} />} title={collapsed ? t('nav.logOut') : undefined} className={`w-full justify-start text-rose-300 hover:bg-rose-400/10 ${collapsed ? 'md:justify-center' : ''}`}><span className={collapsed ? 'md:hidden' : ''}>{t('nav.logOut')}</span></Button></div>
+      <div className={`border-t border-border p-3 ${collapsed ? 'md:p-2' : ''}`}><div className={`mb-2 flex items-center gap-2.5 rounded-2xl border border-border bg-gradient-to-br from-surface-elevated to-surface px-3 py-3 shadow-[0_10px_24px_rgb(var(--shadow)/.12)] ${collapsed ? 'md:justify-center md:px-1' : ''}`} title={collapsed ? `${user?.name || 'User'} · ${user?.role || 'Staff'}` : undefined}><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary-muted to-primary text-body-sm font-extrabold text-primary-foreground">{user?.name?.substring(0, 2).toUpperCase() || 'US'}</div><div className={collapsed ? 'md:hidden' : 'min-w-0'}><div className="truncate text-xs font-bold text-ink">{user?.name || 'User'}</div><div className="mt-0.5 flex items-center gap-1.5 text-caption font-medium text-stone"><span className="h-1.5 w-1.5 rounded-full bg-success" />{user?.role || 'Staff'}</div></div></div><Button onClick={() => setPasswordOpen(true)} variant="ghost" size="sm" icon={<KeyRound size={14} />} title={collapsed ? t('auth.changePassword') : undefined} className={`w-full justify-start ${collapsed ? 'md:justify-center' : ''}`}><span className={collapsed ? 'md:hidden' : ''}>{t('auth.changePassword')}</span></Button><Button onClick={logout} variant="ghost" size="sm" icon={<LogOut size={14} />} title={collapsed ? t('nav.logOut') : undefined} className={`w-full justify-start text-rose-300 hover:bg-rose-400/10 ${collapsed ? 'md:justify-center' : ''}`}><span className={collapsed ? 'md:hidden' : ''}>{t('nav.logOut')}</span></Button></div>
     </aside>
+    <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
   </>
 }
