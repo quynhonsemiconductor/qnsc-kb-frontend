@@ -65,6 +65,42 @@ export async function rejectDraft(id: string, reviewNote: string) {
   return response.data
 }
 
+export type BulkDecideDecided = {
+  draft_id: string
+  title: string
+  article_id?: string
+  version?: number
+  status?: string
+}
+
+export type BulkDecideBlocked = {
+  draft_id: string
+  status_code: number
+  code?: string | null
+  reason?: string | null
+}
+
+export type BulkDecideResult = {
+  decision: 'approve' | 'reject'
+  requested: number
+  decided_count: number
+  blocked_count: number
+  decided: BulkDecideDecided[]
+  blocked: BulkDecideBlocked[]
+}
+
+export async function bulkDecideDrafts(payload: {
+  draft_ids: string[]
+  decision: 'approve' | 'reject'
+  dept?: string
+  department_ids?: string[]
+  visibility?: 'public' | 'department'
+  review_note?: string
+}): Promise<BulkDecideResult> {
+  const response = await client.post('/governance/pending-drafts/bulk-decide', payload)
+  return response.data
+}
+
 export async function restructureDraft(id: string) {
   const response = await client.post(`/governance/pending-drafts/${id}/restructure`)
   return response.data
