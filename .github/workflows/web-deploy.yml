@@ -99,7 +99,7 @@ jobs:
     # Cloudflare Pages answers those with index.html (405 on POST), and the deployed site
     # cannot log in while looking perfectly healthy. v1.7.1 also asserts the origin is
     # present in the built bundle, so that failure can no longer ship silently.
-    uses: QNSC-VN/qnsc-ci/.github/workflows/web-deploy.yml@v1.10.0
+    uses: QNSC-VN/qnsc-ci/.github/workflows/web-deploy.yml@v1.13.1
     with:
       product: qnsc-kb
       # Standalone repo, not a monorepo: wrangler runs at the repo root and the bundle
