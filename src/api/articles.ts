@@ -114,7 +114,7 @@ export async function getBookmarks() {
   return response.data
 }
 
-export async function isBookmarked(userId: string, articleId: string) {
+export async function isBookmarked(articleId: string) {
   try {
     const bookmarks = await getBookmarks()
     return bookmarks.some((b: any) => b.id === articleId)

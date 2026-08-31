@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Search as SearchIcon, Filter, Layers, FileText, ArrowRight, X, Sparkles, Calendar } from 'lucide-react'
 import { search } from '../../api/search'
 import { listDepartments } from '../../api/auth'
@@ -14,6 +14,11 @@ import { Button } from '../../components/ui/Button'
 import { PageTransition } from '../../components/ui/PageTransition'
 import { Badge } from '../../components/ui/Badge'
 
+// The API validates `limit` as ge=1, le=20, so 20 is the most this surface can ever show.
+// It is a deliberate ceiling on the reranked candidate pool, not a page size.
+const SEARCH_LIMIT_STEP = 10
+const SEARCH_LIMIT_MAX = 20
+
 export default function SearchResultsPage() {
   const [query, setQuery] = useState('')
   const [dept, setDept] = useState('')
@@ -24,13 +29,21 @@ export default function SearchResultsPage() {
   const [results, setResults] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
+  // Raised by "load more" up to SEARCH_LIMIT_MAX. /search is a ranked-retrieval surface
+  // with no offset — the server caps the candidate pool — so this widens the window
+  // rather than paging through it.
+  const [limit, setLimit] = useState(SEARCH_LIMIT_STEP)
   const [requested, setRequested] = useState(false)
   const [error, setError] = useState(false)
   const [departments, setDepartments] = useState<{ id: string; name: string; company_domain: string; active: boolean }[]>([])
 
-  const navigate = useNavigate()
   const { t } = useLanguage()
   const { user } = useAuth()
+  // Aborts the previous request on every new submit. Without it a slow earlier query could
+  // resolve after a newer one and overwrite the results the user is looking at.
+  const requestRef = useRef<AbortController | null>(null)
+
+  useEffect(() => () => requestRef.current?.abort(), [])
 
   useEffect(() => {
     void listDepartments().then(setDepartments).catch((err) => console.error('Failed to load departments', err))
@@ -45,9 +58,12 @@ export default function SearchResultsPage() {
     if (dept && !visibleDepartments.some(item => item.name === dept)) setDept('')
   }, [dept, visibleDepartments])
 
-  const handleSearch = async (e?: React.FormEvent) => {
+  const handleSearch = async (e?: React.FormEvent, nextLimit = SEARCH_LIMIT_STEP) => {
     e?.preventDefault()
     if (!query.trim()) return
+    requestRef.current?.abort()
+    const controller = new AbortController()
+    requestRef.current = controller
     setLoading(true)
     setSearched(true)
     setError(false)
@@ -60,14 +76,18 @@ export default function SearchResultsPage() {
         status: status || undefined,
         date_from: dateFrom || undefined,
         date_to: dateTo ? `${dateTo}T23:59:59` : undefined,
-        limit: 10
-      })
+        limit: nextLimit
+      }, controller.signal)
       setResults(data)
+      setLimit(nextLimit)
     } catch (err) {
+      // A cancelled request is not a failure: its replacement is already in flight, and
+      // showing an error for it would flash a banner on every keystroke-fast resubmit.
+      if (controller.signal.aborted) return
       console.error(err)
       setError(true)
     } finally {
-      setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
   }
 
@@ -174,7 +194,7 @@ export default function SearchResultsPage() {
             {/* Status */}
             <div className="space-y-1.5">
               <label className="block text-body-sm font-medium text-muted-foreground">
-                Status
+                {t('search.status')}
               </label>
               <Select
                 value={status}
@@ -229,14 +249,14 @@ export default function SearchResultsPage() {
         </div>
       ) : searched && error ? (
         <div role="alert" className="flex items-center justify-between gap-3 rounded-surface border border-destructive/25 bg-destructive/10 px-5 py-4 text-body text-destructive">
-          <span className="font-medium">Failed to load results. Please retry.</span>
+          <span className="font-medium">{t('search.failed')}</span>
           <Button
             type="button"
             variant="danger"
             size="sm"
             onClick={() => void handleSearch()}
           >
-            Retry
+            {t('common.retry')}
           </Button>
         </div>
       ) : searched && results.length === 0 ? (
@@ -246,7 +266,7 @@ export default function SearchResultsPage() {
           </div>
           <h3 className="text-h4 font-bold text-foreground">{t('search.noMatches')}</h3>
           <p className="mt-2 max-w-md text-body text-muted-foreground">
-            No authorized document matched this query.
+            {t('search.noAuthorized')}
           </p>
           <Button
             type="button"
@@ -263,7 +283,7 @@ export default function SearchResultsPage() {
         <div className="space-y-3">
           {results.length > 0 && (
             <p className="text-body-sm font-medium text-muted-foreground">
-              {results.length} result{results.length !== 1 ? 's' : ''} found
+              {t('search.resultCount', { count: results.length })}
             </p>
           )}
           {results.map((res, idx) => {
@@ -273,12 +293,7 @@ export default function SearchResultsPage() {
             return (
               <div
                 key={resultKey}
-                role="link"
-                tabIndex={articleId ? 0 : -1}
-                aria-disabled={!articleId}
-                onClick={() => articleId && navigate(`/articles/${articleId}`)}
-                onKeyDown={(event) => { if (articleId && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); navigate(`/articles/${articleId}`) } }}
-                className={`glass-panel interactive-lift group flex items-start justify-between gap-4 rounded-panel border border-border p-5 ${articleId ? 'cursor-pointer' : ''}`}
+                className="glass-panel interactive-lift group flex items-start justify-between gap-4 rounded-panel border border-border p-5"
               >
                 <div className="min-w-0 flex-1 space-y-2.5">
                   {/* Meta badges */}
@@ -296,10 +311,20 @@ export default function SearchResultsPage() {
                     </span>
                   </div>
 
-                  {/* Title */}
+                  {/* The title is the link, rather than the card being a `div role="link"`.
+                      The card cannot be an anchor: it already contains the cited-source
+                      anchor below, and nesting anchors is invalid. A real link also gets
+                      Enter, middle-click and "open in new tab" for free — none of which the
+                      hand-rolled click/keydown handlers supported. */}
                   <h3 className="flex items-center gap-2 text-body-lg font-bold text-foreground transition-colors group-hover:text-primary">
                     <FileText size={16} className="shrink-0 text-muted-foreground group-hover:text-primary" />
-                    <span className="min-w-0 truncate">{res.title}</span>
+                    {articleId ? (
+                      <Link to={`/articles/${articleId}`} className="min-w-0 truncate text-foreground no-underline hover:underline group-hover:text-primary">
+                        {res.title}
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 truncate">{res.title}</span>
+                    )}
                   </h3>
 
                   {/* Excerpt */}
@@ -313,7 +338,6 @@ export default function SearchResultsPage() {
                       href={sourceHref}
                       target="_blank"
                       rel="noreferrer"
-                      onClick={(event) => event.stopPropagation()}
                       className="mt-2 inline-flex items-center gap-1 text-body-sm font-semibold text-info hover:underline"
                     >
                       {t('search.openSource')}{res.page_number ? ` · page ${res.page_number}` : ''}
@@ -332,6 +356,25 @@ export default function SearchResultsPage() {
               </div>
             )
           })}
+          {/* Honest truncation. The result set is capped server-side, so a full window must
+              say so: a truncated list that looks complete is what made a partial answer
+              read as "this is everything". */}
+          {results.length >= limit && limit < SEARCH_LIMIT_MAX && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              className="w-full"
+              onClick={() => void handleSearch(undefined, SEARCH_LIMIT_MAX)}
+            >
+              {t('search.loadMore')}
+            </Button>
+          )}
+          {results.length >= SEARCH_LIMIT_MAX && (
+            <p className="rounded-surface border border-info/25 bg-info/10 px-4 py-3 text-body-sm text-info">
+              {t('search.capped', { count: results.length })}
+            </p>
+          )}
         </div>
       )}
     </PageTransition>

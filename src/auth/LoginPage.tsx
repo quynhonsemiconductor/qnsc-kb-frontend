@@ -5,6 +5,7 @@ import { useAuth } from './useAuth'
 import { BrandMarkGlyph } from '../components/ui/BrandMark'
 import { getMicrosoftLoginUrl, getOidcConfig, login as loginApi } from '../api/auth'
 import { useLanguage } from '../i18n/LanguageProvider'
+import { apiErrorStatus, userMessage } from '../lib/error-handler'
 import { useTheme, type ThemePreference } from '../theme/ThemeProvider'
 import { Select } from '../components/ui/Select'
 import { Button } from '../components/ui/Button'
@@ -41,10 +42,15 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const loginData = await loginApi({ username: email, password })
-      login(loginData.access_token, loginData.user, loginData.refresh_token)
+      login(loginData.access_token, loginData.user)
       navigate('/')
-    } catch (err: any) {
-      setError(err.response?.data?.detail || t('auth.invalidCredentials'))
+    } catch (err: unknown) {
+      // 401 keeps the form's own wording: on this screen it means the credentials were
+      // wrong, not that a session expired, and the server's `detail` is English regardless
+      // of the chosen language. Everything else (throttled after repeated attempts, server
+      // down, offline) goes through the shared mapper so a rate limiter's raw "Too Many
+      // Requests" never reaches a Vietnamese-first UI.
+      setError(apiErrorStatus(err) === 401 ? t('auth.invalidCredentials') : userMessage(err, t))
     } finally {
       setLoading(false)
     }
@@ -56,8 +62,8 @@ export default function LoginPage() {
     try {
       const { authorization_url } = await getMicrosoftLoginUrl()
       window.location.assign(authorization_url)
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Microsoft sign-in is unavailable.')
+    } catch (err: unknown) {
+      setError(userMessage(err, t))
       setSsoLoading(false)
     }
   }

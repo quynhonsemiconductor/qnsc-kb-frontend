@@ -1,4 +1,4 @@
-import React, { FormEvent, useEffect, useMemo, useState } from 'react'
+import React, { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertCircle,
@@ -70,8 +70,10 @@ type Connector = {
   webhook_enabled?: boolean
   department_ids?: string[]
   department_names?: string[]
-  health?: { queue_depth: number; notifications_last_24h: number; documents_needing_attention?: number; documents?: { total: number; published: number; pending_review: number; draft: number; rejected: number; approved: number; held: number }; subscriptions: { active: boolean; seconds_to_expiry?: number | null; reauthorization_required: boolean }[]; scopes: { full_sync_required: boolean; cursor_status: string }[] }
+  health?: ConnectorHealth
 }
+
+type ConnectorHealth = { queue_depth: number; notifications_last_24h: number; documents_needing_attention?: number; documents?: { total: number; published: number; pending_review: number; draft: number; rejected: number; approved: number; held: number }; subscriptions: { active: boolean; seconds_to_expiry?: number | null; reauthorization_required: boolean }[]; scopes: { full_sync_required: boolean; cursor_status: string }[] }
 
 type Scope = {
   external_scope_id: string
@@ -172,24 +174,43 @@ export default function ConnectorsPage() {
   const [aclLoadingId, setAclLoadingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
+  // Long-running loops here outlive a fast navigation: the sync poller runs up to 90s in
+  // 2s steps, so it needs an explicit signal that the page is gone rather than continuing
+  // to fetch and write state into an unmounted component.
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
 
   const refreshConnectors = async (silent = false) => {
     if (silent) setRefreshing(true)
     else setLoading(true)
     try {
       const listed: Connector[] = await listConnectors()
+      if (!mountedRef.current) return
       setItems(listed)
       setError('')
-      listed.forEach(item => {
-        void getConnectorHealth(item.id)
-          .then(health => setItems(current => current.map(row => row.id === item.id ? { ...row, health } : row)))
-          .catch(() => undefined)
-      })
+      // Health is fetched per connector, but applied once. Previously each response called
+      // setItems on its own, so a 10s poll over N connectors produced N re-renders every
+      // cycle; collecting them first makes it one regardless of N.
+      const health = await Promise.all(listed.map(async (item): Promise<[string, ConnectorHealth] | null> => {
+        try {
+          return [item.id, await getConnectorHealth(item.id)]
+        } catch {
+          return null
+        }
+      }))
+      if (!mountedRef.current) return
+      const byId = new Map(health.filter((entry): entry is [string, ConnectorHealth] => entry !== null))
+      if (byId.size) setItems(current => current.map(row => {
+        const result = byId.get(row.id)
+        return result ? { ...row, health: result } : row
+      }))
     } catch (requestError: any) {
-      setError(getErrorMessage(requestError, 'Could not load source connectors'))
+      if (mountedRef.current) setError(getErrorMessage(requestError, 'Could not load source connectors'))
     } finally {
-      if (silent) setRefreshing(false)
-      else setLoading(false)
+      if (mountedRef.current) {
+        if (silent) setRefreshing(false)
+        else setLoading(false)
+      }
     }
   }
 
@@ -382,7 +403,9 @@ export default function ConnectorsPage() {
   const pollSyncJob = async (item: Connector, jobId: string) => {
     const deadline = Date.now() + 90_000
     while (Date.now() < deadline) {
+      if (!mountedRef.current) return null
       const history: ConnectorJob[] = await listConnectorJobs(item.id, 10)
+      if (!mountedRef.current) return null
       setJobs(current => ({ ...current, [item.id]: history }))
       const job = history.find(entry => entry.id === jobId)
       if (job && ['completed', 'failed'].includes(job.status)) return job
@@ -497,7 +520,9 @@ export default function ConnectorsPage() {
       const result = await syncConnector(item.id)
       const jobId = result.job_id as string
       const finishedJob = await pollSyncJob(item, jobId)
+      if (!mountedRef.current) return
       await refreshConnectors(true)
+      if (!mountedRef.current) return
       if (finishedJob?.status === 'completed') {
         const summary = finishedJob.summary || {}
         const imported = Number(summary.imported || 0)
@@ -511,9 +536,9 @@ export default function ConnectorsPage() {
         setMessage(`${item.name} sync is still running. Open Sync activity to follow its progress.`)
       }
     } catch (requestError: any) {
-      setError(getErrorMessage(requestError, 'Could not start or monitor sync'))
+      if (mountedRef.current) setError(getErrorMessage(requestError, 'Could not start or monitor sync'))
     } finally {
-      setBusy(null)
+      if (mountedRef.current) setBusy(null)
     }
   }
 

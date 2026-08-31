@@ -1,5 +1,8 @@
 import client from './client'
 
+// `signal` is threaded through because search is submitted repeatedly from one screen and
+// responses can land out of order: without cancellation a slow earlier query resolving last
+// overwrites the results of the query the user is actually looking at.
 export async function search(params: {
   q: string
   dept?: string
@@ -8,8 +11,8 @@ export async function search(params: {
   date_from?: string
   date_to?: string
   limit?: number
-}) {
-  const response = await client.get('/search', { params })
+}, signal?: AbortSignal) {
+  const response = await client.get('/search', { params, signal })
   return response.data
 }
 

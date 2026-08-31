@@ -112,43 +112,52 @@ export default function ArticleDetailPage() {
   const [loadError, setLoadError] = useState(false)
   const [submittingComment, setSubmittingComment] = useState(false)
 
+  // Incremented on every load. A response only writes state if its sequence is still the
+  // current one, so navigating A->B can never land A's comments and votes on B's page.
+  const loadSequenceRef = useRef(0)
+
   const loadArticleDetails = async () => {
     if (!id) return
+    const sequence = ++loadSequenceRef.current
+    const isCurrent = () => loadSequenceRef.current === sequence
     setLoading(true)
     setLoadError(false)
     try {
+      // Only the article itself decides whether this page can render. It is awaited first
+      // and separately: a failure here is a real load error, and there is nothing to show.
       const art = await getArticle(id)
+      if (!isCurrent()) return
       setArticle(art)
       setRenderedBody(art.body_md)
-      const related = await getRelatedArticles(id).catch(() => [])
-      setRelatedArticles(related)
-
-      const comm = await getComments(id)
-      setComments(comm)
-
-      const vt = await getVotesSummary(id)
-      setVotes(vt)
-
-      const uVt = await getUserVote(id)
-      setUserVote(uVt.vote)
-
-      const book = currentUser?.id ? await isBookmarked(currentUser.id, id).catch(() => false) : false
-      setBookmarked(book)
-      const follow = await getFollowStatus(id).catch(() => ({ following: false }))
-      setFollowing(Boolean(follow.following))
-
-      const hist = await getHistory(id)
-      setHistory(hist)
     } catch (err) {
       console.error(err)
-      setLoadError(true)
-    } finally {
-      setLoading(false)
+      if (isCurrent()) {
+        setLoadError(true)
+        setLoading(false)
+      }
+      return
     }
+    setLoading(false)
+
+    // Everything below is secondary: it decorates the article rather than constituting it.
+    // These run concurrently instead of in a chain of eight awaits, and each one absorbs
+    // its own failure, because a comment or vote endpoint being down must never blank an
+    // article the reader can already be shown.
+    await Promise.all([
+      getRelatedArticles(id).then(related => { if (isCurrent()) setRelatedArticles(related) }).catch(() => undefined),
+      getComments(id).then(comm => { if (isCurrent()) setComments(comm) }).catch(() => undefined),
+      getVotesSummary(id).then(vt => { if (isCurrent()) setVotes(vt) }).catch(() => undefined),
+      getUserVote(id).then(uVt => { if (isCurrent()) setUserVote(uVt.vote) }).catch(() => undefined),
+      getHistory(id).then(hist => { if (isCurrent()) setHistory(hist) }).catch(() => undefined),
+      getFollowStatus(id).then(follow => { if (isCurrent()) setFollowing(Boolean(follow.following)) }).catch(() => undefined),
+      currentUser?.id
+        ? isBookmarked(id).then(book => { if (isCurrent()) setBookmarked(book) }).catch(() => undefined)
+        : Promise.resolve(),
+    ])
   }
 
   useEffect(() => {
-    loadArticleDetails()
+    void loadArticleDetails()
   }, [id])
 
   // The banner below reports an indexing job running in a background worker, so it is
@@ -166,14 +175,23 @@ export default function ArticleDetailPage() {
     setArticle((current: any) => (current && current.index_status === fresh.index_status ? current : fresh))
   }, 5_000, indexing)
 
+  // Keyed on the related ids rather than the array, because every load and every poll
+  // hands back a fresh array with the same contents. Depending on that identity re-ran
+  // this on each cycle, firing one search request per wiki target every few seconds.
+  const relatedKey = relatedArticles.map((item: { id?: string }) => item?.id).join(',')
+  // Read through a ref so the resolver still sees the current list without the effect
+  // taking the array identity as a dependency.
+  const relatedArticlesRef = useRef(relatedArticles)
+  relatedArticlesRef.current = relatedArticles
+
   useEffect(() => {
     if (!article?.body_md) return
     let active = true
-    void resolveWikiLinks(article.body_md, article, relatedArticles).then(body => {
+    void resolveWikiLinks(article.body_md, article, relatedArticlesRef.current).then(body => {
       if (active) setRenderedBody(body)
     })
     return () => { active = false }
-  }, [article?.body_md, article?.id, relatedArticles])
+  }, [article?.body_md, article?.id, relatedKey])
 
   // Release the active source blob URL when leaving the page.
   useEffect(() => {

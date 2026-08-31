@@ -1,0 +1,38 @@
+# Response headers for the Cloudflare Pages deploy (.github/workflows/web-deploy.yml
+# publishes dist/, and Pages reads this file from the root of what it publishes — public/
+# is copied there verbatim by Vite).
+#
+# Without this file the Pages-hosted production SPA carried NO CSP at all: nginx.conf only
+# applies to the docker/Caddy path, and the two hosting paths ship the same bundle. The
+# header set below is kept byte-identical to nginx.conf and the backend's docker/Caddyfile.
+# There is no mechanism enforcing that — three copies of one policy, so an edit to one is a
+# silent divergence.
+#
+# Pages matching rules differ from nginx: rules are ordered, ALL matching rules apply and
+# are merged, and a later rule setting a header a former one already set overrides that
+# single header rather than the whole set. That is the opposite of nginx `add_header`
+# inheritance, which is why /* can carry the security headers while the two asset rules
+# below only need to say something about Cache-Control.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  # `connect-src 'self'` is rewritten at build time by the csp-connect-src plugin in
+  # vite.config.ts, which appends the origin of VITE_API_BASE_URL. The Pages deploy calls
+  # its API cross-origin, so a static file cannot know that value — and 'self' alone would
+  # block every API call. Left as 'self' here deliberately: if the plugin ever stops
+  # running, the shipped policy is TIGHTER than intended and login fails loudly on the
+  # first request, rather than quietly permitting XHR to anywhere.
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; img-src 'self' data: blob:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self' blob:; worker-src 'self' blob:;
+  Cache-Control: no-cache
+
+# Content-hashed filenames: the bytes behind a given URL never change.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Self-hosted webfonts, named by upstream content hash — immutable for the same reason.
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable

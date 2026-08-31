@@ -11,25 +11,21 @@
          the theme the boot script above has already chosen. -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F5F7" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0B1020" />
-    <!-- Fonts, moved out of index.css. preconnect opens the DNS/TCP/TLS handshake to
-         both Google origins while the HTML is still parsing, so the font CSS and the
-         font files themselves are not each paying a cold connection. gstatic needs
-         crossorigin because font files are fetched in CORS mode. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Manrope:wght@500;600;700;800&display=swap" />
+    <!-- Above the stylesheet on purpose: a pending stylesheet blocks script execution, so
+         placing this after the font CSS would hold the theme decision behind a font
+         download and flash the wrong background. See public/theme-boot.js for why it is
+         an external file rather than inline. -->
+    <script src="/theme-boot.js"></script>
+    <!-- Fonts are self-hosted from /fonts (see public/fonts/fonts.css) rather than
+         fetched from fonts.googleapis.com. A third-party stylesheet origin would have to
+         be whitelisted in all three places this app declares a CSP — nginx.conf,
+         public/_headers and the backend's docker/Caddyfile — and a remote stylesheet can
+         pull in further resources, which is the injection path the policy exists to
+         close. Self-hosted, `style-src 'self'` and `font-src 'self'` cover everything and
+         there is no cross-origin handshake left to preconnect to. -->
+    <link rel="stylesheet" href="/fonts/fonts.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>QNSC Knowledge Base</title>
-    <script>
-      (function () {
-        try {
-          var preference = localStorage.getItem('qnsc-theme') || 'system';
-          var isDark = preference === 'dark' || (preference === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
-          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-        } catch (_) { document.documentElement.dataset.theme = 'light'; }
-      })();
-    </script>
   </head>
   <body class="min-h-screen bg-background text-foreground">
     <div id="root"></div>
