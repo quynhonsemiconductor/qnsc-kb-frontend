@@ -4,6 +4,7 @@ import { getSearchGaps, assignSearchGap, dismissSearchGap } from '../../api/gove
 import { listDepartments } from '../../api/auth'
 import { useAuth } from '../../auth/useAuth'
 import { useDialog } from '../../components/ui/DialogProvider'
+import { useLanguage } from '../../i18n/LanguageProvider'
 import PageHeader from '../../components/ui/PageHeader'
 import { Select } from '../../components/ui/Select'
 import { Button } from '../../components/ui/Button'
@@ -13,8 +14,12 @@ import { formatDay } from '../../lib/formatters'
 
 export default function GapQueuePage() {
   const dialog = useDialog()
+  const { t } = useLanguage()
   const [gaps, setGaps] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  // Without this, a failed fetch fell through to the "No search gaps logged / Excellent!"
+  // empty state, congratulating the reader on a queue that was never actually read.
+  const [failed, setFailed] = useState(false)
   const [actingGapId, setActingGapId] = useState<string | null>(null)
 
   // Assignment Modal
@@ -29,8 +34,11 @@ export default function GapQueuePage() {
     try {
       const data = await getSearchGaps('open')
       setGaps(data)
+      setFailed(false)
     } catch (err) {
       console.error(err)
+      setGaps([])
+      setFailed(true)
     } finally {
       setLoading(false)
     }
@@ -87,6 +95,14 @@ export default function GapQueuePage() {
         <div className="flex justify-center items-center h-48 text-slate-400">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-500 mr-3" />
           <span>Analyzing search log queries...</span>
+        </div>
+      ) : failed ? (
+        <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+          <span className="flex items-start gap-2.5 font-medium">
+            <AlertCircle size={18} className="mt-px shrink-0" />
+            {t('gaps.loadFailed')}
+          </span>
+          <Button variant="danger" size="sm" onClick={fetchGaps} icon={<RefreshCw size={14} />}>{t('common.retry')}</Button>
         </div>
       ) : gaps.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center bg-slate-900/5">

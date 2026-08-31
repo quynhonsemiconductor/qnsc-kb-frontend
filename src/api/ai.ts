@@ -111,15 +111,6 @@ export async function renameConversation(id: string, title: string) {
   return response.data
 }
 
-export async function downloadArticleSource(articleId: string) {
-  const response = await client.get(`/articles/${articleId}/source`, { responseType: 'blob' })
-  // The type travels with the URL. A blob: URL carries no headers and no extension, so
-  // without it the viewer cannot tell whether what it received is safe to render inline
-  // — see the type check in PdfViewer.
-  const type = String(response.data?.type || response.headers?.['content-type'] || '').split(';')[0].trim()
-  return { url: URL.createObjectURL(response.data), type }
-}
-
 export async function submitAIFeedback(data: { ai_usage_log_id: string; rating: number; comment?: string }) {
   const response = await client.post('/ai/feedback', data)
   return response.data

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, AlertTriangle, ArrowLeftRight, Check, CheckCircle2, ChevronDown, Clock3, Edit3, Eye,
   FileCheck2, FileText, Hash, Layers3, RefreshCw, Search, ShieldCheck, Sparkles, X,
@@ -18,6 +18,7 @@ import { useDialog } from '../../components/ui/DialogProvider'
 import { usePolling } from '../../hooks/usePolling'
 import { Select } from '../../components/ui/Select'
 import { FloatingPanel } from '../../components/ui/FloatingPanel'
+import { FocusTrap } from '../../components/ui/FocusTrap'
 import { getArticle } from '../../api/articles'
 import { canEditArticleForUser } from '../../utils/articlePermissions'
 import { Button } from '../../components/ui/Button'
@@ -307,6 +308,20 @@ export default function PendingDraftsPage() {
     const firstMatch = draft.similarity_matches?.[0]
     if (firstMatch) void loadComparison(draft.id, firstMatch.article_id)
   }
+
+  // Referenced by the review overlay's aria-labelledby, so the dialog is announced by
+  // the draft title instead of being an unlabelled region.
+  const reviewTitleId = useId()
+
+  // Escape closes the review. It is bound on the document because the overlay is a plain
+  // container: an onKeyDown on it would only fire while focus sat inside its subtree.
+  // Skipped while a decision is in flight, matching closeReview's own guard.
+  useEffect(() => {
+    if (!reviewOpen) return
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') closeReview() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [reviewOpen, actingDraftId])
 
   const closeReview = () => {
     if (actingDraftId) return
@@ -638,8 +653,8 @@ export default function PendingDraftsPage() {
         </article>
       })}</div>}
 
-      {reviewOpen && selectedDraft && <div className="fixed inset-0 z-50 bg-black/75 p-2 backdrop-blur-sm sm:p-4"><section className="mx-auto flex h-[calc(100vh-1rem)] max-w-7xl flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl sm:h-[calc(100vh-2rem)]">
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-hairline bg-surface px-4 py-3 sm:px-6"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="info" size="sm" className="uppercase tracking-widest">Focused review</Badge>{selectedDraft.similarity_level === 'very_high' && <Badge variant="warning" size="sm" className="uppercase tracking-widest">Possible update</Badge>}</div><h2 className="mt-1 truncate text-base font-semibold text-ink sm:text-lg">{selectedDraft.title}</h2><p className="mt-1 truncate text-xs text-stone">{selectedDraft.source_ref} · Original source is unchanged</p></div><div className="flex shrink-0 items-center gap-2">{user?.permissions?.includes('ai.ask') && <Button variant="ghost" size="sm" onClick={() => navigate(`/ai?${editableTargetArticle ? `articleId=${encodeURIComponent(editableTargetArticle.id)}&articleTitle=${encodeURIComponent(editableTargetArticle.title)}&` : ''}prompt=${encodeURIComponent(requestDraftPrompt)}`)} icon={<MessageSquare size={13} />}>Ask AI about edit</Button>}{canEditTargetArticle && editableTargetArticle && <Button variant="ghost" size="sm" onClick={() => navigate(`/articles/${editableTargetArticle.id}/edit`)} icon={<Edit3 size={13} />}>Edit source article</Button>}<button onClick={() => setShowQuality(value => !value)} className={`hidden rounded-lg border px-2.5 py-2 text-body-sm font-semibold sm:inline-flex ${showQuality ? 'border-cyan/30 bg-cyan/10 text-cyan' : 'border-hairline text-stone hover:text-ink'}`}>{showQuality ? 'Hide quality' : 'Quality details'}</button>{matches.length > 0 && <button onClick={toggleComparison} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-body-sm font-semibold ${showComparison ? 'border-amber-300/30 bg-amber-400/10 text-amber-200' : 'border-hairline text-stone hover:text-ink'}`}><ArrowLeftRight size={13} />{showComparison ? 'Hide comparison' : 'Compare article'}</button>}<button onClick={closeReview} className="rounded-lg p-2 text-stone hover:bg-surface-soft hover:text-ink" title="Close review"><X size={18} /></button></div></header>
+      {reviewOpen && selectedDraft && <div className="fixed inset-0 z-50 bg-black/75 p-2 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-labelledby={reviewTitleId}><FocusTrap className="contents"><section className="mx-auto flex h-[calc(100vh-1rem)] max-w-7xl flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl sm:h-[calc(100vh-2rem)]">
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-hairline bg-surface px-4 py-3 sm:px-6"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="info" size="sm" className="uppercase tracking-widest">Focused review</Badge>{selectedDraft.similarity_level === 'very_high' && <Badge variant="warning" size="sm" className="uppercase tracking-widest">Possible update</Badge>}</div><h2 id={reviewTitleId} className="mt-1 truncate text-base font-semibold text-ink sm:text-lg">{selectedDraft.title}</h2><p className="mt-1 truncate text-xs text-stone">{selectedDraft.source_ref} · Original source is unchanged</p></div><div className="flex shrink-0 items-center gap-2">{user?.permissions?.includes('ai.ask') && <Button variant="ghost" size="sm" onClick={() => navigate(`/ai?${editableTargetArticle ? `articleId=${encodeURIComponent(editableTargetArticle.id)}&articleTitle=${encodeURIComponent(editableTargetArticle.title)}&` : ''}prompt=${encodeURIComponent(requestDraftPrompt)}`)} icon={<MessageSquare size={13} />}>Ask AI about edit</Button>}{canEditTargetArticle && editableTargetArticle && <Button variant="ghost" size="sm" onClick={() => navigate(`/articles/${editableTargetArticle.id}/edit`)} icon={<Edit3 size={13} />}>Edit source article</Button>}<button onClick={() => setShowQuality(value => !value)} className={`hidden rounded-lg border px-2.5 py-2 text-body-sm font-semibold sm:inline-flex ${showQuality ? 'border-cyan/30 bg-cyan/10 text-cyan' : 'border-hairline text-stone hover:text-ink'}`}>{showQuality ? 'Hide quality' : 'Quality details'}</button>{matches.length > 0 && <button onClick={toggleComparison} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-body-sm font-semibold ${showComparison ? 'border-amber-300/30 bg-amber-400/10 text-amber-200' : 'border-hairline text-stone hover:text-ink'}`}><ArrowLeftRight size={13} />{showComparison ? 'Hide comparison' : 'Compare article'}</button>}<button onClick={closeReview} className="rounded-lg p-2 text-stone hover:bg-surface-soft hover:text-ink" title="Close review"><X size={18} /></button></div></header>
         {showComparison && matches.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-surface-soft px-4 py-2.5 sm:px-6"><span className="mr-1 text-caption font-semibold uppercase tracking-widest text-stone">Related article</span>{matches.map(match => <button key={match.article_id} onClick={() => void loadComparison(selectedDraft.id, match.article_id)} className={`rounded-lg border px-2.5 py-1.5 text-left text-xs transition ${compareArticleId === match.article_id ? 'border-amber-300/40 bg-amber-400/10 text-amber-200' : 'border-hairline bg-canvas text-steel hover:border-amber-300/30 hover:text-ink'}`}><span className="font-semibold">{Math.round(match.score * 100)}%</span> · {match.title}</button>)}</div>}
         {showQuality && <ReviewQuality report={selectedDraft.restructure_report} chunkCount={selectedDraft.restructure_chunk_count} busy={isAiBusy(selectedDraft)} />}
         {selectedDraft.restructure_candidate_md && <section className="flex shrink-0 flex-col gap-3 border-b border-amber-300/20 bg-gradient-to-r from-amber-400/[0.09] via-surface to-cyan/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div className="flex min-w-0 items-start gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-400/10 text-amber-300"><Sparkles size={17} /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-xs font-semibold text-ink">AI layout needs your decision</p><Badge variant="warning" size="sm" className="uppercase tracking-wider">Candidate retained</Badge></div><p className="mt-1 text-body-sm leading-5 text-steel">The safety check found content that may have changed. Inspect the candidate, then choose which version will be published.</p></div></div><div className="flex shrink-0 flex-wrap gap-2"><Button variant="secondary" size="sm" onClick={() => setReviewTab('candidate')}>Review AI candidate</Button><Button variant="ghost" size="sm" onClick={() => void handleRestructureDecision('keep_lossless')} disabled={Boolean(actingDraftId) || selectedDraft.restructure_decision === 'lossless_kept'}>Use lossless view</Button><Button variant="primary" size="sm" onClick={() => void handleRestructureDecision('keep_ai')} disabled={Boolean(actingDraftId) || selectedDraft.restructure_decision === 'ai_kept'} icon={<Check size={13} />}>Keep AI layout</Button></div></section>}
@@ -655,7 +670,7 @@ export default function PendingDraftsPage() {
           </>}
           <div className="flex shrink-0 justify-end gap-2"><Button variant="danger" size="sm" onClick={() => void handleReject(selectedDraft.id)} disabled={!canPublishThisDraft || Boolean(actingDraftId)}>Reject</Button><Button variant="primary" size="sm" onClick={() => void handleConfirmApprove()} disabled={!decisionReady || Boolean(actingDraftId)} icon={<Check size={14} />}>{actingDraftId ? 'Publishing…' : 'Publish document'}</Button></div>
         </footer>
-      </section></div>}
+      </section></FocusTrap></div>}
     </main>
   )
 }

@@ -61,7 +61,7 @@ export default function AcceptInvitePage() {
       // Success returns exactly what POST /auth/login returns, so this is a login:
       // same store action, same landing, no second round trip to authenticate.
       const data = await acceptInvitation({ token, password })
-      login(data.access_token, data.user, data.refresh_token)
+      login(data.access_token, data.user)
       navigate('/')
     } catch (err: unknown) {
       const status = apiErrorStatus(err)

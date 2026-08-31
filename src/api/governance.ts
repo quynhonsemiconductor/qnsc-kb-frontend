@@ -161,13 +161,18 @@ export async function dismissSearchGap(id: string) {
   return response.data
 }
 
-export async function getAuditLogs(filters: { userId?: string; action?: string; startTime?: string; endTime?: string } = {}) {
+// The audit table is append-only and never shrinks, so the page must ask for a window
+// rather than whatever the server's default happens to be. The response stays a plain
+// array; a full page implies there may be more, which is what drives the pager.
+export async function getAuditLogs(filters: { userId?: string; action?: string; startTime?: string; endTime?: string; limit?: number; offset?: number } = {}) {
   const response = await client.get('/governance/audit-log', {
     params: {
       user_id: filters.userId || undefined,
       action: filters.action || undefined,
       start_time: filters.startTime || undefined,
       end_time: filters.endTime || undefined,
+      limit: filters.limit,
+      offset: filters.offset,
     },
   })
   return response.data

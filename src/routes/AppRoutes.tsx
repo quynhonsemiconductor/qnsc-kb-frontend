@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Route, Navigate, Outlet, createRoutesFromElements } from 'react-router-dom'
 import AppLayout from '../layouts/AppLayout'
 import ProtectedRoute from './ProtectedRoute'
 import { PageSkeleton } from '../components/ui/Skeleton'
@@ -34,48 +34,53 @@ const RolesPage = lazy(() => import('../pages/admin/RolesPage'))
 const LLMSettingsPage = lazy(() => import('../pages/admin/LLMSettingsPage'))
 const UiCatalogPage = lazy(() => import('../pages/dev/UiCatalogPage'))
 
-export default function AppRoutes() {
-  return (
-    <Suspense fallback={<PageSkeleton />}><Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/accept-invite" element={<AcceptInvitePage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      {import.meta.env.DEV && <Route path="/dev/ui" element={<UiCatalogPage />} />}
-      <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-        <Route index element={<HomePage />} />
-        <Route path="home" element={<HomePage />} />
-        <Route path="browse" element={<BrowsePage />} />
-        <Route path="bookmarks" element={<BookmarksPage />} />
-        <Route path="sources" element={<ProtectedRoute permission="article.create"><SourcesPage /></ProtectedRoute>} />
-        <Route path="articles" element={<ProtectedRoute permission="article.read"><BrowsePage /></ProtectedRoute>} />
-        <Route path="articles/manage" element={<ProtectedRoute permission="article.read"><ArticleListPage /></ProtectedRoute>} />
-        <Route path="articles/new" element={<ProtectedRoute permission="article.create"><ArticleEditPage /></ProtectedRoute>} />
-        <Route path="articles/:id" element={<ProtectedRoute permission="article.read"><ArticleDetailPage /></ProtectedRoute>} />
-        <Route path="articles/:id/edit" element={<ProtectedRoute permission="article.edit"><ArticleEditPage /></ProtectedRoute>} />
-        <Route path="search" element={<SearchResultsPage />} />
-        <Route path="ai" element={<AskPage />} />
-        
-        {/* Governance */}
-        <Route path="governance/pending-drafts" element={<ProtectedRoute permission="governance.read"><PendingDraftsPage /></ProtectedRoute>} />
-        <Route path="governance/pending-drafts/:id/batch-review" element={<ProtectedRoute permission="governance.read"><BatchReviewPage /></ProtectedRoute>} />
-        <Route path="governance/gap-queue" element={<ProtectedRoute permission="governance.read"><GapQueuePage /></ProtectedRoute>} />
-        <Route path="governance/audit-log" element={<ProtectedRoute permission="governance.read"><AuditLogPage /></ProtectedRoute>} />
-        <Route path="governance/health" element={<ProtectedRoute permission="governance.read"><HealthDashboardPage /></ProtectedRoute>} />
-        <Route path="governance/coverage" element={<ProtectedRoute permission="governance.read"><CoveragePage /></ProtectedRoute>} />
-        
-        {/* Meta */}
-        <Route path="meta/tags" element={<TagsPage />} />
-        <Route path="meta/glossary" element={<GlossaryPage />} />
-        <Route path="admin/users" element={<ProtectedRoute permission="user.manage"><UsersPage /></ProtectedRoute>} />
-        <Route path="admin/access-groups" element={<ProtectedRoute permission="user.manage"><AccessGroupsPage /></ProtectedRoute>} />
-        <Route path="admin/departments" element={<ProtectedRoute permission="user.manage"><DepartmentsPage /></ProtectedRoute>} />
-        <Route path="admin/connectors" element={<ProtectedRoute permission="connector.manage"><ConnectorsPage /></ProtectedRoute>} />
-        <Route path="admin/features" element={<ProtectedRoute permission="role.manage"><FeatureFlagsPage /></ProtectedRoute>} />
-        <Route path="admin/roles" element={<ProtectedRoute permission="role.manage"><RolesPage /></ProtectedRoute>} />
-        <Route path="admin/llm" element={<ProtectedRoute permission="role.manage"><LLMSettingsPage /></ProtectedRoute>} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes></Suspense>
-  )
-}
+// The route tree is declared as elements and converted with createRoutesFromElements
+// rather than handed to <Routes>, because the editor's unsaved-work guard needs
+// useBlocker, and useBlocker only exists inside a data router (RouterProvider). The
+// element form keeps this tree reviewable as JSX instead of a nested object literal.
+//
+// Suspense stays outside the tree, wrapping every element from the root, so the lazy()
+// page boundaries above still split each page into its own chunk exactly as before.
+export const routes = createRoutesFromElements(
+  <Route element={<Suspense fallback={<PageSkeleton />}><Outlet /></Suspense>}>
+    <Route path="/login" element={<LoginPage />} />
+    <Route path="/accept-invite" element={<AcceptInvitePage />} />
+    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+    <Route path="/reset-password" element={<ResetPasswordPage />} />
+    {import.meta.env.DEV && <Route path="/dev/ui" element={<UiCatalogPage />} />}
+    <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+      <Route index element={<HomePage />} />
+      <Route path="home" element={<HomePage />} />
+      <Route path="browse" element={<BrowsePage />} />
+      <Route path="bookmarks" element={<BookmarksPage />} />
+      <Route path="sources" element={<ProtectedRoute permission="article.create"><SourcesPage /></ProtectedRoute>} />
+      <Route path="articles" element={<ProtectedRoute permission="article.read"><BrowsePage /></ProtectedRoute>} />
+      <Route path="articles/manage" element={<ProtectedRoute permission="article.read"><ArticleListPage /></ProtectedRoute>} />
+      <Route path="articles/new" element={<ProtectedRoute permission="article.create"><ArticleEditPage /></ProtectedRoute>} />
+      <Route path="articles/:id" element={<ProtectedRoute permission="article.read"><ArticleDetailPage /></ProtectedRoute>} />
+      <Route path="articles/:id/edit" element={<ProtectedRoute permission="article.edit"><ArticleEditPage /></ProtectedRoute>} />
+      <Route path="search" element={<SearchResultsPage />} />
+      <Route path="ai" element={<AskPage />} />
+
+      {/* Governance */}
+      <Route path="governance/pending-drafts" element={<ProtectedRoute permission="governance.read"><PendingDraftsPage /></ProtectedRoute>} />
+      <Route path="governance/pending-drafts/:id/batch-review" element={<ProtectedRoute permission="governance.read"><BatchReviewPage /></ProtectedRoute>} />
+      <Route path="governance/gap-queue" element={<ProtectedRoute permission="governance.read"><GapQueuePage /></ProtectedRoute>} />
+      <Route path="governance/audit-log" element={<ProtectedRoute permission="governance.read"><AuditLogPage /></ProtectedRoute>} />
+      <Route path="governance/health" element={<ProtectedRoute permission="governance.read"><HealthDashboardPage /></ProtectedRoute>} />
+      <Route path="governance/coverage" element={<ProtectedRoute permission="governance.read"><CoveragePage /></ProtectedRoute>} />
+
+      {/* Meta */}
+      <Route path="meta/tags" element={<TagsPage />} />
+      <Route path="meta/glossary" element={<GlossaryPage />} />
+      <Route path="admin/users" element={<ProtectedRoute permission="user.manage"><UsersPage /></ProtectedRoute>} />
+      <Route path="admin/access-groups" element={<ProtectedRoute permission="user.manage"><AccessGroupsPage /></ProtectedRoute>} />
+      <Route path="admin/departments" element={<ProtectedRoute permission="user.manage"><DepartmentsPage /></ProtectedRoute>} />
+      <Route path="admin/connectors" element={<ProtectedRoute permission="connector.manage"><ConnectorsPage /></ProtectedRoute>} />
+      <Route path="admin/features" element={<ProtectedRoute permission="role.manage"><FeatureFlagsPage /></ProtectedRoute>} />
+      <Route path="admin/roles" element={<ProtectedRoute permission="role.manage"><RolesPage /></ProtectedRoute>} />
+      <Route path="admin/llm" element={<ProtectedRoute permission="role.manage"><LLMSettingsPage /></ProtectedRoute>} />
+    </Route>
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Route>,
+)
