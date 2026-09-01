@@ -22,12 +22,16 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const baseStyle = 'ui-button relative inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50'
+  // `duration-fast` + `ease-standard` rather than `duration-200`: a button press is state
+  // feedback the user must not wait on. `shadow-raised`/`shadow-overlay` replace `shadow-sm`
+  // and `shadow-md` so depth comes from the elevation scale and tracks --shadow in both themes.
+  const baseStyle = 'ui-button relative inline-flex items-center justify-center gap-2 font-semibold transition-colors duration-fast ease-standard disabled:pointer-events-none disabled:opacity-50'
 
   const variants: Record<ButtonVariant, string> = {
-    primary: 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm hover:shadow-md',
+    primary: 'bg-primary hover:bg-primary-strong text-primary-foreground shadow-raised',
     secondary: 'border border-border bg-surface hover:bg-surface-soft text-foreground hover:border-primary/30',
-    danger: 'bg-destructive text-primary-foreground hover:bg-destructive/90 shadow-sm',
+    // `text-destructive-foreground`, not the primary on-fill token it used to borrow.
+    danger: 'bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-raised',
     ghost: 'text-foreground hover:bg-surface-soft',
   }
 
