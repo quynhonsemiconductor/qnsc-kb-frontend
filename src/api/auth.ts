@@ -43,20 +43,12 @@ export async function listDepartments() {
   return (await client.get('/auth/departments')).data
 }
 
-export async function listAccessGroups() {
-  return (await client.get('/auth/groups')).data
+export async function listDepartmentMembers(departmentId: string) {
+  return (await client.get(`/auth/departments/${departmentId}/members`)).data
 }
 
-export async function listAccessGroupMembers(groupId: string) {
-  return (await client.get(`/auth/groups/${groupId}/members`)).data
-}
-
-export async function createAccessGroup(name: string) {
-  return (await client.post('/auth/groups', { name })).data
-}
-
-export async function replaceAccessGroupMembers(groupId: string, userIds: string[]) {
-  return (await client.put(`/auth/groups/${groupId}/members`, { user_ids: userIds })).data
+export async function replaceDepartmentMembers(departmentId: string, userIds: string[]) {
+  return (await client.put(`/auth/departments/${departmentId}/members`, { user_ids: userIds })).data
 }
 
 export async function createDepartment(data: { name: string; description: string; company_domain?: string }) {
