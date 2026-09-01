@@ -58,7 +58,7 @@ export default function LLMSettingsPage() {
     }
   }
 
-  return <main className="page-shell page-stack text-ink">
+  return <div className="page-shell page-stack text-ink">
     <header className="page-hero glass-panel soft-grid relative mb-1 flex flex-col gap-4 overflow-hidden rounded-panel border border-border px-4 py-5 md:flex-row md:items-start md:justify-between sm:px-6 sm:py-6">
       <div><p className="text-caption font-bold uppercase tracking-[.18em] text-muted">Administration / AI</p><h1 className="mt-3 font-display text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">AI provider</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Choose which LLM powers the assistant, document reading view, and AI tagging for the whole workspace.</p></div>
       <Badge variant={config?.enabled ? 'success' : 'default'} size="md" dot>{loading ? 'Loading…' : config?.enabled ? 'AI enabled' : 'AI disabled'}</Badge>
@@ -79,9 +79,9 @@ export default function LLMSettingsPage() {
         </div>
       </div></section>
 
-      <section className="flex flex-col gap-4 rounded-xl border border-hairline bg-surface p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><div className="rounded-lg bg-emerald-50 p-2 text-emerald-700"><ShieldCheck size={18} /></div><div><h2 className="font-semibold">Use this provider</h2><p className="mt-1 text-xs text-steel">Disabling it makes AI features unavailable until another provider is configured.</p></div></div><button type="button" role="switch" aria-checked={enabled} onClick={() => setEnabled(current => !current)} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${enabled ? 'border-emerald-400/30 bg-emerald-50 text-emerald-700' : 'border-hairline bg-canvas text-stone'}`}><span className={`h-4 w-4 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-stone/40'}`} />{enabled ? 'Enabled' : 'Disabled'}</button></section>
+      <section className="flex flex-col gap-4 rounded-xl border border-hairline bg-surface p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><div className="rounded-lg bg-success/10 p-2 text-success-text"><ShieldCheck size={18} /></div><div><h2 className="font-semibold">Use this provider</h2><p className="mt-1 text-xs text-steel">Disabling it makes AI features unavailable until another provider is configured.</p></div></div><button type="button" role="switch" aria-checked={enabled} onClick={() => setEnabled(current => !current)} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${enabled ? 'border-success/30 bg-success/10 text-success-text' : 'border-border bg-canvas text-muted-foreground'}`}><span className={`h-4 w-4 rounded-full ${enabled ? 'bg-success' : 'bg-muted/40'}`} />{enabled ? 'Enabled' : 'Disabled'}</button></section>
 
       <div className="flex justify-end"><Button type="submit" variant="primary" disabled={saving || loading} loading={saving} icon={<Save size={15} />}>{saving ? 'Saving…' : 'Save AI provider'}</Button></div>
     </form>
-  </main>
+  </div>
 }

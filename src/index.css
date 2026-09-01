@@ -37,6 +37,29 @@
   --warning: 190 119 34;
   --destructive: 205 71 93;
   --info: 20 157 177;
+  /* On-fill companions. Each semantic fill owns the text colour that is legible on top of
+     it, so no component has to borrow another role's on-fill token. White clears 4.5:1 on
+     --destructive (4.51:1) and --success; --warning is a light amber, so text on it must be
+     ink rather than white — that pair is exactly what a borrowed white token gets wrong. */
+  --destructive-foreground: 255 255 255;
+  --success-foreground: 255 255 255;
+  --info-foreground: 255 255 255;
+  --warning-foreground: 41 25 4;
+  /* Backdrop behind modals and the mobile drawer. Themed, unlike the bg-black/40 it
+     replaces: on the light theme a near-black scrim reads as a blackout rather than a dim. */
+  --scrim: 21 25 48;
+  /* ON-TINT TEXT. A semantic hue is chosen to work as a FILL, so putting that same value
+     on its own 10% tint is the pair that fails: measured on real badges, `text-success` on
+     `bg-success/10` was 3.04:1, `text-info` 2.83:1, `text-destructive` 3.69:1 and
+     `text-primary` 4.22:1 — all under 4.5:1 at the 11px badge size. These are the same
+     hues taken deep enough to clear the floor against a near-white composite, so a status
+     pill keeps its meaning-carrying colour AND becomes readable. Light theme goes darker;
+     the dark block below goes brighter, because there the tint composite is near-black. */
+  --primary-text: 68 68 184;
+  --success-text: 16 110 76;
+  --warning-text: 124 68 8;
+  --destructive-text: 158 27 51;
+  --info-text: 11 94 108;
   --ring: 109 109 239;
   --sidebar: 241 242 250;
   --sidebar-active: 229 229 255;
@@ -61,7 +84,16 @@
   --primary-strong: 96 84 214;
   --primary-muted: 168 158 255;
   --primary-soft: 44 39 94;
-  --primary-foreground: 249 249 255;
+  /* Dark themes need a DARK on-primary, not a light one. The dark palette lifts --primary
+     to 126 116 246 and --destructive to 255 126 146 so they read as accents against a near
+     black page — but that makes them bright FILLS, and near-white text on a bright fill is
+     exactly the pair that fails: 249 249 255 on --primary measured 3.50:1 and on
+     --destructive 2.31:1, both under the 4.5:1 floor. Inking it instead takes the same two
+     pairs to 5.28:1 and 8.00:1 with no change to either fill, so the accent hues survive
+     and the label on top becomes readable. This token is only ever used ON --primary or
+     --destructive (buttons, the unread badge, avatar glyphs), which is why one value fixes
+     every one of them at once. */
+  --primary-foreground: 12 10 32;
   --secondary: 39 45 74;
   --secondary-foreground: 224 227 244;
   --accent: 77 218 220;
@@ -70,6 +102,26 @@
   --warning: 245 183 109;
   --destructive: 255 126 146;
   --info: 83 211 231;
+  /* All four dark fills are bright accents against a near-black page, so every on-fill
+     token here is ink — the same reasoning as --primary-foreground above. Measured on
+     these fills: 8.01:1 on --destructive, 9.4:1 on --success, 9.6:1 on --info. */
+  --destructive-foreground: 12 10 32;
+  --success-foreground: 6 26 19;
+  --info-foreground: 6 30 35;
+  --warning-foreground: 41 25 4;
+  /* Pure black would be indistinguishable from --background here, so the scrim is the
+     page's own darkest ink: the dimming stays visible against a dark surface. */
+  --scrim: 3 5 20;
+  /* On-tint text, dark counterpart. Here the 10% tint composites against a near-black
+     surface, so these go BRIGHTER than the fill rather than darker. The dark fills already
+     sit high enough that most clear 4.5:1 on their own tint; these lift the two that did
+     not (--primary at 4.35:1, --info) and keep the family consistent so one class name
+     works in both themes. */
+  --primary-text: 168 158 255;
+  --success-text: 122 226 183;
+  --warning-text: 250 205 150;
+  --destructive-text: 255 158 173;
+  --info-text: 125 224 240;
   --ring: 141 132 255;
   --sidebar: 12 16 33;
   --sidebar-active: 34 33 72;
@@ -227,7 +279,7 @@
   .bg-slate-900\/80, .bg-slate-900\/60, .bg-slate-900\/40, .bg-slate-900\/30, .bg-slate-900\/20, .bg-slate-900\/10, .bg-slate-900\/5 { background-color: rgb(var(--surface) / .78) !important; }
   .bg-slate-800\/60, .bg-slate-800\/40 { background-color: rgb(var(--surface-muted) / .82) !important; }
   .border-slate-800\/80, .border-slate-800\/40, .border-slate-700\/80 { border-color: rgb(var(--border) / .84) !important; }
-  .text-slate-100, .text-slate-200, .text-primary-foreground, .text-ink { color: rgb(var(--foreground)) !important; }
+  .text-slate-100, .text-slate-200, .text-ink { color: rgb(var(--foreground)) !important; }
   .text-slate-300, .text-charcoal { color: rgb(var(--secondary-foreground)) !important; }
   .text-slate-400, .text-steel { color: rgb(var(--muted-foreground)) !important; }
   .text-slate-500, .text-slate-600, .text-stone, .text-muted { color: rgb(var(--muted)) !important; }
@@ -237,14 +289,22 @@
   .bg-brand-500 { background-color: rgb(var(--primary)) !important; }
   .bg-brand-600 { background-color: rgb(var(--primary-strong)) !important; }
   /* Legacy primary-action aliases must never resolve to the foreground token:
-     before this mapping, bg-ink + text-primary-foreground could become #E8EEF6 on #E8EEF6. */
+     before this mapping, bg-ink + text-primary-foreground could become #E8EEF6 on #E8EEF6.
+
+     `.text-primary-foreground` is deliberately NOT in the mapping above. It is a SEMANTIC
+     token, not a legacy alias, and repainting it to --foreground broke every control that
+     pairs it with a semantic fill: `bg-primary text-primary-foreground` computed as
+     rgb(21,25,48) on rgb(91,92,226) — 3.36:1, below the 4.5:1 floor — on every primary
+     button in the app, plus the notification badge on --destructive at 2.08:1. The
+     per-fill escape hatch that used to live here only whitelisted the three legacy fills
+     (bg-ink, bg-brand-500, bg-brand-600), so any semantic fill silently lost. Leaving the
+     token alone is what makes it correct on all of them at once. */
   .bg-ink { background-color: rgb(var(--primary)) !important; }
   .bg-coral { background-color: rgb(var(--primary)) !important; }
   .text-coral, .text-minimaxBlue { color: rgb(var(--info)) !important; }
   .border-minimaxBlue { border-color: rgb(var(--primary)) !important; }
   .bg-\[\#18232f\] { background-color: rgb(var(--surface-elevated)) !important; }
   .border-\[\#354457\] { border-color: rgb(var(--border)) !important; }
-  .bg-ink.text-primary-foreground, .bg-brand-500.text-primary-foreground, .bg-brand-600.text-primary-foreground { color: rgb(var(--primary-foreground)) !important; }
   .hover\:bg-slate-800:hover, .hover\:bg-surface:hover { background-color: rgb(var(--surface-muted)) !important; }
   /* Route bare white/near-white hovers to the muted surface tint so hover feedback
      never flashes a harsh pure-white block (--surface-elevated is #fff in light mode). */
@@ -456,13 +516,28 @@ html .text-blue-300 { color: rgb(var(--info)) !important; }
   50% { opacity: 0.3; }
 }
 
-/* Reduced motion: disable all custom animations */
+/* Reduced motion.
+
+   This was an allow-list of four class NAMES (.animate-in, .animate-pulse,
+   .transition-all, .transition) and it silently missed everything that declares its own
+   motion instead of borrowing one of those utilities. Measured with the setting on:
+   9 `.interactive-lift` elements still reported transition-duration .2s, because that
+   class writes `transition: transform ...` itself (see the component layer above) and
+   `.transition` matches the literal class only. `animate-spin` on every Button loading
+   state and `active:scale-[0.97]` on every pressed control were uncovered for the same
+   reason.
+
+   A user asking for reduced motion is not asking for "less of the motion we remembered
+   to tag" — so match everything and keep the escape hatch narrow. Duration .01ms rather
+   than `none`: transitionend/animationend still fire, so any state machine waiting on
+   them completes instead of hanging. */
 @media (prefers-reduced-motion: reduce) {
-  .animate-in,
-  .animate-pulse,
-  .transition-all,
-  .transition {
-    animation: none !important;
-    transition: none !important;
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
   }
 }

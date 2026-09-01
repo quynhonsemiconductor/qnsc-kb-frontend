@@ -30,8 +30,8 @@ function DepartmentPicker({ value, options, onChange }: { value: string[]; optio
       <label className="block text-xs font-semibold text-slate-400">{t('editor.departments')}</label>
       <span className="text-caption font-semibold text-slate-500">{selected.length} selected</span>
     </div>
-    <button ref={anchorRef} type="button" aria-expanded={open} onClick={() => setOpen(current => !current)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 text-left text-xs text-primary-foreground outline-none transition hover:border-brand-500/70 focus:border-brand-500">
-      <span className={selected.length ? 'font-semibold text-primary-foreground' : 'text-slate-500'}>{selected.length ? `${selected.length} department${selected.length === 1 ? '' : 's'} selected` : 'Choose departments'}</span>
+    <button ref={anchorRef} type="button" aria-expanded={open} onClick={() => setOpen(current => !current)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 text-left text-xs text-foreground outline-none transition hover:border-brand-500/70 focus:border-brand-500">
+      <span className={selected.length ? 'font-semibold text-foreground' : 'text-slate-500'}>{selected.length ? `${selected.length} department${selected.length === 1 ? '' : 's'} selected` : 'Choose departments'}</span>
       <ChevronDown size={15} className={`shrink-0 text-slate-500 transition ${open ? 'rotate-180 text-brand-400' : ''}`} />
     </button>
     <FloatingPanel anchorRef={anchorRef} open={open} onClose={() => setOpen(false)} className="border-slate-700 bg-slate-900 p-1.5 shadow-2xl shadow-black/40">
@@ -369,7 +369,7 @@ export default function ArticleEditPage() {
                 <Select
                   value={visibility}
                   onChange={(e) => { setVisibility(e.target.value as typeof visibility); setDirty(true) }}
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-primary-foreground outline-none focus:border-brand-500"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-none focus:border-brand-500"
                 >
                   <option value="department">{t('editor.visibilityDepartments')}</option>
                   <option value="public">{t('editor.visibilityPublic')}</option>
@@ -406,7 +406,7 @@ export default function ArticleEditPage() {
                 <Select
                   value={language}
                   onChange={(e) => { setLanguage(e.target.value); setDirty(true) }}
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-primary-foreground outline-none focus:border-brand-500"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-none focus:border-brand-500"
                 >
                   <option value="en">English</option>
                   <option value="vi">Vietnamese</option>
@@ -422,7 +422,7 @@ export default function ArticleEditPage() {
                   <Select
                     value={status}
                     onChange={(e) => { setStatus(e.target.value); setDirty(true) }}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-primary-foreground outline-none focus:border-brand-500"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-none focus:border-brand-500"
                   >
                     <option value="draft">{t('editor.statusDraft')}</option>
                     <option value="published">{t('editor.statusPublished')}</option>
