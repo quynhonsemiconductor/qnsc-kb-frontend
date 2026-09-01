@@ -180,10 +180,13 @@ export default function HealthDashboardPage() {
                 detail: 'Private source storage',
               },
               {
-                label: 'SharePoint sync',
-                healthy: Boolean(metrics.dependencies.sharepoint?.configured),
-                status: metrics.dependencies.sharepoint?.configured ? 'Configured' : 'No active connector',
-                detail: `${metrics.dependencies.sharepoint?.active_connectors || 0} active connector(s)`,
+                // `connectors` counts every remote provider; `sharepoint` is the older
+                // key with the same shape, kept as a fallback so a not-yet-deployed API
+                // does not render this card as "no active connector".
+                label: 'Connector sync',
+                healthy: Boolean(metrics.dependencies.connectors?.configured ?? metrics.dependencies.sharepoint?.configured),
+                status: (metrics.dependencies.connectors?.configured ?? metrics.dependencies.sharepoint?.configured) ? 'Configured' : 'No active connector',
+                detail: `${metrics.dependencies.connectors?.active_connectors ?? metrics.dependencies.sharepoint?.active_connectors ?? 0} active connector(s)`,
               },
               {
                 label: 'Indexing queue',
