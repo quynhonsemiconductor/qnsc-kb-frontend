@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Search as SearchIcon, Filter, Layers, FileText, ArrowRight, X, Sparkles, Calendar } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Search as SearchIcon, Filter, Layers, FileText, ArrowRight, X, Sparkles } from 'lucide-react'
 import { search } from '../../api/search'
 import { listDepartments } from '../../api/auth'
 import { useAuth } from '../../auth/useAuth'
@@ -20,7 +20,12 @@ const SEARCH_LIMIT_STEP = 10
 const SEARCH_LIMIT_MAX = 20
 
 export default function SearchResultsPage() {
-  const [query, setQuery] = useState('')
+  // Seeded from the URL. /search?q=… is a shareable, linkable address: what a colleague
+  // pastes into chat, what a citation points at, what a bookmark holds. Reading the query
+  // only from local state meant every one of those arrived at an empty form showing no
+  // results, with nothing to say the query had been dropped.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [query, setQuery] = useState(() => searchParams.get('q') ?? '')
   const [dept, setDept] = useState('')
   const [tag, setTag] = useState('')
   const [status, setStatus] = useState('published')
@@ -61,6 +66,13 @@ export default function SearchResultsPage() {
   const handleSearch = async (e?: React.FormEvent, nextLimit = SEARCH_LIMIT_STEP) => {
     e?.preventDefault()
     if (!query.trim()) return
+    // Keep the address bar in step with what is on screen, so a refined result set stays
+    // as shareable as the one the user arrived on. `replace` rather than push: a search box
+    // is not a navigation history, and pushing every submit would make Back walk backwards
+    // through queries instead of leaving the page.
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('q', query.trim())
+    setSearchParams(nextParams, { replace: true })
     requestRef.current?.abort()
     const controller = new AbortController()
     requestRef.current = controller
@@ -90,6 +102,18 @@ export default function SearchResultsPage() {
       if (!controller.signal.aborted) setLoading(false)
     }
   }
+
+  // Runs the query that arrived in the URL, exactly once per mount. A seeded input that
+  // never fires is worse than an empty one: the page looks like it searched and found
+  // nothing. The ref guard is what holds this to a single request — `handleSearch` closes
+  // over the filter state, so declaring it a dependency would re-fire the search on every
+  // filter change and take the explicit Search button out of the user's hands.
+  const seededRef = useRef(false)
+  useEffect(() => {
+    if (seededRef.current) return
+    seededRef.current = true
+    if (searchParams.get('q')?.trim()) void handleSearch()
+  })
 
   const clearFilters = () => {
     setDept('')
@@ -161,8 +185,13 @@ export default function SearchResultsPage() {
             )}
           </div>
 
-          {/* Filter grid — 2 cols on small, 4 cols on large */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Tracks are `minmax(0,1fr)`, not the bare `1fr` the shorthand produces. A grid
+              item defaults to min-width:auto, so a bare `1fr` track grows to its widest
+              item's intrinsic width instead of the container's: at 320px this container
+              measured 252px while its single track resolved to 346px, pushing the date pair
+              and its neighbours 55px past the viewport, clipped rather than scrolled.
+              Flooring the track at 0 lets the content shrink to the page. */}
+          <div className="grid gap-3 [grid-template-columns:repeat(1,minmax(0,1fr))] sm:[grid-template-columns:repeat(2,minmax(0,1fr))] lg:[grid-template-columns:repeat(4,minmax(0,1fr))]">
             {/* Department */}
             <div className="space-y-1.5">
               <label className="block text-body-sm font-medium text-muted-foreground">
@@ -211,22 +240,33 @@ export default function SearchResultsPage() {
               <label className="block text-body-sm font-medium text-muted-foreground">
                 {t('search.from')} / {t('search.to')}
               </label>
+              {/* `min-w-0` has to sit on the FLEX ITEM, and that is this wrapper — `Input`
+                  forwards `className` to the inner <input>, not to the div it returns. A
+                  `type="date"` field carries an intrinsic minimum width from its own picker
+                  UI and a flex item defaults to min-width:auto, so the pair refused to
+                  shrink into its grid column and ran 75px past the right edge of the
+                  viewport, carrying the "to" field off-screen with it.
+                  The decorative Calendar icons are gone too: a date input already draws its
+                  own picker indicator, so they were a second icon competing for the same
+                  corner, and their `pr-10` padding made the overflow worse. */}
               <div className="flex items-center gap-2">
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  aria-label="Date from"
-                  rightIcon={<Calendar size={14} />}
-                />
+                <div className="min-w-0 flex-1">
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    aria-label="Date from"
+                  />
+                </div>
                 <span className="shrink-0 text-body-sm text-muted">–</span>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  aria-label="Date to"
-                  rightIcon={<Calendar size={14} />}
-                />
+                <div className="min-w-0 flex-1">
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    aria-label="Date to"
+                  />
+                </div>
               </div>
             </div>
           </div>

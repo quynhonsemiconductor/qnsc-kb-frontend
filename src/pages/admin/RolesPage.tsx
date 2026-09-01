@@ -188,7 +188,7 @@ export default function RolesPage() {
     }
   }
 
-  return <main className="page-shell-wide page-stack text-ink">
+  return <div className="page-shell-wide page-stack text-ink">
     <header className="flex flex-col gap-4 border-b border-hairline-soft pb-5 md:flex-row md:items-end md:justify-between">
       <div>
         <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-stone"><Shield size={14} className="text-cyan-700" /> Access control</div>
@@ -207,7 +207,7 @@ export default function RolesPage() {
         <div className="mb-3 flex items-center justify-between px-2"><p className="text-xs font-bold uppercase tracking-widest text-stone">Roles</p><Badge variant="default" size="sm">{roles.length}</Badge></div>
         <div className="relative mb-3"><Input aria-label="Search roles" leftIcon={<Search size={15} />} className="text-xs" placeholder="Find a role…" value={roleSearch} onChange={event => setRoleSearch(event.target.value)} /></div>
         <div className="max-h-[28rem] space-y-1 overflow-y-auto pr-1">
-          {loading ? <p className="px-3 py-8 text-center text-xs text-stone">Loading roles…</p> : filteredRoles.map(item => <button key={item.id} type="button" onClick={() => setSelected(item.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition ${selected === item.id ? 'bg-ink text-primary-foreground shadow-sm' : 'hover:bg-surface-soft'}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${selected === item.id ? 'bg-white/15 text-primary-foreground' : 'bg-canvas text-steel'}`}><Users size={15} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{item.name}</span><span className={`block truncate text-body-sm ${selected === item.id ? 'text-primary-foreground/60' : 'text-stone'}`}>{item.company_domain || 'Global'}{item.system ? ' · system' : ''}</span></span>{item.system && <span className="text-caption text-cyan">Built-in</span>}</button>)}
+          {loading ? <p className="px-3 py-8 text-center text-xs text-stone">Loading roles…</p> : filteredRoles.map(item => <button key={item.id} type="button" onClick={() => setSelected(item.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition ${selected === item.id ? 'bg-primary text-primary-foreground shadow-raised' : 'hover:bg-surface-soft'}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${selected === item.id ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-canvas text-muted-foreground'}`}><Users size={15} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{item.name}</span><span className={`block truncate text-body-sm ${selected === item.id ? 'text-primary-foreground' : 'text-muted-foreground'}`}>{item.company_domain || 'Global'}{item.system ? ' · system' : ''}</span></span>{item.system && <span className={`text-caption font-semibold ${selected === item.id ? 'text-primary-foreground' : 'text-info-text'}`}>Built-in</span>}</button>)}
           {!loading && !filteredRoles.length && <p className="px-3 py-8 text-center text-xs text-stone">No matching roles.</p>}
         </div>
       </aside>
@@ -228,5 +228,5 @@ export default function RolesPage() {
     </div>
 
     {role && canEdit && <div className={`sticky bottom-4 z-10 flex flex-col gap-3 rounded-xl border px-4 py-3 shadow-lg sm:flex-row sm:items-center sm:justify-between ${isDirty ? 'border-info/30 bg-info/10' : 'border-border bg-surface-elevated'}`}><div className="flex items-center gap-3"><span className={`flex h-8 w-8 items-center justify-center rounded-full ${isDirty ? 'bg-info text-accent-foreground' : 'bg-surface-soft text-stone'}`}>{isDirty ? <Sparkles size={15} /> : <Check size={15} />}</span><div><p className="text-sm font-semibold">{isDirty ? `${changedKeys.length} unsaved change${changedKeys.length === 1 ? '' : 's'}` : 'All changes saved'}</p><p className="text-xs text-steel">{isDirty ? 'Review the access scopes, then save this role.' : 'This role is up to date.'}</p></div></div><div className="flex gap-2"><Button variant="secondary" size="sm" icon={<RotateCcw size={14} />} disabled={!isDirty || saving} onClick={() => setDraft(savedDraft)}>Discard</Button><Button variant="primary" size="sm" icon={<Check size={14} />} iconPosition="right" disabled={!isDirty} loading={saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save permissions'}</Button></div></div>}
-  </main>
+  </div>
 }

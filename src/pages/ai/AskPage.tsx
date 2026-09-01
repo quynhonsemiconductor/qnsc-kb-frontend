@@ -750,7 +750,7 @@ export default function AskPage() {
           )}
         </aside>
 
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-canvas">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-canvas">
            <div className="signal-line flex shrink-0 items-center justify-between border-b border-hairline bg-surface/45 px-4 py-3.5 sm:px-5 sm:py-4 lg:px-8">
              <div className="flex min-w-0 items-center gap-3">
               <Button
@@ -858,17 +858,27 @@ export default function AskPage() {
                           <div className="min-w-0 flex-1">
                             {message.failed ? (
                               <div className="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2.5">
-                                <div className="flex items-start gap-2 text-body leading-6 text-destructive">
-                                  <AlertCircle size={15} className="mt-0.5 shrink-0 text-destructive" />
+                                <div className="flex items-start gap-2 text-body leading-6 text-destructive-text">
+                                  <AlertCircle size={15} className="mt-0.5 shrink-0 text-destructive-text" />
                                   <span>{message.text}</span>
                                 </div>
+                                {/* No `className` overrides of the variant's own fill/text.
+                                    This passed `variant="danger"` (which emits
+                                    `bg-destructive text-primary-foreground`) and then tried
+                                    to repaint it as a tint with `bg-destructive/10
+                                    text-destructive`. There is no class-merge helper in this
+                                    project, so both sets survive and CSS source order picks
+                                    the winner: the fill became the 10% tint while the text
+                                    stayed the on-primary token, measured at 1.46:1. A solid
+                                    danger button is 8.01:1 dark / 4.51:1 light and matches
+                                    every other destructive action in the app. */}
                                 <Button
                                   variant="danger"
                                   size="sm"
                                   icon={<ArrowUp size={12} />}
                                   iconPosition="right"
                                   onClick={() => void handleAsk(message.retryQuestion || '')}
-                                  className="mt-2 rounded-md border border-destructive/25 bg-destructive/10 text-xs font-medium text-destructive hover:bg-destructive/20"
+                                  className="mt-2"
                                 >
                                   Try again
                                 </Button>
@@ -1077,7 +1087,7 @@ export default function AskPage() {
               </div>
             </div>
           </div>
-        </main>
+        </div>
 
         {selectedSource && (
           <>

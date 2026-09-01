@@ -19,26 +19,32 @@ const accentClasses = {
 
 export default function PageHeader({ eyebrow, title, description, icon: Icon, actions, accent = 'primary' }: PageHeaderProps) {
   return (
-    <header className="page-hero glass-panel soft-grid signal-line relative overflow-hidden rounded-panel border border-border px-4 py-5 sm:px-6 sm:py-6">
-      <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-primary/12 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-0 right-10 h-px w-40 bg-gradient-to-r from-transparent via-info/50 to-transparent" />
-      {/* This header sets `overflow-hidden` (and `signal-line` sets it again) for the
-          decorative blobs above, which makes wrapping mandatory rather than cosmetic:
-          anything overflowing here is CLIPPED, not scrolled, so a row that cannot wrap
-          silently loses text. Every row below may wrap, the title column may shrink
-          (min-w-0) instead of pushing the actions out of the box, and long unbroken
-          strings break rather than run past the edge. */}
-      <div className="relative flex flex-col justify-between gap-x-6 gap-y-5 md:flex-row md:items-end">
+    /* Was `page-hero glass-panel soft-grid signal-line` plus two absolutely-positioned
+       blur blobs. Four decorative layers and an infinite scanning-line animation, on the
+       header of all 14 pages that use this component.
+
+       They are gone for three reasons. The animation re-painted a full-width strip forever
+       on every route, for no information. `overflow-hidden` — needed only to clip those
+       blobs — is what made the wrap handling below load-bearing in the first place, and it
+       silently clipped any action row that could not wrap. And a 30px title over a gradient
+       wash is the generic-AI-dashboard look: it spends the top of every screen on chrome
+       instead of on the documents people came for.
+
+       What remains is a bottom rule. The heading and its actions provide the hierarchy;
+       the page below provides the content. */
+    <header className="relative border-b border-border pb-4">
+      {/* Every row may wrap, the title column may shrink (min-w-0) rather than push the
+          actions off the edge, and long unbroken strings break instead of overflowing. */}
+      <div className="flex flex-col justify-between gap-x-6 gap-y-4 md:flex-row md:items-start">
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-caption font-bold uppercase tracking-[.18em] text-muted">
-            <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border ${accentClasses[accent]}`}><Icon size={16} /></span>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-caption font-bold uppercase tracking-[.14em] text-muted">
+            <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-control border ${accentClasses[accent]}`}><Icon size={15} /></span>
             <span className="min-w-0 break-words">{eyebrow}</span>
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2 py-1 text-caption tracking-[.12em] text-success"><span className="h-1.5 w-1.5 rounded-full bg-success" /> Live</span>
           </div>
-          <h1 className="font-display mt-3 break-words text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">{title}</h1>
-          <p className="mt-2 max-w-2xl text-body leading-6 text-muted-foreground">{description}</p>
+          <h1 className="font-display mt-2 break-words text-h2 font-extrabold tracking-tight text-foreground">{title}</h1>
+          <p className="mt-1 max-w-2xl text-body leading-6 text-muted-foreground">{description}</p>
         </div>
-        {actions && <div className="relative flex flex-wrap items-center gap-2 md:justify-end">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2 md:justify-end">{actions}</div>}
       </div>
     </header>
   )

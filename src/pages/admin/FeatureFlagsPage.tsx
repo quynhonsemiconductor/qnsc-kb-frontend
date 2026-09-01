@@ -47,10 +47,10 @@ export default function FeatureFlagsPage() {
   }
 
   return (
-    <main className="page-shell page-stack text-ink">
+    <div className="page-shell page-stack text-ink">
       <PageHeader eyebrow="Administration" title="Feature controls" description="Turn optional AI and knowledge-base capabilities on or off for the workspace. Changes apply to new processing jobs." icon={Settings2} />
 
-      {(message || error) && <div className={`mb-5 rounded-lg border px-4 py-3 text-sm ${error ? 'border-rose-400/25 bg-rose-500/10 text-rose-200' : 'border-emerald-400/25 bg-emerald-500/10 text-emerald-200'}`}>{error || message}</div>}
+      {(message || error) && <div className={`mb-5 rounded-lg border px-4 py-3 text-sm ${error ? 'border-rose-400/25 bg-rose-500/10 text-rose-200' : 'border-emerald-400/25 bg-emerald-500/10 text-success-text'}`}>{error || message}</div>}
 
       <section className="space-y-3">
         {loading ? <div className="rounded-xl border border-hairline bg-surface p-5 text-sm text-steel">Loading feature controls…</div> : flags.map(flag => (
@@ -69,17 +69,17 @@ export default function FeatureFlagsPage() {
               aria-checked={flag.enabled}
               disabled={savingKey === flag.key}
               onClick={() => void toggle(flag)}
-              variant={flag.enabled ? 'primary' : 'secondary'}
+              variant="secondary"
               size="sm"
               loading={savingKey === flag.key}
-              icon={!savingKey || savingKey !== flag.key ? <span className={`grid h-4 w-4 place-items-center rounded-full ${flag.enabled ? 'bg-emerald-400 text-[#102017]' : 'bg-surface-soft'}`}>{flag.enabled && <Check size={11} />}</span> : undefined}
-              className={flag.enabled ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20' : ''}
+              icon={!savingKey || savingKey !== flag.key ? <span className={`grid h-4 w-4 place-items-center rounded-full ${flag.enabled ? 'bg-success text-success-foreground' : 'bg-surface-soft'}`}>{flag.enabled && <Check size={11} />}</span> : undefined}
+              className={flag.enabled ? 'border-success/30 bg-success/10 text-success-text hover:bg-success/20' : ''}
             >
               {savingKey === flag.key ? 'Saving…' : flag.enabled ? 'Enabled' : 'Disabled'}
             </Button>
           </article>
         ))}
       </section>
-    </main>
+    </div>
   )
 }

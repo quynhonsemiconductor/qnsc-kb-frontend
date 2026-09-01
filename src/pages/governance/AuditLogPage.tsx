@@ -102,7 +102,13 @@ export default function AuditLogPage() {
               <tbody className="divide-y divide-slate-800/60 text-charcoal">
                 {logs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-900/40 transition-colors">
-                    <td className="p-3.5 font-medium text-primary-foreground">{log.user?.name || t('audit.systemWorker')}</td>
+                    {/* `text-foreground`, not `text-primary-foreground`. This is body text on
+                        a table row, not a label on a primary fill — the on-primary token
+                        belongs only on top of --primary/--destructive. It read as readable
+                        until now because the compat layer repainted the token to --foreground
+                        for every consumer; with that mapping gone the misuse shows up as
+                        near-white on a near-white row (measured 1.07:1 across 100 rows). */}
+                    <td className="p-3.5 font-medium text-foreground">{log.user?.name || t('audit.systemWorker')}</td>
                     <td className="p-3.5">
                       <Badge variant={
                         log.action === 'create' || log.action === 'approve'

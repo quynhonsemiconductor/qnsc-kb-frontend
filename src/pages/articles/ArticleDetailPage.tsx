@@ -355,7 +355,7 @@ export default function ArticleDetailPage() {
             className={`rounded-xl border p-2 ${
               bookmarked 
                 ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
-                : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
+                : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-foreground'
             }`}
             icon={<Bookmark size={18} fill={bookmarked ? "currentColor" : "none"} />}
           />
@@ -365,7 +365,7 @@ export default function ArticleDetailPage() {
             size="sm"
             onClick={() => void handleFollowToggle()}
             aria-label={following ? "Unfollow article" : "Follow article"}
-            className={`rounded-xl border p-2 ${following ? 'border-info/30 bg-info/10 text-info' : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'}`}
+            className={`rounded-xl border p-2 ${following ? 'border-info/30 bg-info/10 text-info' : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-foreground'}`}
             icon={<Bell size={18} fill={following ? 'currentColor' : 'none'} />}
           />
         
@@ -378,7 +378,7 @@ export default function ArticleDetailPage() {
             className={`rounded-xl border p-2 ${
               showHistory 
                 ? 'bg-brand-500/10 border-brand-500/30 text-brand-400' 
-                : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
+                : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-foreground'
             }`}
             icon={<History size={18} />}
           />
@@ -470,7 +470,7 @@ export default function ArticleDetailPage() {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs ${
                     userVote === 1
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-md'
-                      : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
+                      : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-foreground'
                   }`}
                   icon={<ThumbsUp size={14} />}
                 >
@@ -484,7 +484,7 @@ export default function ArticleDetailPage() {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs ${
                     userVote === -1
                       ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 shadow-md'
-                      : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-primary-foreground'
+                      : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-foreground'
                   }`}
                   icon={<ThumbsDown size={14} />}
                 >
@@ -496,7 +496,7 @@ export default function ArticleDetailPage() {
 
           {/* Comments section */}
           <div className="bg-slate-900/30 border border-slate-800/80 rounded-xl p-5 space-y-5">
-            <h3 className="text-lg font-bold text-primary-foreground flex items-center gap-2">
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
               <MessageSquare size={18} />
               <span>Comments ({comments.length})</span>
             </h3>
@@ -511,7 +511,7 @@ export default function ArticleDetailPage() {
                         {comm.user?.name?.substring(0,2).toUpperCase() || 'US'}
                       </div>
                       <div>
-                        <span className="text-sm font-semibold text-primary-foreground">{comm.user?.name}</span>
+                        <span className="text-sm font-semibold text-foreground">{comm.user?.name}</span>
                         <span className="text-caption text-slate-500 ml-2">
                           {formatDateTime(comm.created_at)}
                         </span>
@@ -541,7 +541,7 @@ export default function ArticleDetailPage() {
                 placeholder="Share your thoughts or suggest corrections..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                className="w-full rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-sm text-primary-foreground placeholder-slate-500 outline-none focus:border-brand-500 h-24 resize-none"
+                className="w-full rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-sm text-foreground placeholder-slate-500 outline-none focus:border-brand-500 h-24 resize-none"
                 required
               />
               <div className="flex justify-end mt-2">
@@ -564,7 +564,7 @@ export default function ArticleDetailPage() {
               <div className="grid gap-2 sm:grid-cols-2">
                 {relatedArticles.map((related) => (
                   <Link key={related.id} to={`/articles/${related.id}`} className="rounded-lg border border-slate-800 bg-slate-950/30 p-3 transition hover:border-brand-500/50 hover:bg-slate-900">
-                    <p className="truncate text-sm font-semibold text-primary-foreground">{related.title}</p>
+                    <p className="truncate text-sm font-semibold text-foreground">{related.title}</p>
                     <p className="mt-1 truncate text-xs text-slate-500">{related.dept}</p>
                   </Link>
                 ))}
@@ -599,11 +599,11 @@ export default function ArticleDetailPage() {
               )}
               <div>
                 <label className="text-slate-500 text-xs block mb-0.5">Department</label>
-                <span className="text-primary-foreground font-semibold">{article.dept}</span>
+                <span className="text-foreground font-semibold">{article.dept}</span>
               </div>
               <div>
                 <label className="text-slate-500 text-xs block mb-0.5">Next Review Schedule</label>
-                <span className="text-primary-foreground font-semibold">
+                <span className="text-foreground font-semibold">
                   {formatDay(article.next_review, 'No schedule set')}
                 </span>
               </div>
@@ -625,7 +625,7 @@ export default function ArticleDetailPage() {
                     }}
                     className="cursor-pointer hover:bg-slate-800/40 p-2 rounded transition-all text-xs border border-transparent hover:border-slate-800"
                   >
-                    <div className="flex justify-between items-center text-primary-foreground font-bold mb-1">
+                    <div className="flex justify-between items-center text-foreground font-bold mb-1">
                       <span>Version {hist.version}</span>
                       <span className="text-caption text-slate-500 font-normal">
                         {formatDay(hist.created_at)}

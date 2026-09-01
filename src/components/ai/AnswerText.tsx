@@ -40,7 +40,7 @@ function AnswerText({ content, citations = [], onCitationClick }: AnswerTextProp
             <button
               key={`citation-${offset}`}
               type="button"
-              className="mx-0.5 inline-flex items-center rounded-md border border-info/40 bg-info/10 px-1.5 py-0.5 align-baseline text-body-sm font-semibold text-info transition-colors hover:bg-info/20"
+              className="mx-0.5 inline-flex items-center rounded-md border border-info/40 bg-info/10 px-1.5 py-0.5 align-baseline text-body-sm font-semibold text-info-text transition-colors duration-fast hover:bg-info/20 focus-visible:ring-2 focus-visible:ring-ring"
               title={`${citation.title}${citation.page_number ? ` — page ${citation.page_number}` : ''}`}
               onClick={() => onCitationClick(citation)}
             >
