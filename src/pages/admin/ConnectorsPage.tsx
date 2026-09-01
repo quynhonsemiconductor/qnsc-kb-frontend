@@ -31,6 +31,8 @@ import {
 import {
   createConnector,
   ConnectorAclPrincipal,
+  ConnectorProvider,
+  listConnectorProviders,
   getConnectorReadme,
   getConnectorHealth,
   getConnectorSourceTree,
@@ -99,18 +101,46 @@ type SourceTree = { connector_id: string; connector_name: string; system: string
 type ConnectorReadme = { connector_id: string; generated_at: string; markdown: string }
 type Department = { id: string; name: string; company_domain: string; active: boolean }
 
-const providerInfo: Record<string, { label: string; description: string }> = {
+// How one source provider presents itself. The icon lives here rather than in an
+// inline ternary at each render site: those ternaries read
+// `system === 'sharepoint' ? … : …`, so every provider added after SharePoint
+// silently inherited the Google Drive icon.
+type ProviderInfo = {
+  label: string
+  description: string
+  icon: React.ReactNode
+  accentClassName: string
+}
+
+const providerInfo: Record<string, ProviderInfo> = {
   google_drive: {
     label: 'Google Drive',
     description: 'Shared drives and folders from Google Workspace.',
+    icon: <HardDrive size={18} />,
+    accentClassName: 'bg-info/10 text-info',
   },
   sharepoint: {
     label: 'SharePoint',
     description: 'Sites, document libraries, and folders from Microsoft 365.',
+    icon: <FolderSync size={18} />,
+    accentClassName: 'bg-cyan/10 text-info-text',
+  },
+  onedrive: {
+    label: 'OneDrive',
+    description: 'Personal and shared drives from OneDrive for Business.',
+    icon: <Cloud size={18} />,
+    accentClassName: 'bg-info/10 text-info',
+  },
+  local_folder: {
+    label: 'Local folder',
+    description: 'A server-side directory, for deployments with no cloud source.',
+    icon: <FolderOpen size={18} />,
+    accentClassName: 'bg-info/10 text-info',
   },
 }
 
-const getProvider = (system: string) => providerInfo[system] || { label: system, description: 'Cloud source' }
+const getProvider = (system: string): ProviderInfo =>
+  providerInfo[system] || { label: system, description: 'Cloud source', icon: <HardDrive size={18} />, accentClassName: 'bg-info/10 text-info' }
 
 const getConnectorState = (item: Connector): ConnectorState => {
   if (!item.authorized) return 'needs_action'
@@ -148,7 +178,10 @@ const getErrorMessage = (requestError: any, fallback: string) => requestError?.r
 
 export default function ConnectorsPage() {
   const [items, setItems] = useState<Connector[]>([])
-  const [form, setForm] = useState({ name: '', system: 'google_drive' })
+  // Empty until the API answers. Rendering the full catalogue while this loads would
+  // flash cards that are about to disappear, so the selector waits instead.
+  const [providers, setProviders] = useState<ConnectorProvider[]>([])
+  const [form, setForm] = useState({ name: '', system: '' })
   const [departments, setDepartments] = useState<Department[]>([])
   const [scopes, setScopes] = useState<Record<string, Scope[]>>({})
   const [jobs, setJobs] = useState<Record<string, ConnectorJob[]>>({})
@@ -229,6 +262,23 @@ export default function ConnectorsPage() {
     void listDepartments().then((result: Department[]) => setDepartments(result.filter(item => item.active))).catch(() => setDepartments([]))
   }, [])
 
+  // Which providers this deployment can actually offer. The server owns this: hiding a
+  // card the API would reject at creation keeps the two from disagreeing.
+  useEffect(() => {
+    void listConnectorProviders()
+      .then(result => setProviders(result.filter(item => item.available)))
+      .catch(() => setProviders([]))
+  }, [])
+
+  // Keep the selection on something offerable. It starts empty and the catalogue arrives
+  // asynchronously, so without this the form would submit `system: ''`; it also repairs a
+  // selection that a configuration change just removed.
+  useEffect(() => {
+    if (!providers.length) return
+    if (providers.some(item => item.system === form.system)) return
+    setForm(current => ({ ...current, system: providers[0].system }))
+  }, [providers, form.system])
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const oauth = params.get('oauth')
@@ -270,7 +320,9 @@ export default function ConnectorsPage() {
     try {
       const item = await createConnector({ name: form.name.trim(), system: form.system, config: { sync_mode: 'daily' } })
       setItems(current => [...current, item])
-      setForm({ name: '', system: 'google_drive' })
+      // Clear the name only. Resetting `system` to a hardcoded 'google_drive' pointed the
+      // form at a provider this deployment may not offer at all.
+      setForm(current => ({ ...current, name: '' }))
       setMessage(`${getProvider(form.system).label} connector created. Authorize it to continue.`)
     } catch (requestError: any) {
       setError(getErrorMessage(requestError, 'Could not create connector'))
@@ -587,11 +639,12 @@ export default function ConnectorsPage() {
           <form onSubmit={create} className="rounded-[24px] border border-border bg-surface p-5 shadow-[0_14px_36px_rgb(var(--shadow)/.06)] sm:p-6">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-ink text-primary-foreground"><Plus size={16} /></span><h2 className="text-base font-bold text-foreground">Add a source</h2></div><p className="mt-2 max-w-xl text-xs leading-5 text-muted-foreground">Create the connection first, then authorize it in the provider's own secure sign-in window.</p></div><div className="hidden items-center gap-1.5 text-body-sm font-semibold text-success-text sm:flex"><ShieldCheck size={14} />Encrypted credentials</div></div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {Object.entries(providerInfo).map(([system, provider]) => <button key={system} type="button" onClick={() => setForm(current => ({ ...current, system }))} className={`group rounded-2xl border p-4 text-left transition ${form.system === system ? 'border-info/50 bg-info/8 shadow-[0_8px_24px_rgb(var(--info)/.1)]' : 'border-border bg-canvas hover:border-info/30 hover:bg-surface-soft'}`}><span className="flex items-start justify-between gap-3"><span className={`grid h-10 w-10 place-items-center rounded-xl ${form.system === system ? 'bg-info text-primary-foreground' : 'bg-info/10 text-info'}`}>{system === 'sharepoint' ? <FolderSync size={18} /> : <HardDrive size={18} />}</span><span className={`grid h-5 w-5 place-items-center rounded-full border ${form.system === system ? 'border-info bg-info text-primary-foreground' : 'border-border text-transparent'}`}><Check size={12} /></span></span><span className="mt-3 block text-sm font-bold text-foreground">{provider.label}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{provider.description}</span></button>)}
+              {providers.map(({ system }) => { const provider = getProvider(system); return <button key={system} type="button" onClick={() => setForm(current => ({ ...current, system }))} className={`group rounded-2xl border p-4 text-left transition ${form.system === system ? 'border-info/50 bg-info/8 shadow-[0_8px_24px_rgb(var(--info)/.1)]' : 'border-border bg-canvas hover:border-info/30 hover:bg-surface-soft'}`}><span className="flex items-start justify-between gap-3"><span className={`grid h-10 w-10 place-items-center rounded-xl ${form.system === system ? 'bg-info text-primary-foreground' : 'bg-info/10 text-info'}`}>{provider.icon}</span><span className={`grid h-5 w-5 place-items-center rounded-full border ${form.system === system ? 'border-info bg-info text-primary-foreground' : 'border-border text-transparent'}`}><Check size={12} /></span></span><span className="mt-3 block text-sm font-bold text-foreground">{provider.label}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{provider.description}</span></button> })}
             </div>
+            {!providers.length && <p className="mt-4 rounded-xl border border-dashed border-border bg-canvas px-4 py-3 text-xs leading-5 text-muted-foreground">No source provider is configured on this deployment yet. An administrator needs to supply the provider credentials in the API environment before a source can be added.</p>}
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <Input required className="min-w-0 flex-1" placeholder="Connection name, e.g. Engineering Drive" value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} />
-              <Button type="submit" variant="primary" size="lg" disabled={!form.name.trim()} loading={busy === 'create'} icon={<Plus size={16} />}>{busy === 'create' ? 'Creating source…' : 'Create source'}</Button>
+              <Button type="submit" variant="primary" size="lg" disabled={!form.name.trim() || !form.system} loading={busy === 'create'} icon={<Plus size={16} />}>{busy === 'create' ? 'Creating source…' : 'Create source'}</Button>
             </div>
           </form>
 
@@ -639,7 +692,7 @@ function EmptyConnectors({ hasItems, onReset }: { hasItems: boolean; onReset: ()
 
 function ConnectorCard({ item, provider, state, open, scopes, jobs, preview, sourceTree, readme, sourceMapOpen, activityOpen, activityLoading, departmentOpen, departments, departmentIds, busy, scopeLoading, aclPrincipals, aclOpen, aclLoading, onAuthorize, onSync, onRetryFailed, onPreview, onToggleSourceMap, onToggleScopes, onRefreshScopes, onToggleActivity, onToggleDepartments, onSaveDepartments, onSaveScopes, onChangeMode, onEnableWebhooks, onToggleAcl, onSaveAclMapping }: {
   item: Connector
-  provider: { label: string; description: string }
+  provider: ProviderInfo
   state: ConnectorState
   open: boolean
   scopes: Scope[]
@@ -687,7 +740,7 @@ function ConnectorCard({ item, provider, state, open, scopes, jobs, preview, sou
     <div className="p-5 sm:p-6">
       {item.authorized && <div className="mb-4 flex flex-wrap gap-2 text-caption font-semibold text-muted-foreground"><Badge variant="default" size="sm">Queue {item.health?.queue_depth ?? 0}</Badge><Badge variant="default" size="sm">Notifications 24h {item.health?.notifications_last_24h ?? 0}</Badge>{heldDocuments > 0 && <Badge variant="warning" size="sm">{heldDocuments} held after repeated errors</Badge>}{reconciliationPending && <Badge variant="warning" size="sm">Reconciliation pending</Badge>}{webhookRenewalDue && <Badge variant="warning" size="sm">Webhook renewal due</Badge>}</div>}
       {item.authorized && (item.health?.documents?.total ?? 0) > 0 && <DocumentBreakdown counts={item.health!.documents!} />}
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div className="flex min-w-0 items-start gap-3"><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${item.system === 'sharepoint' ? 'bg-cyan/10 text-info-text' : 'bg-info/10 text-info'}`}>{item.system === 'sharepoint' ? <FolderSync size={20} /> : <HardDrive size={20} />}</span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-base font-bold text-foreground">{item.name}</h3><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-bold ${status.className}`}>{status.icon}{status.label}</span></div><p className="mt-1 text-xs text-muted-foreground">{provider.label}{item.company_domain ? ` · ${item.company_domain}` : ''}</p><p className="mt-2 max-w-xl text-xs leading-5 text-muted-foreground">{status.description}. {item.authorized ? (selectedCount ? `${selectedCount} location${selectedCount === 1 ? '' : 's'} selected for sync.` : 'Choose at least one location to control what is indexed.') : 'Complete authorization to discover available locations.'}</p></div></div><div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">{!item.authorized && <Button type="button" variant="primary" size="md" onClick={() => onAuthorize(item)} disabled={primaryBusy || itemBusy} loading={busy === `authorize:${item.id}`} icon={busy === `authorize:${item.id}` ? undefined : <ExternalLink size={15} />}>{busy === `authorize:${item.id}` ? 'Opening secure sign-in…' : 'Authorize source'}</Button>}{item.authorized && <><Button type="button" variant="primary" size="md" onClick={() => onSync(item)} disabled={primaryBusy || itemBusy} loading={busy === `sync:${item.id}`} icon={busy === `sync:${item.id}` ? undefined : <RefreshCw size={15} />}>{busy === `sync:${item.id}` ? 'Queueing sync…' : 'Sync now'}</Button>{heldDocuments > 0 && <Button type="button" variant="secondary" size="md" onClick={() => onRetryFailed(item)} disabled={primaryBusy || itemBusy} loading={busy === `retry:${item.id}`} icon={busy === `retry:${item.id}` ? undefined : <RotateCcw size={15} />} className="border-warning/35 text-warning hover:bg-warning/10">{busy === `retry:${item.id}` ? 'Releasing…' : `Retry ${heldDocuments} held`}</Button>}<Button type="button" variant="secondary" size="md" onClick={() => onToggleSourceMap(item)} disabled={primaryBusy || itemBusy} loading={busy === `source-map:${item.id}`} icon={busy === `source-map:${item.id}` ? undefined : <FolderTree size={15} />} className={sourceMapOpen ? 'border-info/35 bg-info/10 text-info' : ''}>{sourceMapOpen ? 'Close source map' : 'Source map'}</Button>{item.system === 'sharepoint' && <Button type="button" variant="secondary" size="md" onClick={() => onPreview(item)} disabled={primaryBusy || itemBusy || selectedCount === 0} loading={busy === `preview:${item.id}`} icon={busy === `preview:${item.id}` ? undefined : <Search size={15} />} className="border-info/30 text-info hover:bg-info/10">{busy === `preview:${item.id}` ? 'Previewing…' : 'Preview files'}</Button>}<Button type="button" variant="secondary" size="md" onClick={() => onToggleScopes(item)} disabled={scopeLoading || itemBusy} loading={scopeLoading} icon={scopeLoading ? undefined : <FolderOpen size={15} />} className={open ? 'border-info/35 bg-info/10 text-info' : ''}>{open ? 'Close locations' : 'Manage locations'}<ChevronDown size={14} className={`transition ${open ? 'rotate-180' : ''}`} /></Button>{item.system === 'sharepoint' && <Button type="button" variant="secondary" size="md" onClick={() => onToggleAcl(item)} disabled={aclLoading || itemBusy} loading={aclLoading} icon={aclLoading ? undefined : <ShieldCheck size={15} />} className={aclOpen ? 'border-cyan/35 bg-cyan/10 text-info-text' : ''}>{aclOpen ? 'Close ACL' : 'Review ACL'}</Button>}</>}</div></div>
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div className="flex min-w-0 items-start gap-3"><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${provider.accentClassName}`}>{provider.icon}</span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-base font-bold text-foreground">{item.name}</h3><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-bold ${status.className}`}>{status.icon}{status.label}</span></div><p className="mt-1 text-xs text-muted-foreground">{provider.label}{item.company_domain ? ` · ${item.company_domain}` : ''}</p><p className="mt-2 max-w-xl text-xs leading-5 text-muted-foreground">{status.description}. {item.authorized ? (selectedCount ? `${selectedCount} location${selectedCount === 1 ? '' : 's'} selected for sync.` : 'Choose at least one location to control what is indexed.') : 'Complete authorization to discover available locations.'}</p></div></div><div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">{!item.authorized && <Button type="button" variant="primary" size="md" onClick={() => onAuthorize(item)} disabled={primaryBusy || itemBusy} loading={busy === `authorize:${item.id}`} icon={busy === `authorize:${item.id}` ? undefined : <ExternalLink size={15} />}>{busy === `authorize:${item.id}` ? 'Opening secure sign-in…' : 'Authorize source'}</Button>}{item.authorized && <><Button type="button" variant="primary" size="md" onClick={() => onSync(item)} disabled={primaryBusy || itemBusy} loading={busy === `sync:${item.id}`} icon={busy === `sync:${item.id}` ? undefined : <RefreshCw size={15} />}>{busy === `sync:${item.id}` ? 'Queueing sync…' : 'Sync now'}</Button>{heldDocuments > 0 && <Button type="button" variant="secondary" size="md" onClick={() => onRetryFailed(item)} disabled={primaryBusy || itemBusy} loading={busy === `retry:${item.id}`} icon={busy === `retry:${item.id}` ? undefined : <RotateCcw size={15} />} className="border-warning/35 text-warning hover:bg-warning/10">{busy === `retry:${item.id}` ? 'Releasing…' : `Retry ${heldDocuments} held`}</Button>}<Button type="button" variant="secondary" size="md" onClick={() => onToggleSourceMap(item)} disabled={primaryBusy || itemBusy} loading={busy === `source-map:${item.id}`} icon={busy === `source-map:${item.id}` ? undefined : <FolderTree size={15} />} className={sourceMapOpen ? 'border-info/35 bg-info/10 text-info' : ''}>{sourceMapOpen ? 'Close source map' : 'Source map'}</Button>{item.system === 'sharepoint' && <Button type="button" variant="secondary" size="md" onClick={() => onPreview(item)} disabled={primaryBusy || itemBusy || selectedCount === 0} loading={busy === `preview:${item.id}`} icon={busy === `preview:${item.id}` ? undefined : <Search size={15} />} className="border-info/30 text-info hover:bg-info/10">{busy === `preview:${item.id}` ? 'Previewing…' : 'Preview files'}</Button>}<Button type="button" variant="secondary" size="md" onClick={() => onToggleScopes(item)} disabled={scopeLoading || itemBusy} loading={scopeLoading} icon={scopeLoading ? undefined : <FolderOpen size={15} />} className={open ? 'border-info/35 bg-info/10 text-info' : ''}>{open ? 'Close locations' : 'Manage locations'}<ChevronDown size={14} className={`transition ${open ? 'rotate-180' : ''}`} /></Button>{item.system === 'sharepoint' && <Button type="button" variant="secondary" size="md" onClick={() => onToggleAcl(item)} disabled={aclLoading || itemBusy} loading={aclLoading} icon={aclLoading ? undefined : <ShieldCheck size={15} />} className={aclOpen ? 'border-cyan/35 bg-cyan/10 text-info-text' : ''}>{aclOpen ? 'Close ACL' : 'Review ACL'}</Button>}</>}</div></div>
       {item.last_error && <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-amber-400/25 bg-amber-500/8 px-3.5 py-3 text-xs text-warning-text"><AlertCircle size={15} className="mt-0.5 shrink-0" /><span><span className="font-bold">Latest sync notice:</span> {item.last_error}</span></div>}
       <div className="mt-5 grid gap-3 border-t border-border-soft pt-5 sm:grid-cols-2"><div className="rounded-xl bg-canvas px-3.5 py-3"><p className="text-caption font-bold uppercase tracking-[.12em] text-muted">Last activity</p><p className="mt-1.5 text-xs font-semibold text-foreground">{formatDate(item.last_sync)}</p></div>{item.authorized ? <div className="rounded-xl bg-canvas px-3.5 py-3"><p className="text-caption font-bold uppercase tracking-[.12em] text-muted">Automation</p><div className="mt-1.5 flex items-center gap-2"><Select aria-label={`Sync schedule for ${item.name}`} className="h-7 min-w-0 rounded-lg border border-border bg-surface px-2 text-xs font-semibold text-foreground outline-none" value={item.sync_mode} onChange={event => onChangeMode(item, event.target.value)} disabled={itemBusy}><option value="daily">Daily sync</option><option value="on_update">On update</option><option value="manual">Manual only</option></Select>{item.sync_mode === 'on_update' && <span className="inline-flex shrink-0 items-center gap-1 text-caption font-semibold text-info">{item.webhook_enabled ? <><Check size={12} />Live</> : <Button type="button" variant="ghost" size="sm" onClick={() => onEnableWebhooks(item)} disabled={itemBusy} className="font-semibold underline decoration-dotted underline-offset-2 hover:no-underline">Enable alerts</Button>}</span>}</div></div> : <div className="rounded-xl bg-canvas px-3.5 py-3"><p className="text-caption font-bold uppercase tracking-[.12em] text-muted">Next step</p><p className="mt-1.5 text-xs font-semibold text-foreground">Authorize to unlock sync controls</p></div>}</div>
       {item.authorized && <Button type="button" variant="ghost" size="sm" onClick={() => onToggleActivity(item)} disabled={activityLoading || itemBusy} icon={<History size={14} />} className="mt-4 text-xs font-bold text-info hover:text-info/75">{activityLoading ? 'Loading sync activity…' : activityOpen ? 'Hide sync activity' : 'View sync activity'}{jobs.length > 0 && <Badge variant="info" size="sm">{jobs.length}</Badge>}</Button>}

@@ -13,6 +13,18 @@ export type ConnectorAclPrincipal = {
   internal_user_id?: string | null
 }
 
+/** A source provider this deployment declares, and whether it can be used. */
+export type ConnectorProvider = {
+  system: string
+  available: boolean
+  /** Setting names an operator must supply before `available` turns true. */
+  missing_settings: string[]
+}
+
+export async function listConnectorProviders(): Promise<ConnectorProvider[]> {
+  return (await client.get('/connectors/providers')).data
+}
+
 export async function listConnectors() { return (await client.get('/connectors')).data }
 export async function createConnector(data: { name: string; system: string; path?: string; config?: Record<string, unknown> }) { return (await client.post('/connectors', data)).data }
 export async function syncConnector(id: string) { return (await client.post(`/connectors/${id}/sync`)).data }
