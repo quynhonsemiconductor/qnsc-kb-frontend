@@ -26,7 +26,6 @@ const CoveragePage = lazy(() => import('../pages/governance/CoveragePage'))
 const TagsPage = lazy(() => import('../pages/meta/TagsPage'))
 const GlossaryPage = lazy(() => import('../pages/meta/GlossaryPage'))
 const UsersPage = lazy(() => import('../pages/admin/UsersPage'))
-const AccessGroupsPage = lazy(() => import('../pages/admin/AccessGroupsPage'))
 const DepartmentsPage = lazy(() => import('../pages/admin/DepartmentsPage'))
 const ConnectorsPage = lazy(() => import('../pages/admin/ConnectorsPage'))
 const FeatureFlagsPage = lazy(() => import('../pages/admin/FeatureFlagsPage'))
@@ -74,7 +73,6 @@ export const routes = createRoutesFromElements(
       <Route path="meta/tags" element={<TagsPage />} />
       <Route path="meta/glossary" element={<GlossaryPage />} />
       <Route path="admin/users" element={<ProtectedRoute permission="user.manage"><UsersPage /></ProtectedRoute>} />
-      <Route path="admin/access-groups" element={<ProtectedRoute permission="user.manage"><AccessGroupsPage /></ProtectedRoute>} />
       <Route path="admin/departments" element={<ProtectedRoute permission="user.manage"><DepartmentsPage /></ProtectedRoute>} />
       <Route path="admin/connectors" element={<ProtectedRoute permission="connector.manage"><ConnectorsPage /></ProtectedRoute>} />
       <Route path="admin/features" element={<ProtectedRoute permission="role.manage"><FeatureFlagsPage /></ProtectedRoute>} />

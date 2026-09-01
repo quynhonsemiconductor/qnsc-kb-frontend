@@ -7,8 +7,8 @@ export type ConnectorAclPrincipal = {
   roles: string[]
   mapping_status: 'mapped' | 'unmapped'
   external_group_name?: string | null
-  access_group_id?: string | null
-  access_group_name?: string | null
+  department_id?: string | null
+  department_name?: string | null
   internal_user_id?: string | null
 }
 
@@ -27,4 +27,4 @@ export async function selectConnectorScopes(id: string, scope_ids: string[]) { r
 export async function previewConnector(id: string, limit = 50) { return (await client.get(`/connectors/${id}/preview`, { params: { limit } })).data }
 export async function subscribeConnectorWebhooks(id: string) { return (await client.post(`/connectors/${id}/webhooks/subscribe`)).data }
 export async function listConnectorAclPrincipals(id: string): Promise<ConnectorAclPrincipal[]> { return (await client.get(`/connectors/${id}/acl-principals`)).data }
-export async function setConnectorGroupMapping(id: string, externalGroupId: string, data: { access_group_id: string; external_group_name?: string }) { return (await client.put(`/connectors/${id}/group-mappings/${encodeURIComponent(externalGroupId)}`, data)).data }
+export async function setConnectorGroupMapping(id: string, externalGroupId: string, data: { department_id: string; external_group_name?: string }) { return (await client.put(`/connectors/${id}/group-mappings/${encodeURIComponent(externalGroupId)}`, data)).data }
