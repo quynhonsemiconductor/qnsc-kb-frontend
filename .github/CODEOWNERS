@@ -1,6 +1,6 @@
 # Default owner for everything in this repo.
 # Enforced via the main-protection ruleset (require_code_owner_review).
-* @QNSC-VN/kb-maintainers
+* @BKL-HCM/kb-maintainers
 
-/.github/         @QNSC-VN/kb-maintainers
-/src/api/         @QNSC-VN/kb-maintainers
+/.github/         @BKL-HCM/kb-maintainers
+/src/api/         @BKL-HCM/kb-maintainers
