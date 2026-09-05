@@ -32,7 +32,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    uses: quynhonsemiconductor/qnsc-ci/.github/workflows/actions-security.yml@v1
+    uses: quynhonsemiconductor/ci/.github/workflows/actions-security.yml@v1
     with:
       blocking: true
 
@@ -46,7 +46,7 @@ jobs:
       contents: read
       security-events: write # SARIF upload
       packages: read
-    uses: quynhonsemiconductor/qnsc-ci/.github/workflows/security.yml@v1
+    uses: quynhonsemiconductor/ci/.github/workflows/security.yml@v1
     with:
       product: qnsc-kb-frontend
       scan_container: false
