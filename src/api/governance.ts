@@ -197,3 +197,77 @@ export async function verifyReviewDeadlines() {
   const response = await client.post('/governance/reviews/verify')
   return response.data
 }
+
+// The AI agent that applies a written rule to pending drafts. Scoping (connector, dept,
+// file extension, similarity ceiling) is structured and enforced server-side; only the
+// free-text `instruction` is ever sent to the model. can_approve/can_reject both default
+// to false, so a new rule is a dry run until someone explicitly grants it authority.
+export type ApprovalRule = {
+  id: string
+  name: string
+  instruction: string
+  active: boolean
+  priority: number
+  connector_id: string | null
+  dept: string | null
+  file_extensions: string[] | null
+  max_similarity_score: number | null
+  can_approve: boolean
+  can_reject: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ApprovalRulePayload = {
+  name: string
+  instruction: string
+  active?: boolean
+  priority?: number
+  connector_id?: string | null
+  dept?: string | null
+  file_extensions?: string[] | null
+  max_similarity_score?: number | null
+  can_approve?: boolean
+  can_reject?: boolean
+}
+
+export async function listApprovalRules(): Promise<ApprovalRule[]> {
+  return (await client.get('/governance/approval-rules')).data
+}
+
+export async function createApprovalRule(payload: ApprovalRulePayload): Promise<ApprovalRule> {
+  return (await client.post('/governance/approval-rules', payload)).data
+}
+
+export async function updateApprovalRule(id: string, payload: ApprovalRulePayload): Promise<ApprovalRule> {
+  return (await client.patch(`/governance/approval-rules/${id}`, payload)).data
+}
+
+export async function deleteApprovalRule(id: string): Promise<void> {
+  await client.delete(`/governance/approval-rules/${id}`)
+}
+
+export type ApprovalAgentResult = {
+  draft_id: string
+  title: string | null
+  decision: 'approve' | 'reject' | 'abstain'
+  applied: boolean
+  rule: string | null
+  reason: string
+}
+
+export type ApprovalAgentRunResponse = {
+  evaluated: number
+  approved: number
+  rejected: number
+  left_for_review: number
+  results: ApprovalAgentResult[]
+  disabled?: boolean
+}
+
+// Defaults to a dry run server-side if `dry_run` is omitted -- deciding hundreds of
+// drafts unattended should be something a caller asks for, not what happens by omission.
+export async function runApprovalAgent(payload: { dry_run?: boolean; limit?: number } = {}): Promise<ApprovalAgentRunResponse> {
+  return (await client.post('/governance/approval-agent/run', payload)).data
+}
