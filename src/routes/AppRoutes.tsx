@@ -30,6 +30,7 @@ const DepartmentsPage = lazy(() => import('../pages/admin/DepartmentsPage'))
 const ConnectorsPage = lazy(() => import('../pages/admin/ConnectorsPage'))
 const FeatureFlagsPage = lazy(() => import('../pages/admin/FeatureFlagsPage'))
 const RolesPage = lazy(() => import('../pages/admin/RolesPage'))
+const ApprovalRulesPage = lazy(() => import('../pages/admin/ApprovalRulesPage'))
 const LLMSettingsPage = lazy(() => import('../pages/admin/LLMSettingsPage'))
 const UiCatalogPage = lazy(() => import('../pages/dev/UiCatalogPage'))
 
@@ -77,6 +78,7 @@ export const routes = createRoutesFromElements(
       <Route path="admin/connectors" element={<ProtectedRoute permission="connector.manage"><ConnectorsPage /></ProtectedRoute>} />
       <Route path="admin/features" element={<ProtectedRoute permission="role.manage"><FeatureFlagsPage /></ProtectedRoute>} />
       <Route path="admin/roles" element={<ProtectedRoute permission="role.manage"><RolesPage /></ProtectedRoute>} />
+      <Route path="governance/approval-rules" element={<ProtectedRoute permission="article.publish"><ApprovalRulesPage /></ProtectedRoute>} />
       <Route path="admin/llm" element={<ProtectedRoute permission="role.manage"><LLMSettingsPage /></ProtectedRoute>} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
