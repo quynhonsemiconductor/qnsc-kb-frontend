@@ -1,5 +1,5 @@
 # =============================================================================
-# Web · Deploy — thin caller of the shared reusable (qnsc-ci).
+# Web · Deploy — thin caller of the shared reusable (ci).
 #
 # Triggers:
 #   develop → push to main (auto)
@@ -39,7 +39,7 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────
   # CI gate — a red main must not deploy. Fails CLOSED.
   #
-  # There is deliberately NO wait-for-infra job here, unlike rally's equivalent. That
+  # There is deliberately NO wait-for-infra job here, unlike rova's equivalent. That
   # gate keys on `github.sha` to find the infra run for the SAME commit, and infra lives
   # in the backend repo — a sha from this repository does not exist there, so the lookup
   # could only ever match nothing or something unrelated.
@@ -93,7 +93,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    # v1.7.1 or later is REQUIRED here: v1.7.0 exported only VITE_API_URL, which rally
+    # v1.7.1 or later is REQUIRED here: v1.7.0 exported only VITE_API_URL, which rova
     # builds empty on purpose. This SPA calls its API cross-origin and needs the absolute
     # origin at build time — without it the bundle falls back to a relative /api/v1,
     # Cloudflare Pages answers those with index.html (405 on POST), and the deployed site

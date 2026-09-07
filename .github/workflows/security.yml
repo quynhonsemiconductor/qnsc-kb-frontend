@@ -1,5 +1,5 @@
 # =============================================================================
-# Security · Scan — thin caller of the shared reusable (qnsc-ci).
+# Security · Scan — thin caller of the shared reusable (ci).
 #
 # scan_container is false: the Dockerfile here builds an nginx image for the
 # single-VPS Compose stack, and nothing deploys it — the SPA ships to Cloudflare
