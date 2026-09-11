@@ -50,7 +50,6 @@ export default function GraphExplorerPage() {
   useEffect(() => {
     const handle = setTimeout(() => { void loadEntities(query, typeFilter) }, 300)
     return () => clearTimeout(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, typeFilter])
 
   useEffect(() => {
@@ -61,7 +60,6 @@ export default function GraphExplorerPage() {
       .then(setDetail)
       .catch((requestError: any) => setError(requestError?.response?.data?.detail || 'Could not load this entity.'))
       .finally(() => setDetailLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId])
 
   // The canvas needs a focal node to center on. Nothing is selected on a fresh visit
@@ -69,7 +67,6 @@ export default function GraphExplorerPage() {
   // mention_count -- becomes the default view instead of an empty diagram.
   useEffect(() => {
     if (!selectedId && entities.length) setSelectedId(entities[0].id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entities])
 
   useEffect(() => {
