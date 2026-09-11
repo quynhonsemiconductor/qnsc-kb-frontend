@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, ChevronDown, FileText, FolderTree, Plus, Search, Sparkles, Square, CheckSquare, Upload, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import { autoTagArticles, confirmArticleTags, getArticles } from '../../api/articles'
+import { autoTagArticles, bulkReclassifyArticles, confirmArticleTags, getArticles } from '../../api/articles'
 import { getTags } from '../../api/search'
 import { uploadSource, uploadSources } from '../../api/governance'
 import { useDialog } from '../../components/ui/DialogProvider'
@@ -13,6 +13,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
+import { ARTICLE_TYPES, SENSITIVITY_LEVELS } from '../../utils/articleTaxonomy'
 
 type Department = { id: string; name: string; company_domain: string; active: boolean }
 type UploadResult = { filename: string; status: string; status_code?: number; detail?: { message?: string; code?: string }; id?: string; [key: string]: any }
@@ -48,6 +49,8 @@ export default function ArticleListPage() {
   const navigate = useNavigate()
   const dialog = useDialog()
   const { user } = useAuth()
+  const canManageArticlePermissions = Boolean(user?.permissions?.includes('permission.manage'))
+  const [bulkReclassifying, setBulkReclassifying] = useState(false)
 
   // Typing in the search box used to fire one request per keystroke, so a slow
   // early response could land after a faster later one and show stale results.
@@ -101,6 +104,32 @@ export default function ArticleListPage() {
     } catch (error: any) {
       await dialog.alert(error?.response?.data?.detail || 'Could not generate tags for the selected documents.', { title: 'AI tagging failed', tone: 'danger' })
     } finally { setAutoTagging(false) }
+  }
+
+  const handleBulkReclassify = async (field: 'type' | 'sensitivity') => {
+    if (!selectedArticleIds.length || bulkReclassifying) return
+    const options = field === 'type' ? ARTICLE_TYPES : SENSITIVITY_LEVELS
+    const raw = await dialog.prompt(
+      `New ${field} for ${selectedArticleIds.length} selected document${selectedArticleIds.length === 1 ? '' : 's'}: ${options.join(', ')}`,
+      {
+        title: field === 'type' ? 'Change document type' : 'Change sensitivity',
+        confirmLabel: 'Apply',
+        validate: value => (options as readonly string[]).includes(field === 'type' ? value.trim().toUpperCase() : value.trim().toLowerCase())
+          ? undefined
+          : `Enter one of: ${options.join(', ')}`,
+      },
+    )
+    if (!raw) return
+    const value = field === 'type' ? raw.trim().toUpperCase() : raw.trim().toLowerCase()
+    setBulkReclassifying(true)
+    try {
+      const result = await bulkReclassifyArticles(selectedArticleIds.map(articleId => ({ article_id: articleId, [field]: value })))
+      await dialog.alert(`Updated ${result.changed_count} document${result.changed_count === 1 ? '' : 's'}.`, { title: 'Reclassified', tone: 'success' })
+      setSelectedArticleIds([])
+      await fetchArticlesList()
+    } catch (error: any) {
+      await dialog.alert(error?.response?.data?.detail || 'Could not reclassify the selected documents.', { title: 'Reclassify failed', tone: 'danger' })
+    } finally { setBulkReclassifying(false) }
   }
 
   const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,7 +197,7 @@ export default function ArticleListPage() {
 
     <section className="glass-panel rounded-2xl border border-border p-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-caption font-bold uppercase tracking-[.16em] text-primary">Find a document</p><p className="mt-1 text-xs text-muted-foreground">Use a filter when you know the department, topic, or status.</p></div><div className="flex items-center gap-3">{filtersActive && <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>Clear filters</Button>}<Link to="/browse" className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:text-info"><FolderTree size={14} /> Browse hierarchy</Link></div></div><div className="flex flex-wrap items-center gap-2"><div className="min-w-[13.75rem] flex-1"><Input value={searchQuery} onChange={event => updateFilter(setSearchQuery, event.target.value)} placeholder="Search document titles…" leftIcon={<Search size={15} />} /></div><Select value={selectedDept} onChange={event => updateFilter(setSelectedDept, event.target.value)} className="w-full sm:w-44"><option value="">All departments</option>{departments.filter(item => item.active && item.company_domain === user?.company_domain).map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</Select><Select value={selectedTopic} onChange={event => updateFilter(setSelectedTopic, event.target.value)} className="w-full sm:w-40"><option value="">All topics</option>{tags.map(tag => <option key={tag} value={tag}>{tag}</option>)}</Select><Select value={selectedStatus} onChange={event => updateFilter(setSelectedStatus, event.target.value)} className="w-full sm:w-36"><option value="">All statuses</option><option value="published">Published</option><option value="draft">Draft</option><option value="pending_review">Pending review</option></Select></div></section>
 
-    {selectedArticleIds.length > 0 && <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"><span className="text-sm font-semibold text-foreground">{selectedArticleIds.length} selected</span><Button type="button" variant="primary" size="sm" onClick={() => void handleAutoTag()} disabled={autoTagging} loading={autoTagging} icon={<Sparkles size={14} />}>{autoTagging ? 'Suggesting topics…' : 'Suggest topics'}</Button></div>}
+    {selectedArticleIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"><span className="text-sm font-semibold text-foreground">{selectedArticleIds.length} selected</span><div className="flex flex-wrap items-center gap-2"><Button type="button" variant="primary" size="sm" onClick={() => void handleAutoTag()} disabled={autoTagging} loading={autoTagging} icon={<Sparkles size={14} />}>{autoTagging ? 'Suggesting topics…' : 'Suggest topics'}</Button>{canManageArticlePermissions && <><Button type="button" variant="secondary" size="sm" onClick={() => void handleBulkReclassify('type')} disabled={bulkReclassifying}>Change type</Button><Button type="button" variant="secondary" size="sm" onClick={() => void handleBulkReclassify('sensitivity')} disabled={bulkReclassifying}>Change sensitivity</Button></>}</div></div>}
 
     <section className="overflow-hidden rounded-xl border border-border bg-surface-elevated">
       <div className="flex items-center justify-between border-b border-border px-4 py-3"><div className="flex items-center gap-3"><button type="button" onClick={selectAllOnPage} aria-label="Select all documents on page" className="text-muted-foreground hover:text-primary">{articles.length > 0 && selectedArticleIds.length === articles.length ? <CheckSquare size={17} /> : <Square size={17} />}</button><span className="text-sm font-bold text-foreground">Documents</span></div><span className="text-xs text-muted-foreground">{articles.length ? `${offset + 1}–${offset + articles.length}` : '0'} on this page</span></div>

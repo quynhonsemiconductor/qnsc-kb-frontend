@@ -46,6 +46,18 @@ export async function confirmArticleTags(items: { article_id: string; tags: stri
   return response.data
 }
 
+export async function bulkReclassifyArticles(items: { article_id: string; type?: string; sensitivity?: string }[]) {
+  const response = await client.post('/articles/bulk-reclassify', { items })
+  return response.data as { changed: { article_id: string; type: string; sensitivity: string }[]; changed_count: number }
+}
+
+export type StructuredMetadata = { document_number: string | null; issue_date: string | null; expiry_date: string | null; signed_by: string | null }
+
+export async function updateStructuredMetadata(id: string, metadata: Partial<StructuredMetadata>): Promise<StructuredMetadata> {
+  const response = await client.put(`/articles/${id}/structured-metadata`, metadata)
+  return response.data
+}
+
 export async function deleteArticle(id: string) {
   const response = await client.delete(`/articles/${id}`)
   return response.data

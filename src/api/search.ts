@@ -28,6 +28,7 @@ export type TagCatalogItem = {
   normalized_tag: string
   active: boolean
   deprecated_at?: string | null
+  parent_id?: string | null
 }
 
 export async function getTagCatalog(): Promise<TagCatalogItem[]> {
@@ -35,8 +36,8 @@ export async function getTagCatalog(): Promise<TagCatalogItem[]> {
   return response.data
 }
 
-export async function createTagCatalogItem(tag: string): Promise<TagCatalogItem> {
-  const response = await client.post('/meta/tag-catalog', { tag })
+export async function createTagCatalogItem(tag: string, parentId?: string | null): Promise<TagCatalogItem> {
+  const response = await client.post('/meta/tag-catalog', { tag, parent_id: parentId || null })
   return response.data
 }
 

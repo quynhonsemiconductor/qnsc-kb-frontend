@@ -12,7 +12,8 @@ import {
   ThumbsUp, 
   ThumbsDown, 
   MessageSquare,
-  History
+  History,
+  GitCompare
   ,Bell
 } from 'lucide-react'
 import { 
@@ -31,6 +32,7 @@ import {
   getHistory,
   restoreArticleVersion
   ,getFollowStatus, followArticle, unfollowArticle
+  ,updateStructuredMetadata, type StructuredMetadata
 } from '../../api/articles'
 import { downloadArticleSource } from '../../api/articles'
 import { getArticles } from '../../api/articles'
@@ -41,8 +43,12 @@ import { usePolling } from '../../hooks/usePolling'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
 import { canEditArticleForUser } from '../../utils/articlePermissions'
+import { diffWords } from '../../utils/textDiff'
+import { userMessage } from '../../lib/error-handler'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
+import { Modal } from '../../components/ui/Modal'
+import { Input } from '../../components/ui/Input'
 import { formatDateTime, formatDay } from '../../lib/formatters'
 
 function normalizeWikiTarget(value: string) {
@@ -85,6 +91,29 @@ function MarkdownLink({ href, children, ...props }: React.ComponentProps<'a'>) {
   return <a href={href} target={href?.startsWith('#') ? undefined : '_blank'} rel={href?.startsWith('#') ? undefined : 'noreferrer'} {...props}>{children}</a>
 }
 
+function VersionDiff({ oldText, newText }: { oldText: string; newText: string }) {
+  const tokens = diffWords(oldText, newText)
+  if (!tokens) {
+    return (
+      <p className="text-xs text-slate-400">
+        These versions are too large to highlight word-by-word. Open each version separately to compare.
+      </p>
+    )
+  }
+  if (!tokens.some(token => token.type !== 'same')) {
+    return <p className="text-xs text-slate-400">No wording differs between this version and the current one.</p>
+  }
+  return (
+    <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6 text-slate-300">
+      {tokens.map((token, index) => {
+        if (token.type === 'same') return <span key={index}>{token.text}</span>
+        if (token.type === 'del') return <span key={index} className="rounded bg-rose-500/15 text-rose-300 line-through">{token.text}</span>
+        return <span key={index} className="rounded bg-emerald-500/15 text-emerald-300">{token.text}</span>
+      })}
+    </pre>
+  )
+}
+
 export default function ArticleDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { user: currentUser } = useAuth()
@@ -104,6 +133,11 @@ export default function ArticleDetailPage() {
   const [following, setFollowing] = useState(false)
   const [history, setHistory] = useState<any[]>([])
   const [showHistory, setShowHistory] = useState(false)
+  const [viewingVersion, setViewingVersion] = useState<any>(null)
+  const [compareWithCurrent, setCompareWithCurrent] = useState(false)
+  const [editingMetadata, setEditingMetadata] = useState(false)
+  const [metadataDraft, setMetadataDraft] = useState<StructuredMetadata>({ document_number: '', issue_date: '', expiry_date: '', signed_by: '' })
+  const [savingMetadata, setSavingMetadata] = useState(false)
   const [sourceViewer, setSourceViewer] = useState<{ url: string; name: string; type: string } | null>(null)
   const [sourceLoading, setSourceLoading] = useState(false)
   const sourceUrlRef = useRef<string | null>(null)
@@ -208,7 +242,7 @@ export default function ArticleDetailPage() {
         navigate('/articles')
       } catch (err) {
         console.error(err)
-        await dialog.alert('Failed to delete article', { title: 'Delete failed' })
+        await dialog.alert(userMessage(err, t), { title: 'Delete failed' })
       }
     }
   }
@@ -241,6 +275,30 @@ export default function ArticleDetailPage() {
       navigate('/governance/pending-drafts')
     } catch (err: any) {
       await dialog.alert(err?.response?.data?.detail || 'Could not restore this version.', { title: 'Restore failed', tone: 'danger' })
+    }
+  }
+
+  const openMetadataEditor = () => {
+    setMetadataDraft({
+      document_number: article?.structured_metadata?.document_number || '',
+      issue_date: article?.structured_metadata?.issue_date || '',
+      expiry_date: article?.structured_metadata?.expiry_date || '',
+      signed_by: article?.structured_metadata?.signed_by || '',
+    })
+    setEditingMetadata(true)
+  }
+
+  const saveMetadata = async () => {
+    if (!id) return
+    setSavingMetadata(true)
+    try {
+      const saved = await updateStructuredMetadata(id, metadataDraft)
+      setArticle((current: any) => current ? { ...current, structured_metadata: saved } : current)
+      setEditingMetadata(false)
+    } catch (err: any) {
+      await dialog.alert(err?.response?.data?.detail || 'Could not save document details.', { title: 'Save failed', tone: 'danger' })
+    } finally {
+      setSavingMetadata(false)
     }
   }
 
@@ -450,7 +508,21 @@ export default function ArticleDetailPage() {
                 </Badge>
                 {article.self_approved && <Badge variant="warning" size="sm">Self-approved</Badge>}
                 {article.source_changed && <Badge variant="danger" size="sm">Source changed</Badge>}
+                {article.legal_hold && <Badge variant="danger" size="sm">Legal hold</Badge>}
+                {!article.legal_hold && article.retention_until && new Date(article.retention_until) >= new Date(new Date().toDateString()) && (
+                  <Badge variant="warning" size="sm">Retained until {formatDay(article.retention_until)}</Badge>
+                )}
               </div>
+
+              {(article.structured_metadata?.document_number || article.structured_metadata?.issue_date || article.structured_metadata?.expiry_date || article.structured_metadata?.signed_by || canEdit) && (
+                <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 text-xs text-slate-400">
+                  {article.structured_metadata?.document_number && <span><span className="text-slate-500">No.</span> <span className="font-semibold text-slate-200">{article.structured_metadata.document_number}</span></span>}
+                  {article.structured_metadata?.issue_date && <span><span className="text-slate-500">Issued</span> <span className="font-semibold text-slate-200">{article.structured_metadata.issue_date}</span></span>}
+                  {article.structured_metadata?.expiry_date && <span><span className="text-slate-500">Expires</span> <span className="font-semibold text-slate-200">{article.structured_metadata.expiry_date}</span></span>}
+                  {article.structured_metadata?.signed_by && <span><span className="text-slate-500">Signed by</span> <span className="font-semibold text-slate-200">{article.structured_metadata.signed_by}</span></span>}
+                  {canEdit && <Button variant="ghost" size="sm" onClick={openMetadataEditor} icon={<Edit size={12} />} className="ml-auto text-slate-500">Edit details</Button>}
+                </div>
+              )}
             </div>
 
             {/* Render Markdown text (simple fallback renderer for preview logic) */}
@@ -620,9 +692,7 @@ export default function ArticleDetailPage() {
                 {history.map((hist) => (
                   <div 
                     key={hist.id} 
-                    onClick={() => {
-                      void dialog.alert(`Showing title of historical snapshot version ${hist.version}: "${hist.snapshot.title}"\n\nContent:\n${hist.snapshot.body_md}`, { title: `Historical version ${hist.version}`, tone: 'info' })
-                    }}
+                    onClick={() => { setCompareWithCurrent(false); setViewingVersion(hist) }}
                     className="cursor-pointer hover:bg-slate-800/40 p-2 rounded transition-all text-xs border border-transparent hover:border-slate-800"
                   >
                     <div className="flex justify-between items-center text-foreground font-bold mb-1">
@@ -667,6 +737,65 @@ export default function ArticleDetailPage() {
             setSourceViewer(null)
           }}
         />
+      )}
+      {viewingVersion && (
+        <Modal
+          open
+          onClose={() => setViewingVersion(null)}
+          title={`${t('articles.versionHistory')} · Version ${viewingVersion.version}`}
+          size="lg"
+        >
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+              <span>{formatDateTime(viewingVersion.created_at)} · Edited by {viewingVersion.editor?.name || 'Owner'}</span>
+              {viewingVersion.version !== article?.version && (
+                <Button
+                  variant={compareWithCurrent ? 'primary' : 'secondary'}
+                  size="sm"
+                  icon={<GitCompare size={14} />}
+                  onClick={() => setCompareWithCurrent(current => !current)}
+                >
+                  {compareWithCurrent ? 'Showing differences' : 'Compare with current'}
+                </Button>
+              )}
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+              {compareWithCurrent ? (
+                <VersionDiff oldText={viewingVersion.snapshot.body_md} newText={article?.body_md || ''} />
+              ) : (
+                <div className="markdown-surface max-w-none text-sm">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewingVersion.snapshot.body_md}</ReactMarkdown>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
+              <Button variant="ghost" size="sm" onClick={() => setViewingVersion(null)}>Close</Button>
+              {canEdit && viewingVersion.version !== article?.version && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => { void handleRestoreVersion(viewingVersion); setViewingVersion(null) }}
+                >
+                  {t('articles.restoreActive')}
+                </Button>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+      {editingMetadata && (
+        <Modal open onClose={() => setEditingMetadata(false)} title="Document details" size="sm">
+          <div className="space-y-4">
+            <Input label="Document number" value={metadataDraft.document_number || ''} onChange={e => setMetadataDraft(current => ({ ...current, document_number: e.target.value }))} placeholder="e.g. SOP-114" />
+            <Input label="Issue date" type="date" value={metadataDraft.issue_date || ''} onChange={e => setMetadataDraft(current => ({ ...current, issue_date: e.target.value }))} />
+            <Input label="Expiry date" type="date" value={metadataDraft.expiry_date || ''} onChange={e => setMetadataDraft(current => ({ ...current, expiry_date: e.target.value }))} />
+            <Input label="Signed by" value={metadataDraft.signed_by || ''} onChange={e => setMetadataDraft(current => ({ ...current, signed_by: e.target.value }))} placeholder="Name or title" />
+            <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
+              <Button variant="ghost" size="sm" onClick={() => setEditingMetadata(false)}>Cancel</Button>
+              <Button variant="primary" size="sm" disabled={savingMetadata} loading={savingMetadata} onClick={() => void saveMetadata()}>Save</Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )
