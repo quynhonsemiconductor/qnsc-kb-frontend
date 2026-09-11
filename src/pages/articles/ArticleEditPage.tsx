@@ -13,6 +13,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { toDateInputValue } from '../../lib/formatters'
+import { ARTICLE_TYPES, SENSITIVITY_LEVELS } from '../../utils/articleTaxonomy'
 
 const ARTICLE_TEMPLATE = '# Purpose\n\n## Summary\n\n## Procedure or details\n\n## Ownership and review\n'
 type Department = { id: string; name: string; company_domain: string; active: boolean }
@@ -76,6 +77,11 @@ export default function ArticleEditPage() {
   // rewriting such an article to 'department' would widen access from a named list of
   // people to a whole department.
   const [visibility, setVisibility] = useState<'public' | 'department' | 'users'>('department')
+  // Reclassification, not routine editing: only sent to the API when the viewer holds
+  // permission.manage, same gate the backend enforces. Loaded either way so the current
+  // values are visible even to an editor who cannot change them.
+  const [docType, setDocType] = useState<string>('SOP')
+  const [sensitivity, setSensitivity] = useState<string>('internal')
   const [explicitUserIds, setExplicitUserIds] = useState<string[]>([])
   const [deniedUserIds, setDeniedUserIds] = useState<string[]>([])
   // The version this editor loaded. Sent back on save so the API can refuse to overwrite a
@@ -130,6 +136,8 @@ export default function ArticleEditPage() {
           setLanguage(art.language || 'vi')
           setStatus(art.status)
           setVisibility(art.visibility || 'department')
+          setDocType(art.type || 'SOP')
+          setSensitivity(art.sensitivity || 'internal')
           setExplicitUserIds((art.explicit_user_ids || []).map((item: string) => String(item)))
           setDeniedUserIds((art.explicit_denied_user_ids || []).map((item: string) => String(item)))
           setTagsInput(art.tags ? art.tags.map((tag: { tag: string }) => tag.tag).join(', ') : '')
@@ -191,6 +199,10 @@ export default function ArticleEditPage() {
       if (visibility !== 'users') payload.visibility = visibility
       payload.explicit_user_ids = explicitUserIds
       payload.denied_user_ids = deniedUserIds
+      if (isEditMode) {
+        payload.type = docType
+        payload.sensitivity = sensitivity
+      }
     }
 
     try {
@@ -380,6 +392,31 @@ export default function ArticleEditPage() {
                 {visibility === 'users' && <p className="mt-1.5 text-body-sm leading-5 text-amber-300/90">{t('editor.visibilityUsersLocked')}</p>}
                 <p className="mt-1.5 text-body-sm leading-5 text-slate-500">Explicit deny entries always override other access grants.</p>
               </div>
+
+              {isEditMode && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Document type</label>
+                  <Select
+                    value={docType}
+                    disabled={!canManageArticlePermissions}
+                    onChange={(e) => { setDocType(e.target.value); setDirty(true) }}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-none focus:border-brand-500 disabled:opacity-60"
+                  >
+                    {ARTICLE_TYPES.map(value => <option key={value} value={value}>{value}</option>)}
+                  </Select>
+                  <label className="mt-3 block text-xs font-semibold text-slate-400 mb-1.5">Sensitivity</label>
+                  <Select
+                    value={sensitivity}
+                    disabled={!canManageArticlePermissions}
+                    onChange={(e) => { setSensitivity(e.target.value); setDirty(true) }}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-none focus:border-brand-500 disabled:opacity-60"
+                  >
+                    {SENSITIVITY_LEVELS.map(value => <option key={value} value={value}>{value}</option>)}
+                  </Select>
+                  {!canManageArticlePermissions && <p className="mt-1.5 text-body-sm leading-5 text-slate-500">Only permission managers can reclassify a document's type or sensitivity.</p>}
+                  {canManageArticlePermissions && <p className="mt-1.5 text-body-sm leading-5 text-amber-300/90">Sensitivity controls who can see this article. A change is submitted for approval like any other edit.</p>}
+                </div>
+              )}
 
               {canManageArticlePermissions && (explicitUserIds.length > 0 || deniedUserIds.length > 0) && (
                 <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3">

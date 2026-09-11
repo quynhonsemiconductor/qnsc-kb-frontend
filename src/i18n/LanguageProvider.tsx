@@ -24,6 +24,7 @@ const messages: Record<Language, Record<string, string>> = {
     'nav.metadata': 'Metadata',
     'nav.tags': 'Tags',
     'nav.glossary': 'Glossary',
+    'nav.graph': 'Knowledge graph',
     'nav.logOut': 'Log Out',
     // These eight were hardcoded English in Sidebar.tsx, so the primary navigation rendered
     // half-translated in the DEFAULT locale: "TRI THỨC" and "QUẢN TRỊ" sat directly above an
@@ -295,6 +296,7 @@ const messages: Record<Language, Record<string, string>> = {
     'nav.metadata': 'Siêu dữ liệu',
     'nav.tags': 'Thẻ',
     'nav.glossary': 'Thuật ngữ',
+    'nav.graph': 'Đồ thị tri thức',
     'nav.logOut': 'Đăng xuất',
     'nav.home': 'Trang chủ',
     'nav.saved': 'Đã lưu',

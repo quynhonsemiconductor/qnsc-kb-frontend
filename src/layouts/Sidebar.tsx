@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity, AlertTriangle, BookOpen, Bookmark, Bot, ChevronDown, ClipboardList,
-  Compass, FileArchive, FileText, FolderTree, Home, KeyRound, LogOut,
+  Compass, FileArchive, FileText, FolderTree, Home, KeyRound, LogOut, Network,
   Search, Settings2, Tag, Users, Shield, Sparkles, X, Building2, PanelLeftClose, PanelLeftOpen,
   type LucideIcon,
 } from 'lucide-react'
@@ -123,7 +123,7 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
           {has('user.manage') && <NavItem to="/admin/users" icon={Users} collapsed={collapsed}>{t('nav.usersRoles')}</NavItem>}{has('user.manage') && <NavItem to="/admin/departments" icon={Building2} collapsed={collapsed}>{t('nav.departments')}</NavItem>}{has('role.manage') && <NavItem to="/admin/roles" icon={Shield} collapsed={collapsed}>{t('nav.rolesPermissions')}</NavItem>}{has('connector.manage') && <NavItem to="/admin/connectors" icon={FolderTree} collapsed={collapsed}>{t('nav.sourceConnectors')}</NavItem>}{has('role.manage') && <NavItem to="/admin/features" icon={Settings2} collapsed={collapsed}>{t('nav.featureControls')}</NavItem>}{has('role.manage') && <NavItem to="/admin/llm" icon={Sparkles} collapsed={collapsed}>{t('nav.aiProvider')}</NavItem>}{has('article.create') && <NavItem to="/sources" icon={FileArchive} collapsed={collapsed}>{t('nav.sourcesFiles')}</NavItem>}
         </NavSection>
         <NavSection title={t('nav.metadata')} open={expanded.metadata} onToggle={() => toggle('metadata')} collapsed={collapsed}>
-          <NavItem to="/meta/tags" icon={Tag} collapsed={collapsed}>{t('nav.tags')}</NavItem><NavItem to="/meta/glossary" icon={Compass} collapsed={collapsed}>{t('nav.glossary')}</NavItem>
+          <NavItem to="/meta/tags" icon={Tag} collapsed={collapsed}>{t('nav.tags')}</NavItem><NavItem to="/meta/graph" icon={Network} collapsed={collapsed}>{t('nav.graph')}</NavItem><NavItem to="/meta/glossary" icon={Compass} collapsed={collapsed}>{t('nav.glossary')}</NavItem>
         </NavSection>
       </nav>
 

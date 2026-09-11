@@ -24,6 +24,7 @@ const AuditLogPage = lazy(() => import('../pages/governance/AuditLogPage'))
 const HealthDashboardPage = lazy(() => import('../pages/governance/HealthDashboardPage'))
 const CoveragePage = lazy(() => import('../pages/governance/CoveragePage'))
 const TagsPage = lazy(() => import('../pages/meta/TagsPage'))
+const GraphExplorerPage = lazy(() => import('../pages/meta/GraphExplorerPage'))
 const GlossaryPage = lazy(() => import('../pages/meta/GlossaryPage'))
 const UsersPage = lazy(() => import('../pages/admin/UsersPage'))
 const DepartmentsPage = lazy(() => import('../pages/admin/DepartmentsPage'))
@@ -72,6 +73,7 @@ export const routes = createRoutesFromElements(
 
       {/* Meta */}
       <Route path="meta/tags" element={<TagsPage />} />
+      <Route path="meta/graph" element={<ProtectedRoute permission="article.read"><GraphExplorerPage /></ProtectedRoute>} />
       <Route path="meta/glossary" element={<GlossaryPage />} />
       <Route path="admin/users" element={<ProtectedRoute permission="user.manage"><UsersPage /></ProtectedRoute>} />
       <Route path="admin/departments" element={<ProtectedRoute permission="user.manage"><DepartmentsPage /></ProtectedRoute>} />

@@ -52,6 +52,8 @@ interface Message {
   originalInformation?: string
   willUpdate?: string
   editInstruction?: string
+  clarificationOptions?: string[]
+  confidence?: 'low' | 'normal'
 }
 
 interface PendingEditConfirmation {
@@ -506,6 +508,8 @@ export default function AskPage() {
             originalInformation,
             willUpdate: data.will_update || actionData.will_update,
             editInstruction,
+            clarificationOptions: data.clarification_options || undefined,
+            confidence: data.confidence,
           } : message))
         },
         confirmedArticleId || requestArticleId,
@@ -856,6 +860,12 @@ export default function AskPage() {
                             {isFailure || isNoAnswer ? <AlertCircle size={14} /> : <Bot size={14} />}
                           </div>
                           <div className="min-w-0 flex-1">
+                            {!isStreamingThis && message.confidence === 'low' && (
+                              <div className="mb-3 flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning-text">
+                                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                                <span>The Knowledge Base only had loosely related information for this — please verify before relying on it.</span>
+                              </div>
+                            )}
                             {message.failed ? (
                               <div className="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2.5">
                                 <div className="flex items-start gap-2 text-body leading-6 text-destructive-text">
@@ -956,6 +966,25 @@ export default function AskPage() {
                                 ))}
                               </div>
                             )}
+                          </div>
+                        )}
+                        {!isStreamingThis && message.clarificationOptions && message.clarificationOptions.length > 0 && (
+                          <div className="mt-4 flex flex-wrap gap-2 pl-10">
+                            {message.clarificationOptions.map(option => (
+                              <Button
+                                key={option}
+                                variant="secondary"
+                                size="sm"
+                                type="button"
+                                disabled={loading}
+                                onClick={() => {
+                                  const previousQuestion = messages[index - 1]?.sender === 'user' ? messages[index - 1].text : ''
+                                  void handleAsk(previousQuestion ? `${previousQuestion} (phòng ${option})` : `Phòng ${option}`)
+                                }}
+                              >
+                                {option}
+                              </Button>
+                            ))}
                           </div>
                         )}
                         <div className="mt-4 flex items-center gap-2 border-t border-hairline/70 pt-3 pl-10">

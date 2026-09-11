@@ -82,6 +82,7 @@ type Draft = {
     department_ids?: string[]
   } | null
   candidate_count?: number
+  tags?: string[]
 }
 
 type RestructureReport = {
@@ -130,7 +131,46 @@ function ReviewQuality({ report, chunkCount, busy }: { report?: RestructureRepor
   </section>
 }
 
+//: One stage per draft, in priority order — a draft still formatting has not reached the
+//: point where "needs a version decision" could even be evaluated, so earlier stages
+//: take priority over later ones rather than a draft appearing to qualify for several.
+const BOARD_STAGES = [
+  { key: 'formatting', label: 'Formatting', match: (draft: Draft) => ['queued', 'processing'].includes(draft.restructure_status || '') },
+  { key: 'split_review', label: 'Needs split review', match: (draft: Draft) => (draft.candidate_count || 0) > 1 },
+  { key: 'version_decision', label: 'Needs version decision', match: (draft: Draft) => Boolean(draft.requires_update_confirmation) },
+  { key: 'ready', label: 'Ready for final review', match: () => true },
+] as const
+
+function DraftBoard({ drafts, onOpen }: { drafts: Draft[]; onOpen: (draft: Draft) => void }) {
+  const columns = useMemo(() => {
+    const byStage = new Map<string, Draft[]>(BOARD_STAGES.map(stage => [stage.key, []]))
+    for (const draft of drafts) {
+      const stage = BOARD_STAGES.find(candidate => candidate.match(draft))!
+      byStage.get(stage.key)!.push(draft)
+    }
+    return BOARD_STAGES.map(stage => ({ ...stage, drafts: byStage.get(stage.key) || [] }))
+  }, [drafts])
+
+  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {columns.map(column => <div key={column.key} className="rounded-xl border border-hairline bg-surface/60 p-3">
+      <div className="mb-3 flex items-center justify-between px-1">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-stone">{column.label}</h3>
+        <Badge variant="default" size="sm">{column.drafts.length}</Badge>
+      </div>
+      <div className="space-y-2">
+        {column.drafts.length === 0
+          ? <p className="px-1 text-body-sm text-stone">Nothing here.</p>
+          : column.drafts.map(draft => <button key={draft.id} type="button" onClick={() => onOpen(draft)} className="block w-full rounded-lg border border-border bg-surface-elevated px-3 py-2 text-left text-xs text-ink transition hover:border-info/40 hover:bg-surface-muted">
+              <p className="truncate font-semibold">{draft.title}</p>
+              <p className="mt-0.5 truncate text-stone">{draft.dept || 'No department yet'}</p>
+            </button>)}
+      </div>
+    </div>)}
+  </div>
+}
+
 export default function PendingDraftsPage() {
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list')
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -615,6 +655,17 @@ export default function PendingDraftsPage() {
         </div>}
       </section>}
 
+      <div className="flex items-center justify-end gap-1 px-1">
+        <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="sm" onClick={() => setViewMode('list')} icon={<ListChecks size={13} />}>List</Button>
+        <Button variant={viewMode === 'board' ? 'secondary' : 'ghost'} size="sm" onClick={() => setViewMode('board')} icon={<Layers3 size={13} />}>Board</Button>
+      </div>
+
+      {viewMode === 'board' && (loading
+        ? <div className="grid min-h-56 place-items-center rounded-xl border border-hairline bg-surface text-sm text-steel"><RefreshCw size={16} className="mr-2 animate-spin" /> Loading review queue…</div>
+        : <DraftBoard drafts={filteredDrafts} onOpen={openReview} />
+      )}
+
+      {viewMode === 'list' && <>
       {filteredDrafts.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 px-1">
         <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-steel">
           <input type="checkbox" className="sr-only" checked={allVisibleSelected} onChange={toggleAllVisible} />
@@ -663,9 +714,10 @@ export default function PendingDraftsPage() {
           </div></div>
         </article>
       })}</div>}
+      </>}
 
-      {reviewOpen && selectedDraft && <div className="fixed inset-0 z-50 bg-black/75 p-2 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-labelledby={reviewTitleId}><FocusTrap className="contents"><section className="mx-auto flex h-[calc(100vh-1rem)] max-w-7xl flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl sm:h-[calc(100vh-2rem)]">
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-hairline bg-surface px-4 py-3 sm:px-6"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="info" size="sm" className="uppercase tracking-widest">Focused review</Badge>{selectedDraft.similarity_level === 'very_high' && <Badge variant="warning" size="sm" className="uppercase tracking-widest">Possible update</Badge>}</div><h2 id={reviewTitleId} className="mt-1 truncate text-base font-semibold text-ink sm:text-lg">{selectedDraft.title}</h2><p className="mt-1 truncate text-xs text-stone">{selectedDraft.source_ref} · Original source is unchanged</p></div><div className="flex shrink-0 items-center gap-2">{user?.permissions?.includes('ai.ask') && <Button variant="ghost" size="sm" onClick={() => navigate(`/ai?${editableTargetArticle ? `articleId=${encodeURIComponent(editableTargetArticle.id)}&articleTitle=${encodeURIComponent(editableTargetArticle.title)}&` : ''}prompt=${encodeURIComponent(requestDraftPrompt)}`)} icon={<MessageSquare size={13} />}>Ask AI about edit</Button>}{canEditTargetArticle && editableTargetArticle && <Button variant="ghost" size="sm" onClick={() => navigate(`/articles/${editableTargetArticle.id}/edit`)} icon={<Edit3 size={13} />}>Edit source article</Button>}<button onClick={() => setShowQuality(value => !value)} className={`hidden rounded-lg border px-2.5 py-2 text-body-sm font-semibold sm:inline-flex ${showQuality ? 'border-cyan/30 bg-cyan/10 text-info-text' : 'border-hairline text-stone hover:text-ink'}`}>{showQuality ? 'Hide quality' : 'Quality details'}</button>{matches.length > 0 && <button onClick={toggleComparison} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-body-sm font-semibold ${showComparison ? 'border-amber-300/30 bg-amber-400/10 text-warning-text' : 'border-hairline text-stone hover:text-ink'}`}><ArrowLeftRight size={13} />{showComparison ? 'Hide comparison' : 'Compare article'}</button>}<button onClick={closeReview} className="rounded-lg p-2 text-stone hover:bg-surface-soft hover:text-ink" title="Close review"><X size={18} /></button></div></header>
+      {reviewOpen && selectedDraft &&<div className="fixed inset-0 z-50 bg-black/75 p-2 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-labelledby={reviewTitleId}><FocusTrap className="contents"><section className="mx-auto flex h-[calc(100vh-1rem)] max-w-7xl flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl sm:h-[calc(100vh-2rem)]">
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-hairline bg-surface px-4 py-3 sm:px-6"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="info" size="sm" className="uppercase tracking-widest">Focused review</Badge>{selectedDraft.similarity_level === 'very_high' && <Badge variant="warning" size="sm" className="uppercase tracking-widest">Possible update</Badge>}</div><h2 id={reviewTitleId} className="mt-1 truncate text-base font-semibold text-ink sm:text-lg">{selectedDraft.title}</h2><p className="mt-1 truncate text-xs text-stone">{selectedDraft.source_ref} · Original source is unchanged</p>{selectedDraft.tags && selectedDraft.tags.length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="text-caption font-semibold uppercase tracking-widest text-stone">AI-suggested tags:</span>{selectedDraft.tags.map(tag => <Badge key={tag} variant="default" size="sm">{tag}</Badge>)}</div>}</div><div className="flex shrink-0 items-center gap-2">{user?.permissions?.includes('ai.ask') && <Button variant="ghost" size="sm" onClick={() => navigate(`/ai?${editableTargetArticle ? `articleId=${encodeURIComponent(editableTargetArticle.id)}&articleTitle=${encodeURIComponent(editableTargetArticle.title)}&` : ''}prompt=${encodeURIComponent(requestDraftPrompt)}`)} icon={<MessageSquare size={13} />}>Ask AI about edit</Button>}{canEditTargetArticle && editableTargetArticle && <Button variant="ghost" size="sm" onClick={() => navigate(`/articles/${editableTargetArticle.id}/edit`)} icon={<Edit3 size={13} />}>Edit source article</Button>}<button onClick={() => setShowQuality(value => !value)} className={`hidden rounded-lg border px-2.5 py-2 text-body-sm font-semibold sm:inline-flex ${showQuality ? 'border-cyan/30 bg-cyan/10 text-info-text' : 'border-hairline text-stone hover:text-ink'}`}>{showQuality ? 'Hide quality' : 'Quality details'}</button>{matches.length > 0 && <button onClick={toggleComparison} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-body-sm font-semibold ${showComparison ? 'border-amber-300/30 bg-amber-400/10 text-warning-text' : 'border-hairline text-stone hover:text-ink'}`}><ArrowLeftRight size={13} />{showComparison ? 'Hide comparison' : 'Compare article'}</button>}<button onClick={closeReview} className="rounded-lg p-2 text-stone hover:bg-surface-soft hover:text-ink" title="Close review"><X size={18} /></button></div></header>
         {showComparison && matches.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-surface-soft px-4 py-2.5 sm:px-6"><span className="mr-1 text-caption font-semibold uppercase tracking-widest text-stone">Related article</span>{matches.map(match => <button key={match.article_id} onClick={() => void loadComparison(selectedDraft.id, match.article_id)} className={`rounded-lg border px-2.5 py-1.5 text-left text-xs transition ${compareArticleId === match.article_id ? 'border-amber-300/40 bg-amber-400/10 text-warning-text' : 'border-hairline bg-canvas text-steel hover:border-amber-300/30 hover:text-ink'}`}><span className="font-semibold">{Math.round(match.score * 100)}%</span> · {match.title}</button>)}</div>}
         {showQuality && <ReviewQuality report={selectedDraft.restructure_report} chunkCount={selectedDraft.restructure_chunk_count} busy={isAiBusy(selectedDraft)} />}
         {selectedDraft.restructure_candidate_md && <section className="flex shrink-0 flex-col gap-3 border-b border-amber-300/20 bg-gradient-to-r from-amber-400/[0.09] via-surface to-cyan/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div className="flex min-w-0 items-start gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-400/10 text-amber-300"><Sparkles size={17} /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-xs font-semibold text-ink">AI layout needs your decision</p><Badge variant="warning" size="sm" className="uppercase tracking-wider">Candidate retained</Badge></div><p className="mt-1 text-body-sm leading-5 text-steel">The safety check found content that may have changed. Inspect the candidate, then choose which version will be published.</p></div></div><div className="flex shrink-0 flex-wrap gap-2"><Button variant="secondary" size="sm" onClick={() => setReviewTab('candidate')}>Review AI candidate</Button><Button variant="ghost" size="sm" onClick={() => void handleRestructureDecision('keep_lossless')} disabled={Boolean(actingDraftId) || selectedDraft.restructure_decision === 'lossless_kept'}>Use lossless view</Button><Button variant="primary" size="sm" onClick={() => void handleRestructureDecision('keep_ai')} disabled={Boolean(actingDraftId) || selectedDraft.restructure_decision === 'ai_kept'} icon={<Check size={13} />}>Keep AI layout</Button></div></section>}
