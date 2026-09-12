@@ -54,6 +54,10 @@ interface Message {
   editInstruction?: string
   clarificationOptions?: string[]
   confidence?: 'low' | 'normal'
+  // Populated only when the backend's CLAIM_VERIFICATION_ENABLED flag is on (off by
+  // default). Absent, not an empty array, on any answer the flag did not run for --
+  // treat that as "not checked", not "every claim confirmed".
+  unverifiedClaims?: { sentence: string; source_id: string }[]
 }
 
 interface PendingEditConfirmation {
@@ -510,6 +514,7 @@ export default function AskPage() {
             editInstruction,
             clarificationOptions: data.clarification_options || undefined,
             confidence: data.confidence,
+            unverifiedClaims: data.unverified_claims,
           } : message))
         },
         confirmedArticleId || requestArticleId,
@@ -864,6 +869,17 @@ export default function AskPage() {
                               <div className="mb-3 flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning-text">
                                 <AlertCircle size={14} className="mt-0.5 shrink-0" />
                                 <span>The Knowledge Base only had loosely related information for this — please verify before relying on it.</span>
+                              </div>
+                            )}
+                            {!isStreamingThis && !!message.unverifiedClaims?.length && (
+                              <div className="mb-3 flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning-text">
+                                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                                <span>
+                                  {message.unverifiedClaims.length === 1
+                                    ? 'One cited claim in this answer could not be confirmed against its source — please verify: '
+                                    : `${message.unverifiedClaims.length} cited claims in this answer could not be confirmed against their sources — please verify: `}
+                                  {message.unverifiedClaims.map(claim => `"${claim.sentence}"`).join('; ')}
+                                </span>
                               </div>
                             )}
                             {message.failed ? (

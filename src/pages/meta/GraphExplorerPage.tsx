@@ -13,7 +13,7 @@ import GraphCanvas, { TYPE_COLORS } from './graph/GraphCanvas'
 const ENTITY_TYPES = ['person', 'organization', 'system', 'policy', 'location', 'product', 'concept', 'other']
 
 function toCanvasLinks(relationships: GraphRelationship[]) {
-  return relationships.map(edge => ({ id: edge.id, source: edge.source_entity_id, target: edge.target_entity_id, relation: edge.relation }))
+  return relationships.map(edge => ({ id: edge.id, source: edge.source_entity_id, target: edge.target_entity_id, relation: edge.relation, description: edge.description }))
 }
 
 export default function GraphExplorerPage() {
@@ -98,6 +98,33 @@ export default function GraphExplorerPage() {
     return counts
   }, [entities])
 
+  // Which currently-rendered graph nodes match the active search, so typing a query
+  // highlights matches already on screen instead of doing nothing until a list item is
+  // clicked (which still re-centers the view -- that stays an explicit navigation
+  // action, distinct from just searching). `entities` is already server-filtered by
+  // `query`, so intersecting it with the visible neighborhood is the match set.
+  const highlightIds = useMemo(() => {
+    if (!query.trim() || !neighbors) return undefined
+    const matched = new Set(entities.map(entity => entity.id))
+    return new Set(neighbors.entities.map(entity => entity.id).filter(id => matched.has(id)))
+  }, [query, entities, neighbors])
+
+  // The picture alone doesn't say what's WORTH noticing in it -- this turns the
+  // rendered neighborhood into one sentence a reader can act on: who is the hub, and
+  // who gets referenced the most, without them having to count edges themselves.
+  const graphInsight = useMemo(() => {
+    if (!neighbors || neighbors.entities.length < 2) return null
+    if (!neighbors.relationships.length) return { sparse: true as const }
+    const degree = new Map<string, number>()
+    for (const rel of neighbors.relationships) {
+      degree.set(rel.source_entity_id, (degree.get(rel.source_entity_id) || 0) + 1)
+      degree.set(rel.target_entity_id, (degree.get(rel.target_entity_id) || 0) + 1)
+    }
+    const hub = [...neighbors.entities].sort((a, b) => (degree.get(b.id) || 0) - (degree.get(a.id) || 0))[0]
+    const mostMentioned = [...neighbors.entities].sort((a, b) => b.mention_count - a.mention_count)[0]
+    return { sparse: false as const, hub, hubDegree: degree.get(hub.id) || 0, mostMentioned, sameEntity: hub.id === mostMentioned.id }
+  }, [neighbors])
+
   return <div className="page-shell page-stack text-foreground">
     <PageHeader
       eyebrow="Knowledge taxonomy"
@@ -148,20 +175,52 @@ export default function GraphExplorerPage() {
 
         {!selectedId ? <div className="grid h-full min-h-[20rem] flex-1 place-items-center text-center text-sm text-muted-foreground"><div><Network size={28} className="mx-auto mb-3 opacity-40" /><p>Select an entity to see how it connects to the rest of the knowledge base.</p></div></div>
           : viewMode === 'graph' ? <div className="flex flex-1 flex-col gap-4">
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-              {Object.entries(TYPE_COLORS).map(([type, color]) => (
-                <span key={type} className="inline-flex items-center gap-1.5 text-caption font-semibold text-muted-foreground"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} /> {type}</span>
-              ))}
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(TYPE_COLORS).map(([type, color]) => (
+                  <span
+                    key={type}
+                    className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-semibold capitalize"
+                    style={{ backgroundColor: `${color}14`, borderColor: `${color}30`, color }}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} /> {type}
+                  </span>
+                ))}
+              </div>
+              {neighbors && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-3 py-1 text-caption font-semibold text-muted-foreground">
+                  {neighbors.entities.length} entit{neighbors.entities.length === 1 ? 'y' : 'ies'} · {neighbors.relationships.length} relationship{neighbors.relationships.length === 1 ? '' : 's'}
+                  {highlightIds && ` · ${highlightIds.size} match${highlightIds.size === 1 ? '' : 'es'}`}
+                </span>
+              )}
             </div>
+            {neighbors && !!neighbors.entities.length && (
+              <p className="text-caption text-muted-foreground">
+                Larger circles are mentioned more often · hover a node or line for detail · drag to rearrange.
+                {graphInsight && (graphInsight.sparse
+                  ? ' Nothing here is linked yet — extract from more articles to connect them.'
+                  : <>
+                    {' '}
+                    <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setSelectedId(graphInsight.hub.id)}>{graphInsight.hub.name}</button>
+                    {' '}bridges the most connections here ({graphInsight.hubDegree}).
+                    {!graphInsight.sameEntity && <>
+                      {' '}
+                      <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setSelectedId(graphInsight.mostMentioned.id)}>{graphInsight.mostMentioned.name}</button>
+                      {' '}is referenced the most ({graphInsight.mostMentioned.mention_count}×).
+                    </>}
+                  </>)}
+              </p>
+            )}
             {neighborsLoading || !neighbors ? <div className="grid min-h-[22rem] flex-1 place-items-center text-sm text-muted-foreground">Loading graph…</div>
               : neighbors.entities.length <= 1 ? <div className="grid min-h-[22rem] flex-1 place-items-center text-center text-sm text-muted-foreground"><p>No relationships extracted for this entity yet.</p></div>
               : <div className="min-h-[22rem] flex-1">
                 <GraphCanvas
-                  nodes={neighbors.entities.map(entity => ({ id: entity.id, name: entity.name, type: entity.type, mention_count: entity.mention_count }))}
+                  nodes={neighbors.entities.map(entity => ({ id: entity.id, name: entity.name, type: entity.type, mention_count: entity.mention_count, description: entity.description }))}
                   links={toCanvasLinks(neighbors.relationships)}
                   centerId={selectedId}
                   selectedId={selectedId}
                   onSelectNode={setSelectedId}
+                  highlightIds={highlightIds}
                 />
               </div>}
             {detail && <div className="rounded-xl border border-border bg-surface p-4">
