@@ -217,6 +217,19 @@
   .ops-sidebar-hover:hover { background: rgb(var(--sidebar-hover)); }
   .ops-elevated { background: rgb(var(--surface-elevated)); }
   .soft-grid { background-image: linear-gradient(rgb(var(--border) / .18) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--border) / .18) 1px, transparent 1px); background-size: 32px 32px; }
+  /* The knowledge-graph canvas: a dotted, faintly-lit plane rather than a flat panel, so
+     the diagram reads as an instrument sitting on a surface instead of nodes floating on
+     the page background. Two radial glows (not a blur -- see the backdrop-filter note
+     above this block) plus a dot grid, all static, so it costs nothing to repaint while
+     the simulation ticks every frame. */
+  .graph-canvas-surface {
+    background-color: rgb(var(--surface));
+    background-image:
+      radial-gradient(circle at 15% 12%, rgb(var(--primary) / .07), transparent 38%),
+      radial-gradient(circle at 88% 82%, rgb(var(--accent) / .06), transparent 42%),
+      radial-gradient(rgb(var(--border) / .5) 1px, transparent 1px);
+    background-size: auto, auto, 22px 22px;
+  }
   /* `zoom: .88235294` removed. It shrank every glass surface — the AI chat among them —
      by a further 12% ON TOP of the 26% root shrink, so panels rendered at roughly 65% of
      normal size. `zoom` is also not a layout tool: it rescales a subtree without telling

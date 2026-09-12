@@ -202,6 +202,12 @@ export async function verifyReviewDeadlines() {
 // file extension, similarity ceiling) is structured and enforced server-side; only the
 // free-text `instruction` is ever sent to the model. can_approve/can_reject both default
 // to false, so a new rule is a dry run until someone explicitly grants it authority.
+// "standard" | "high", from src/domain/approval_agent.py::compute_draft_risk_tier --
+// derived deterministically from a draft's own metadata/department, never judged by the
+// model. A rule's risk_tiers is an additional scoping filter, same "null means any"
+// convention as every other scoping field here.
+export type ApprovalRiskTier = 'standard' | 'high'
+
 export type ApprovalRule = {
   id: string
   name: string
@@ -212,11 +218,16 @@ export type ApprovalRule = {
   dept: string | null
   file_extensions: string[] | null
   max_similarity_score: number | null
+  risk_tiers: ApprovalRiskTier[] | null
   can_approve: boolean
   can_reject: boolean
   created_by: string | null
   created_at: string
   updated_at: string
+  // Incremented on every edit; each version's full state is snapshotted server-side
+  // (ApprovalRuleVersion) so a past decision stays attributable to the rule as it was
+  // when it fired, not as it reads after a later edit.
+  version: number
 }
 
 export type ApprovalRulePayload = {
@@ -228,6 +239,7 @@ export type ApprovalRulePayload = {
   dept?: string | null
   file_extensions?: string[] | null
   max_similarity_score?: number | null
+  risk_tiers?: ApprovalRiskTier[] | null
   can_approve?: boolean
   can_reject?: boolean
 }

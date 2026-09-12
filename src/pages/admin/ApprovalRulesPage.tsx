@@ -30,6 +30,7 @@ const EMPTY_FORM: ApprovalRulePayload = {
   dept: null,
   file_extensions: null,
   max_similarity_score: null,
+  risk_tiers: null,
   can_approve: false,
   can_reject: false,
 }
@@ -44,6 +45,8 @@ function toFormFields(rule: ApprovalRulePayload) {
     dept: rule.dept ?? '',
     file_extensions: (rule.file_extensions || []).join(', '),
     max_similarity_score: rule.max_similarity_score == null ? '' : String(rule.max_similarity_score),
+    risk_standard: rule.risk_tiers ? rule.risk_tiers.includes('standard') : true,
+    risk_high: rule.risk_tiers ? rule.risk_tiers.includes('high') : true,
     can_approve: rule.can_approve ?? false,
     can_reject: rule.can_reject ?? false,
   }
@@ -63,6 +66,10 @@ function toPayload(fields: FormFields): ApprovalRulePayload {
       ? fields.file_extensions.split(',').map(item => item.trim()).filter(Boolean)
       : null,
     max_similarity_score: fields.max_similarity_score === '' ? null : Number(fields.max_similarity_score),
+    // Both checked (the default) or neither checked both mean "any" -- unchecking both
+    // is treated the same as checking both rather than producing a rule that can never
+    // match anything, which checkboxes make easy to do by accident.
+    risk_tiers: fields.risk_standard === fields.risk_high ? null : fields.risk_standard ? ['standard'] : ['high'],
     can_approve: fields.can_approve,
     can_reject: fields.can_reject,
   }
@@ -96,6 +103,14 @@ function RuleFields({ fields, onChange, connectors }: {
         <Input label="Max similarity (optional)" type="number" min={0} max={1} step={0.01} value={fields.max_similarity_score} onChange={event => onChange({ ...fields, max_similarity_score: event.target.value })} hint="Rejects drafts with no measured score, rather than treating unmeasured as low." />
       </div>
       <Input label="File extensions (optional)" value={fields.file_extensions} onChange={event => onChange({ ...fields, file_extensions: event.target.value })} placeholder=".pdf, .docx" hint="Comma-separated. Leave blank for any file type." />
+      <div className="space-y-1.5">
+        <label className="block text-body font-medium text-foreground">Risk tier</label>
+        <div className="flex flex-wrap items-center gap-5 rounded-xl border border-border bg-surface p-4">
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 rounded border-border" checked={fields.risk_standard} onChange={event => onChange({ ...fields, risk_standard: event.target.checked })} /> Standard</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 rounded border-border" checked={fields.risk_high} onChange={event => onChange({ ...fields, risk_high: event.target.checked })} /> High (restricted/confidential content, or a configured department)</label>
+        </div>
+        <p className="text-body-sm text-muted-foreground">Both checked (or both unchecked) means any risk tier. Uncheck one to scope this rule to only standard or only high-risk drafts.</p>
+      </div>
       <div className="flex flex-wrap items-center gap-5 rounded-xl border border-border bg-surface p-4">
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 rounded border-border" checked={fields.active} onChange={event => onChange({ ...fields, active: event.target.checked })} /> Active</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 rounded border-border" checked={fields.can_approve} onChange={event => onChange({ ...fields, can_approve: event.target.checked })} /> May approve</label>
@@ -272,6 +287,8 @@ export default function ApprovalRulesPage() {
                         {' · '}{rule.dept || 'Any department'}
                         {' · '}{rule.file_extensions?.length ? rule.file_extensions.join(', ') : 'Any file type'}
                         {rule.max_similarity_score != null && ` · similarity ≤ ${rule.max_similarity_score}`}
+                        {rule.risk_tiers?.length ? ` · ${rule.risk_tiers.join('/')} risk only` : ''}
+                        {` · v${rule.version}`}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
