@@ -8,7 +8,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useNavigate } from 'react-router-dom'
 import {
-  approveDraft, assignDraftApprover, bulkDecideDrafts, decideRestructure, getDraftComparison, getEligibleApprovers, getPendingDrafts, rejectDraft, restructureDraft,
+  approveDraft, assignDraftApprover, bulkDecideDrafts, decideRestructure, getDraftComparison, getEligibleApprovers, getPendingDrafts, getPendingDraftDetail, rejectDraft, restructureDraft,
+  PENDING_DRAFT_PAGE_SIZE,
   type BulkDecideResult,
 } from '../../api/governance'
 import { listDepartments } from '../../api/auth'
@@ -73,6 +74,15 @@ type Draft = {
   created_at: string
   similarity_level?: string
   similarity_matches?: { article_id: string; title: string; score: number; lifecycle_status?: string }[]
+  // List rows carry the strongest match and a submission-kind string directly; the detail
+  // response carries the full array and the whole `content_metadata`. Read them through
+  // `topMatch()` / `submissionKind()` below so a row works before its detail has loaded.
+  top_similarity_match?: { article_id: string; title: string; score: number; lifecycle_status?: string } | null
+  submission_kind?: string | null
+  has_reading_view?: boolean
+  has_restructure_candidate?: boolean
+  review_due_at?: string | null
+  review_overdue?: boolean
   requires_update_confirmation?: boolean
   assigned_approver_id?: string | null
   assigned_at?: string | null
@@ -174,6 +184,14 @@ export default function PendingDraftsPage() {
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
+  const [appliedQuery, setAppliedQuery] = useState('')
+  const [pageOffset, setPageOffset] = useState(0)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [total, setTotal] = useState(0)
+  // Ids decided in this session. A ref, not state: it is read inside `fetchDrafts` to
+  // prune the selection, and as state it would either go stale in that closure or add a
+  // dependency that re-triggers the fetch it is used by.
+  const decidedIdsRef = useRef<Set<string>>(new Set())
   const [actingDraftId, setActingDraftId] = useState<string | null>(null)
   const [restructuringDraftId, setRestructuringDraftId] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
@@ -211,25 +229,69 @@ export default function PendingDraftsPage() {
     [departments, user?.company_domain],
   )
 
-  const fetchDrafts = async (showLoading = true) => {
+  // `query` is what the reviewer is typing; `appliedQuery` is what the server has been
+  // asked for. Keeping them apart is what lets the input stay responsive while requests
+  // are debounced -- binding the request to `query` directly would fire one per keystroke.
+  const fetchDrafts = async (showLoading = true, { search = appliedQuery, offset = pageOffset } = {}) => {
     if (showLoading) setLoading(true)
     try {
-      const nextDrafts: Draft[] = await getPendingDrafts('pending')
+      const page = await getPendingDrafts('pending', { search, offset, limit: PENDING_DRAFT_PAGE_SIZE })
+      const nextDrafts: Draft[] = page.items || []
       setDrafts(nextDrafts)
+      setTotal(page.total ?? nextDrafts.length)
       // Decided drafts leave the queue; keep only ids that still need a decision so the
       // action bar count never promises work that is already published.
-      setSelectedIds(current => current.filter(id => nextDrafts.some(item => item.id === id)))
-      setSelectedDraft(current => current ? nextDrafts.find(item => item.id === current.id) || current : current)
+      //
+      // Scoped to THIS page: a selection made on page 1 must survive paging to page 2,
+      // where those drafts are legitimately absent from `items`. Filtering against the
+      // page would silently empty the batch the reviewer had assembled.
+      setSelectedIds(current => current.filter(id => !decidedIdsRef.current.has(id)))
+      // MERGE, do not replace: the open review holds detail fields (bodies, AI report,
+      // content_metadata) that list rows no longer carry. Assigning the row over it would
+      // blank the document the reviewer is reading on the next 4s poll.
+      setSelectedDraft(current => {
+        if (!current) return current
+        const fresh = nextDrafts.find(item => item.id === current.id)
+        return fresh ? { ...current, ...fresh } : current
+      })
       setError('')
     } catch { setError('Could not load the review queue.') } finally {
       if (showLoading) setLoading(false)
     }
   }
 
+  /**
+   * Drop decided drafts from the page and keep the paging counters honest.
+   *
+   * The decided ids are remembered so `fetchDrafts` can prune the selection without
+   * comparing against the current page -- a draft absent from page 2 has not been
+   * decided, it is simply on page 1.
+   */
+  const markDecided = (ids: string[]) => {
+    const decided = new Set(ids)
+    ids.forEach(id => decidedIdsRef.current.add(id))
+    setDrafts(current => current.filter(draft => !decided.has(draft.id)))
+    setSelectedIds(current => current.filter(id => !decided.has(id)))
+    setTotal(current => Math.max(0, current - decided.size))
+  }
+
   useEffect(() => {
-    void fetchDrafts()
     void listDepartments().then(setDepartments).catch(() => setDepartments([]))
   }, [])
+
+  // Debounce the search, and reset to the first page when the terms change -- staying on
+  // page 4 of the previous search would show an empty page for a query with three pages.
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setAppliedQuery(query.trim())
+      setPageOffset(current => (query.trim() === appliedQuery ? current : 0))
+    }, 300)
+    return () => window.clearTimeout(handle)
+  }, [query, appliedQuery])
+
+  useEffect(() => {
+    void fetchDrafts(true, { search: appliedQuery, offset: pageOffset })
+  }, [appliedQuery, pageOffset])
 
   const hasRestructureInFlight = useMemo(
     () => drafts.some(draft => ['queued', 'processing'].includes(draft.restructure_status || '')),
@@ -248,11 +310,14 @@ export default function PendingDraftsPage() {
     }
   }, [docDepartmentIds.length, reviewOpen, selectedDraft, visibleDepartments])
 
-  const filteredDrafts = useMemo(() => drafts.filter((draft) => {
-    const haystack = `${draft.title} ${draft.source_ref} ${draft.summary || ''}`.toLowerCase()
-    return !query.trim() || haystack.includes(query.toLowerCase())
-  }), [drafts, query])
+  // The server already applied `appliedQuery`; `drafts` IS the visible page. The name is
+  // kept because the selection helpers below read "visible" to mean "on screen now".
+  const filteredDrafts = drafts
   const selectedDrafts = useMemo(() => drafts.filter(draft => selectedIds.includes(draft.id)), [drafts, selectedIds])
+  const pageStart = total === 0 ? 0 : pageOffset + 1
+  const pageEnd = Math.min(pageOffset + PENDING_DRAFT_PAGE_SIZE, total)
+  const hasNextPage = pageEnd < total
+  const hasPrevPage = pageOffset > 0
   const visibleSelectedCount = filteredDrafts.filter(draft => selectedIds.includes(draft.id)).length
   const allVisibleSelected = filteredDrafts.length > 0 && visibleSelectedCount === filteredDrafts.length
   const someVisibleSelected = visibleSelectedCount > 0 && !allVisibleSelected
@@ -284,7 +349,14 @@ export default function PendingDraftsPage() {
   const decisionReady = Boolean(canPublishThisDraft && docDepartmentIds.length && restructureDecisionReady) && (!selectedDraft?.requires_update_confirmation || Boolean(updateArticleId || treatAsNew))
   const selectedDepartments = visibleDepartments.filter(item => docDepartmentIds.includes(item.id))
   const primaryDepartmentId = visibleDepartments.find(item => item.name === docDept)?.id
-  const hasReadingView = (draft: Draft | null | undefined) => Boolean(draft?.restructured_body_md)
+  // Each reads the list-row field first and falls back to the detail shape, so the same
+  // helper serves a row rendered from the queue and one whose detail has since merged in.
+  const hasReadingView = (draft: Draft | null | undefined) =>
+    Boolean(draft?.has_reading_view ?? draft?.restructured_body_md)
+  const topMatch = (draft: Draft | null | undefined) =>
+    draft?.top_similarity_match ?? draft?.similarity_matches?.[0]
+  const submissionKind = (draft: Draft | null | undefined) =>
+    draft?.submission_kind ?? draft?.content_metadata?.submission_kind
   const isAiBusy = (draft: Draft | null | undefined) => ['queued', 'processing'].includes(draft?.restructure_status || '')
   const aiStatusLabel = (draft: Draft | null | undefined) => {
     if (draft?.restructure_status === 'queued') return 'AI rewrite queued'
@@ -301,10 +373,10 @@ export default function PendingDraftsPage() {
   // AI already settled does not need a second attempt.
   const canRetryAiFormat = (draft: Draft | null | undefined) => {
     if (!draft || isAiBusy(draft)) return false
-    if (draft.content_metadata?.submission_kind === 'split_candidate') return false
+    if (submissionKind(draft) === 'split_candidate') return false
     return !['llm', 'llm_reviewed', 'lossless_ready', 'disabled'].includes(draft.restructure_status || '')
   }
-  const isManualUpdate = selectedDraft?.content_metadata?.submission_kind === 'manual_update'
+  const isManualUpdate = submissionKind(selectedDraft) === 'manual_update'
   const canEditTargetArticle = canEditArticleForUser(user, editableTargetArticle)
   const requestDraftPrompt = selectedDraft ? `I am reviewing the pending document "${selectedDraft.title}" in department "${selectedDraft.dept || 'unknown'}". I need help identifying who is allowed to change the source article or draft before publication. Explain which role or person owns this responsibility and help me prepare a concise request. Draft ID: ${selectedDraft.id}.` : ''
 
@@ -329,35 +401,57 @@ export default function PendingDraftsPage() {
     } finally { setCompareLoading(false) }
   }
 
+  /**
+   * Open the full review for one draft.
+   *
+   * The list row carries identity and status only, so the bodies, AI report,
+   * `content_metadata` and `similarity_matches` are fetched here. The overlay opens
+   * immediately on the row data and fills in when the detail lands -- waiting for the
+   * request before opening would make every click feel like a page load.
+   */
   const openReview = (draft: Draft) => {
     setSelectedDraft(draft)
     setReviewOpen(true)
+    setDetailLoading(true)
     setDepartmentMenuOpen(false)
     setReviewTab('structured')
     setShowComparison(false)
     setShowQuality(false)
     setShowPublishOptions(false)
-    setUpdateArticleId(draft.content_metadata?.suggested_update_article_id || '')
     setTreatAsNew(false)
     setSelectedApproverId(draft.assigned_approver_id || '')
     setEditableTargetArticle(null)
-    const metadataIds = (draft.content_metadata?.department_ids || []).map(String).filter(id => visibleDepartments.some(item => item.id === id))
-    const fallbackId = draft.dept && visibleDepartments.find(item => item.name === draft.dept)?.id
-    const initialIds = metadataIds.length ? metadataIds : fallbackId ? [fallbackId] : []
-    setDocDepartmentIds(initialIds)
-    setDocDept(visibleDepartments.find(item => item.id === initialIds[0])?.name || '')
     setComparedArticle(null)
-    const targetArticleId = draft.content_metadata?.suggested_update_article_id
-    if (targetArticleId) {
-      void getArticle(targetArticleId).then(setEditableTargetArticle).catch(() => setEditableTargetArticle(null))
-    }
-    void getEligibleApprovers(draft.id).then((eligible) => {
-      setApprovers(eligible)
+    setUpdateArticleId('')
+    setDocDepartmentIds([])
+    setDocDept('')
+
+    void getEligibleApprovers(draft.id).then(setApprovers).catch(() => setApprovers([]))
+
+    void getPendingDraftDetail(draft.id).then((detail: Draft) => {
+      // Guard against a slow response for a draft the reviewer has already navigated
+      // away from: without this, an earlier request can overwrite a later selection.
+      setSelectedDraft(current => (current?.id === draft.id ? { ...current, ...detail } : current))
+      setDrafts(current => current.map(item => (item.id === draft.id ? { ...item, ...detail } : item)))
+
+      const metadataIds = (detail.content_metadata?.department_ids || []).map(String).filter(id => visibleDepartments.some(item => item.id === id))
+      const fallbackId = detail.dept && visibleDepartments.find(item => item.name === detail.dept)?.id
+      const initialIds = metadataIds.length ? metadataIds : fallbackId ? [fallbackId] : []
+      setDocDepartmentIds(initialIds)
+      setDocDept(visibleDepartments.find(item => item.id === initialIds[0])?.name || '')
+
+      const targetArticleId = detail.content_metadata?.suggested_update_article_id
+      setUpdateArticleId(targetArticleId || '')
+      if (targetArticleId) {
+        void getArticle(targetArticleId).then(setEditableTargetArticle).catch(() => setEditableTargetArticle(null))
+      }
+      const firstMatch = detail.similarity_matches?.[0]
+      if (firstMatch) void loadComparison(draft.id, firstMatch.article_id)
     }).catch(() => {
-      setApprovers([])
+      setError('Could not load this draft. Close and reopen to retry.')
+    }).finally(() => {
+      setDetailLoading(false)
     })
-    const firstMatch = draft.similarity_matches?.[0]
-    if (firstMatch) void loadComparison(draft.id, firstMatch.article_id)
   }
 
   // Referenced by the review overlay's aria-labelledby, so the dialog is announced by
@@ -388,7 +482,7 @@ export default function PendingDraftsPage() {
     setActingDraftId(selectedDraft.id)
     try {
       await approveDraft(selectedDraft.id, docDept, docDepartmentIds, updateArticleId || undefined, treatAsNew)
-      setDrafts(current => current.filter(draft => draft.id !== selectedDraft.id))
+      markDecided([selectedDraft.id])
       setMessage(`Published ${selectedDraft.title}.`)
       closeReview()
     } catch (requestError: any) {
@@ -447,7 +541,7 @@ export default function PendingDraftsPage() {
     setActingDraftId(draftId)
     try {
       await rejectDraft(draftId, reviewNote)
-      setDrafts(current => current.filter(draft => draft.id !== draftId))
+      markDecided([draftId])
       setMessage('Draft rejected. The original source remains stored.')
       closeReview()
     } catch { await dialog.alert('The draft could not be rejected.', { title: 'Rejection failed' }) } finally { setActingDraftId(null) }
@@ -546,7 +640,9 @@ export default function PendingDraftsPage() {
       })
       setBulkResult({ ...result, titles })
       // Keep only the blocked ids selected: those are exactly the drafts still needing work.
-      setSelectedIds(result.blocked.map(item => item.draft_id))
+      const blockedIds = new Set(result.blocked.map(item => item.draft_id))
+      selectedIds.filter(id => !blockedIds.has(id)).forEach(id => decidedIdsRef.current.add(id))
+      setSelectedIds([...blockedIds])
       setMessage(result.blocked_count
         ? t('bulk.partialMessage', { decided: result.decided_count, blocked: result.blocked_count })
         : t('bulk.successMessage', { decided: result.decided_count }))
@@ -624,7 +720,10 @@ export default function PendingDraftsPage() {
         <div className="interactive-lift rounded-2xl border border-info/20 bg-info/[0.06] p-4"><div className="flex items-center justify-between text-info-text"><span className="text-xs font-bold uppercase tracking-[.12em]">Related sources</span><Sparkles size={16} /></div><p className="mt-2 font-display text-3xl font-extrabold text-foreground">{relatedCount}</p><p className="mt-1 text-body-sm text-muted-foreground">Partial content overlap</p></div>
       </section>
 
-      <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search drafts, filenames, or extracted text…" leftIcon={<Search size={15} />} />
+      {/* Titles and filenames only, matching what the endpoint searches. The old copy
+          promised "extracted text", which the server does not scan -- a reviewer who
+          searched for a phrase from inside a document got an empty queue and no reason. */}
+      <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search by document title or filename…" leftIcon={<Search size={15} />} />
 
       {bulkResult && <section className="rounded-xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -697,9 +796,12 @@ export default function PendingDraftsPage() {
         {bulkDeptAmbiguous && <p className="mt-2 text-body-sm text-warning-text">{t('bulk.deptRequired')}</p>}
       </section>}
 
-      {loading ? <div className="grid min-h-56 place-items-center rounded-xl border border-hairline bg-surface text-sm text-steel"><RefreshCw size={16} className="mr-2 animate-spin" /> Loading review queue…</div> : filteredDrafts.length === 0 ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-hairline bg-surface/50 p-8 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-emerald-400/10 text-success-text"><Check size={24} /></div><h2 className="mt-4 text-base font-semibold">{drafts.length ? 'No drafts match your search' : 'Review queue is clear'}</h2><p className="mt-2 text-sm text-steel">{drafts.length ? 'Try a different title or filename.' : 'New uploads will appear here when they are ready for review.'}</p></div></div> : <div className="space-y-3">{filteredDrafts.map(draft => {
+      {loading ? <div className="grid min-h-56 place-items-center rounded-xl border border-hairline bg-surface text-sm text-steel"><RefreshCw size={16} className="mr-2 animate-spin" /> Loading review queue…</div> : filteredDrafts.length === 0 ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-hairline bg-surface/50 p-8 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-emerald-400/10 text-success-text"><Check size={24} /></div>{/* The distinction is now `appliedQuery`, not `drafts.length`: with the server
+    filtering, an empty page under a search means nothing matched, and the old test
+    (a non-empty page) could never be true here at all. */}
+<h2 className="mt-4 text-base font-semibold">{appliedQuery ? 'No drafts match your search' : 'Review queue is clear'}</h2><p className="mt-2 text-sm text-steel">{appliedQuery ? 'Search covers document titles and filenames across the whole queue. Try a different term.' : 'New uploads will appear here when they are ready for review.'}</p></div></div> : <div className="space-y-3">{filteredDrafts.map(draft => {
         const similarity = draft.similarity_level && draft.similarity_level !== 'none' ? draft.similarity_level : null
-        const firstMatch = draft.similarity_matches?.[0]
+        const firstMatch = topMatch(draft)
         const selected = selectedIds.includes(draft.id)
         return <article key={draft.id} tabIndex={0} onFocus={() => setFocusedDraftId(draft.id)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedDraftId(current => current === draft.id ? null : current) }} className={`rounded-xl border bg-surface-elevated p-5 shadow-sm outline-none transition hover:border-info/40 hover:bg-surface-muted hover:shadow-lg hover:shadow-black/20 ${selected ? 'border-cyan/50 bg-surface-muted' : 'border-border'} ${focusedDraftId === draft.id ? 'ring-1 ring-cyan/40' : ''}`}>
           <div className="flex items-start gap-3">
@@ -709,11 +811,22 @@ export default function PendingDraftsPage() {
           </label>
           <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-soft text-info-text"><FileText size={18} /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-sm font-semibold text-ink">{draft.title}</h2>{similarity && <Badge variant={similarity === 'very_high' ? 'warning' : 'info'} size="sm" className="uppercase tracking-wide">{similarity === 'very_high' ? 'Possible update' : 'Related content'}</Badge>}{(draft.candidate_count || 0) > 1 && <Badge variant="primary" size="sm" className="uppercase tracking-wide">{draft.candidate_count} split candidates</Badge>}</div><p className="mt-1 truncate text-xs text-stone">{draft.source_ref} · {formatDay(draft.created_at)}</p></div></div><div className="flex flex-wrap justify-end gap-2">{(draft.candidate_count || 0) > 1 && <Button variant="secondary" size="sm" onClick={() => navigate(`/governance/pending-drafts/${draft.id}/batch-review`)} icon={<Layers3 size={14} />}>Batch review</Button>}<Button variant="primary" size="sm" onClick={() => openReview(draft)} icon={<Eye size={14} />}>Open full review</Button>{isAiBusy(draft) ? <Badge variant="info" size="sm" dot>{draft.restructure_status === 'queued' ? 'AI queued' : 'AI formatting…'}</Badge> : canRetryAiFormat(draft) && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(draft)} disabled={restructuringDraftId === draft.id} icon={<Sparkles size={14} />}>{restructuringDraftId === draft.id ? 'Formatting…' : 'Retry AI format'}</Button>}<Button variant="ghost" size="sm" onClick={() => void handleReject(draft.id)} disabled={actingDraftId === draft.id} className="hover:text-rose-300">Reject</Button></div></div>
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-steel">{draft.content_metadata?.submission_kind === 'manual' && <Badge variant="info" size="sm" className="uppercase tracking-wide">Manual submission</Badge>}{draft.content_metadata?.submission_kind === 'manual_update' && <Badge variant="warning" size="sm" className="uppercase tracking-wide">Manual update</Badge>}{firstMatch ? <><ArrowLeftRight size={13} className="text-amber-300" /><span>{Math.round(firstMatch.score * 100)}% similar to <strong className="font-medium text-warning-text">{firstMatch.title}</strong></span></> : <span>No significant overlap detected</span>}<span className="text-stone">·</span><span className={draft.restructure_status === 'llm' ? 'text-success-text' : isAiBusy(draft) ? 'text-info-text' : hasReadingView(draft) ? 'text-info-text' : 'text-amber-300'}>{aiStatusLabel(draft)}</span></div>
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-steel">{submissionKind(draft) === 'manual' && <Badge variant="info" size="sm" className="uppercase tracking-wide">Manual submission</Badge>}{submissionKind(draft) === 'manual_update' && <Badge variant="warning" size="sm" className="uppercase tracking-wide">Manual update</Badge>}{firstMatch ? <><ArrowLeftRight size={13} className="text-amber-300" /><span>{Math.round(firstMatch.score * 100)}% similar to <strong className="font-medium text-warning-text">{firstMatch.title}</strong></span></> : <span>No significant overlap detected</span>}<span className="text-stone">·</span><span className={draft.restructure_status === 'llm' ? 'text-success-text' : isAiBusy(draft) ? 'text-info-text' : hasReadingView(draft) ? 'text-info-text' : 'text-amber-300'}>{aiStatusLabel(draft)}</span></div>
           {draft.restructure_error && <p className="mt-2 line-clamp-2 text-xs text-warning-text">{draft.restructure_error}</p>}
           </div></div>
         </article>
       })}</div>}
+
+      {/* Real pagination, not infinite scroll: a reviewer working a queue needs to know
+          how much is left and to come back to a stable position. `total` comes from a SQL
+          count over the same filters, so "of N" is the real backlog, not the page size. */}
+      {!loading && total > 0 && <nav className="flex flex-wrap items-center justify-between gap-3 px-1 pt-1" aria-label="Review queue pages">
+        <p className="text-caption text-stone">Showing <strong className="font-semibold text-steel">{pageStart}–{pageEnd}</strong> of <strong className="font-semibold text-steel">{total}</strong>{appliedQuery ? ' matching drafts' : ' drafts awaiting review'}</p>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" disabled={!hasPrevPage} onClick={() => setPageOffset(current => Math.max(0, current - PENDING_DRAFT_PAGE_SIZE))}>Previous</Button>
+          <Button variant="ghost" size="sm" disabled={!hasNextPage} onClick={() => setPageOffset(current => current + PENDING_DRAFT_PAGE_SIZE)}>Next</Button>
+        </div>
+      </nav>}
       </>}
 
       {reviewOpen && selectedDraft &&<div className="fixed inset-0 z-50 bg-black/75 p-2 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-labelledby={reviewTitleId}><FocusTrap className="contents"><section className="mx-auto flex h-[calc(100vh-1rem)] max-w-7xl flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl sm:h-[calc(100vh-2rem)]">
@@ -722,7 +835,12 @@ export default function PendingDraftsPage() {
         {showQuality && <ReviewQuality report={selectedDraft.restructure_report} chunkCount={selectedDraft.restructure_chunk_count} busy={isAiBusy(selectedDraft)} />}
         {selectedDraft.restructure_candidate_md && <section className="flex shrink-0 flex-col gap-3 border-b border-amber-300/20 bg-gradient-to-r from-amber-400/[0.09] via-surface to-cyan/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div className="flex min-w-0 items-start gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-400/10 text-amber-300"><Sparkles size={17} /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-xs font-semibold text-ink">AI layout needs your decision</p><Badge variant="warning" size="sm" className="uppercase tracking-wider">Candidate retained</Badge></div><p className="mt-1 text-body-sm leading-5 text-steel">The safety check found content that may have changed. Inspect the candidate, then choose which version will be published.</p></div></div><div className="flex shrink-0 flex-wrap gap-2"><Button variant="secondary" size="sm" onClick={() => setReviewTab('candidate')}>Review AI candidate</Button><Button variant="ghost" size="sm" onClick={() => void handleRestructureDecision('keep_lossless')} disabled={Boolean(actingDraftId) || selectedDraft.restructure_decision === 'lossless_kept'}>Use lossless view</Button><Button variant="primary" size="sm" onClick={() => void handleRestructureDecision('keep_ai')} disabled={Boolean(actingDraftId) || selectedDraft.restructure_decision === 'ai_kept'} icon={<Check size={13} />}>Keep AI layout</Button></div></section>}
         <div className={`grid min-h-0 flex-1 grid-cols-1 ${showComparison ? 'lg:grid-cols-2' : ''}`}>
-          <section className="flex min-h-0 flex-col border-b border-hairline lg:border-b-0 lg:border-r"><div className="flex shrink-0 items-center justify-between border-b border-hairline px-4 py-2.5 sm:px-6"><div><p className="text-caption font-semibold uppercase tracking-widest text-info-text">Incoming document</p><p className={`mt-1 text-xs ${selectedDraft.restructure_status === 'llm' || selectedDraft.restructure_status === 'llm_reviewed' ? 'text-success-text' : isAiBusy(selectedDraft) ? 'text-info-text' : hasReadingView(selectedDraft) ? 'text-info-text' : 'text-amber-300'}`}>{reviewTab === 'candidate' ? 'AI candidate — not yet selected' : reviewTab === 'structured' ? (selectedDraft.restructure_status === 'llm' || selectedDraft.restructure_status === 'llm_reviewed' ? 'AI reading view' : isAiBusy(selectedDraft) ? aiStatusLabel(selectedDraft) : hasReadingView(selectedDraft) ? 'Lossless reading view' : 'Original extracted text') : 'Original extracted text'}</p></div><div className="flex items-center gap-2"><div className="flex rounded-lg border border-hairline bg-surface p-0.5"><button onClick={() => setReviewTab('structured')} className={`rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'structured' ? 'bg-cyan/15 text-info-text' : 'text-stone hover:text-ink'}`}>Reading view</button>{selectedDraft.restructure_candidate_md && <button onClick={() => setReviewTab('candidate')} className={`rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'candidate' ? 'bg-amber-400/15 text-warning-text' : 'text-stone hover:text-ink'}`}>AI candidate</button>}<button onClick={() => setReviewTab('original')} className={`rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'original' ? 'bg-surface-soft text-ink' : 'text-stone hover:text-ink'}`}>Original</button></div>{isAiBusy(selectedDraft) ? <span className="inline-flex items-center gap-1 rounded-md border border-cyan/30 bg-cyan/10 px-2 py-1 text-body-sm font-semibold text-info-text"><RefreshCw size={12} className="animate-spin" /> {selectedDraft.restructure_status === 'queued' ? 'Queued' : 'Formatting…'}</span> : canRetryAiFormat(selectedDraft) && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(selectedDraft)} disabled={restructuringDraftId === selectedDraft.id} icon={<Sparkles size={12} />}>{restructuringDraftId === selectedDraft.id ? 'Formatting…' : 'Retry AI'}</Button>}</div></div>{selectedDraft.restructure_error && <div className="border-b border-amber-400/20 bg-amber-400/[0.06] px-4 py-2 text-body-sm leading-5 text-warning-text sm:px-6">{selectedDraft.restructure_error}</div>}{isAiBusy(selectedDraft) && <div className="flex items-start gap-2 border-b border-cyan/20 bg-cyan/[0.06] px-4 py-2 text-body-sm leading-5 text-info-text sm:px-6"><RefreshCw size={13} className="mt-0.5 shrink-0 animate-spin" /><span>AI reading view is being prepared in the background. The original extracted text is available now.</span></div>}<div className="ask-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{renderMarkdown(reviewTab === 'candidate' ? (selectedDraft.restructure_candidate_md || 'No AI candidate available.') : reviewTab === 'structured' ? (selectedDraft.restructured_body_md || selectedDraft.summary || 'No extracted text available.') : (selectedDraft.summary || 'No extracted text available.'))}</div></section>
+          <section className="flex min-h-0 flex-col border-b border-hairline lg:border-b-0 lg:border-r"><div className="flex shrink-0 items-center justify-between border-b border-hairline px-4 py-2.5 sm:px-6"><div><p className="text-caption font-semibold uppercase tracking-widest text-info-text">Incoming document</p><p className={`mt-1 text-xs ${selectedDraft.restructure_status === 'llm' || selectedDraft.restructure_status === 'llm_reviewed' ? 'text-success-text' : isAiBusy(selectedDraft) ? 'text-info-text' : hasReadingView(selectedDraft) ? 'text-info-text' : 'text-amber-300'}`}>{reviewTab === 'candidate' ? 'AI candidate — not yet selected' : reviewTab === 'structured' ? (selectedDraft.restructure_status === 'llm' || selectedDraft.restructure_status === 'llm_reviewed' ? 'AI reading view' : isAiBusy(selectedDraft) ? aiStatusLabel(selectedDraft) : hasReadingView(selectedDraft) ? 'Lossless reading view' : 'Original extracted text') : 'Original extracted text'}</p></div><div className="flex items-center gap-2"><div className="flex rounded-lg border border-hairline bg-surface p-0.5"><button onClick={() => setReviewTab('structured')} className={`rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'structured' ? 'bg-cyan/15 text-info-text' : 'text-stone hover:text-ink'}`}>Reading view</button>{selectedDraft.restructure_candidate_md && <button onClick={() => setReviewTab('candidate')} className={`rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'candidate' ? 'bg-amber-400/15 text-warning-text' : 'text-stone hover:text-ink'}`}>AI candidate</button>}<button onClick={() => setReviewTab('original')} className={`rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'original' ? 'bg-surface-soft text-ink' : 'text-stone hover:text-ink'}`}>Original</button></div>{isAiBusy(selectedDraft) ? <span className="inline-flex items-center gap-1 rounded-md border border-cyan/30 bg-cyan/10 px-2 py-1 text-body-sm font-semibold text-info-text"><RefreshCw size={12} className="animate-spin" /> {selectedDraft.restructure_status === 'queued' ? 'Queued' : 'Formatting…'}</span> : canRetryAiFormat(selectedDraft) && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(selectedDraft)} disabled={restructuringDraftId === selectedDraft.id} icon={<Sparkles size={12} />}>{restructuringDraftId === selectedDraft.id ? 'Formatting…' : 'Retry AI'}</Button>}</div></div>{selectedDraft.restructure_error && <div className="border-b border-amber-400/20 bg-amber-400/[0.06] px-4 py-2 text-body-sm leading-5 text-warning-text sm:px-6">{selectedDraft.restructure_error}</div>}{isAiBusy(selectedDraft) && <div className="flex items-start gap-2 border-b border-cyan/20 bg-cyan/[0.06] px-4 py-2 text-body-sm leading-5 text-info-text sm:px-6"><RefreshCw size={13} className="mt-0.5 shrink-0 animate-spin" /><span>AI reading view is being prepared in the background. The original extracted text is available now.</span></div>}<div className="ask-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{detailLoading && !selectedDraft.summary && !selectedDraft.restructured_body_md
+            /* The bodies arrive from the detail request, not the list row. Without this the
+               pane rendered "No extracted text available." for the first moment of every
+               review -- reporting an empty document instead of one still loading. */
+            ? <div className="flex h-full items-center justify-center text-sm text-steel"><RefreshCw size={16} className="mr-2 animate-spin" /> Loading document…</div>
+            : renderMarkdown(reviewTab === 'candidate' ? (selectedDraft.restructure_candidate_md || 'No AI candidate available.') : reviewTab === 'structured' ? (selectedDraft.restructured_body_md || selectedDraft.summary || 'No extracted text available.') : (selectedDraft.summary || 'No extracted text available.'))}</div></section>
           {showComparison && <section className="flex min-h-0 flex-col"><div className="flex shrink-0 items-center gap-3 border-b border-hairline px-4 py-2.5 sm:px-6"><ArrowLeftRight size={15} className="text-amber-300" /><div><p className="text-caption font-semibold uppercase tracking-widest text-amber-300">Existing active article</p><p className="mt-1 truncate text-xs text-steel">{comparedArticle?.title || (matches.length ? 'Loading comparison…' : 'No high-similarity article selected')}</p></div></div><div className="ask-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{compareLoading ? <div className="flex h-full items-center justify-center text-sm text-steel"><RefreshCw size={16} className="mr-2 animate-spin" /> Loading existing article…</div> : comparedArticle ? <>{renderMarkdown(comparedArticle.body_md)}<div className="mt-6 border-t border-hairline pt-3 text-xs text-stone">Version {comparedArticle.version} · {comparedArticle.lifecycle_status}</div></> : <div className="flex h-full items-center justify-center text-center text-sm text-stone">{matches.length ? 'Select a similar article above to compare its full content.' : 'This draft has no high-similarity active article.'}</div>}</div></section>}
         </div>
         <footer className="flex shrink-0 flex-col gap-3 border-t border-hairline bg-surface px-4 py-3 sm:px-6">
