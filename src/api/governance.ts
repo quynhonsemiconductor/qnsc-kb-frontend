@@ -35,8 +35,34 @@ export async function uploadSources(files: File[], tagsByFile: string[][] = [], 
   }
 }
 
-export async function getPendingDrafts(status?: string) {
-  const response = await client.get('/governance/pending-drafts', { params: { status } })
+export const PENDING_DRAFT_PAGE_SIZE = 25
+
+export type PendingDraftPage = {
+  items: any[]
+  total: number
+  limit: number
+  offset: number
+}
+
+/**
+ * One page of the review queue.
+ *
+ * `search` is passed to the server rather than applied to the result: the endpoint
+ * returns a page, so filtering here would only ever search the rows already on screen.
+ */
+export async function getPendingDrafts(
+  status?: string,
+  { search, limit = PENDING_DRAFT_PAGE_SIZE, offset = 0 }: { search?: string; limit?: number; offset?: number } = {},
+): Promise<PendingDraftPage> {
+  const response = await client.get('/governance/pending-drafts', {
+    params: { status, search: search?.trim() || undefined, limit, offset },
+  })
+  return response.data
+}
+
+/** The bodies, AI report and chunk count for a single draft -- not carried by the list. */
+export async function getPendingDraftDetail(id: string) {
+  const response = await client.get(`/governance/pending-drafts/${id}/detail`)
   return response.data
 }
 
