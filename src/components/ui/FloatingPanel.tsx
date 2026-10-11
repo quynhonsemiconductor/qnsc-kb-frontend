@@ -96,7 +96,7 @@ export function FloatingPanel({ anchorRef, open, onClose, children, className = 
 
   if (!open || typeof document === 'undefined') return null
   return createPortal(
-    <div ref={panelRef} className={`fixed z-[1000] overflow-y-auto rounded-xl border border-border bg-surface-elevated shadow-[0_18px_40px_rgb(var(--shadow)/.28)] ${className}`} style={{ top: position.top, left: position.left, width: position.width, maxHeight: position.maxHeight }}>
+    <div ref={panelRef} className={`fixed z-popover overflow-y-auto rounded-xl border border-border bg-surface-elevated shadow-popover ${className}`} style={{ top: position.top, left: position.left, width: position.width, maxHeight: position.maxHeight }}>
       {children}
     </div>,
     document.body,

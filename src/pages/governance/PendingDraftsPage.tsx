@@ -692,7 +692,7 @@ export default function PendingDraftsPage() {
         <p className="text-caption text-stone">{t('bulk.keyboardHint')}</p>
       </div>}
 
-      {selectedIds.length > 0 && <section className="sticky top-2 z-40 rounded-xl border border-cyan/30 bg-surface-elevated/95 p-4 shadow-lg shadow-black/30 backdrop-blur">
+      {selectedIds.length > 0 && <section className="sticky top-2 z-sticky rounded-xl border border-cyan/30 bg-surface-elevated/95 p-4 shadow-lg shadow-black/30 backdrop-blur">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan/10 text-info-text"><ListChecks size={17} /></div>

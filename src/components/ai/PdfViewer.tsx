@@ -48,7 +48,7 @@ export default function PdfViewer({ open, fileName, url, mimeType, page, loading
   const sourceUrl = page && !isImage ? `${url}#page=${page}` : url
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-black/70 p-0 sm:p-6">
+    <div className="fixed inset-0 z-modal flex flex-col bg-scrim/70 p-0 sm:p-6">
       <button aria-label="Close document" onClick={onClose} className="absolute inset-0" />
       <div className="relative mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden border border-hairline bg-surface sm:rounded-xl">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-hairline px-4">

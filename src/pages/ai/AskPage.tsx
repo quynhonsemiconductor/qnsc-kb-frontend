@@ -619,13 +619,13 @@ export default function AskPage() {
       <div className="ai-workspace-shell relative -mx-3 -my-4 flex h-[calc(100%+2rem)] max-h-[calc(100%+2rem)] min-h-0 overflow-hidden border-y border-border bg-surface sm:-mx-5 lg:-mx-7">
         {sidebarOpen && (
           <button
-            className="ask-fade-in fixed inset-0 z-20 bg-black/35 lg:hidden"
+            className="ask-fade-in fixed inset-x-0 bottom-14 top-[3.875rem] z-overlay bg-scrim/35 lg:hidden"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close chat history"
           />
         )}
 
-        <aside className={`absolute inset-y-0 left-0 z-30 flex w-[min(88vw,20rem)] shrink-0 flex-col overflow-hidden border-r border-hairline bg-surface/[.98] shadow-2xl transition-[width,transform] duration-300 ease-out lg:static lg:shadow-none ${sidebarOpen ? 'translate-x-0 lg:w-72' : '-translate-x-full lg:translate-x-0 lg:w-14'}`}>
+        <aside className={`absolute inset-y-0 left-0 z-drawer flex w-[min(88vw,20rem)] shrink-0 flex-col overflow-hidden border-r border-hairline bg-surface/[.98] shadow-2xl transition-[width,transform] duration-300 ease-out lg:static lg:shadow-none ${sidebarOpen ? 'translate-x-0 lg:w-72' : '-translate-x-full lg:translate-x-0 lg:w-14'}`}>
           {sidebarOpen ? (
             <>
               <div className="flex shrink-0 items-center gap-2 border-b border-hairline p-4">
@@ -1146,8 +1146,8 @@ export default function AskPage() {
 
         {selectedSource && (
           <>
-            <button aria-label="Close source" onClick={() => setSelectedSource(null)} className="ask-fade-in fixed inset-0 z-40 bg-black/40 lg:hidden" />
-            <aside className={`${sourceCollapsed ? 'w-12' : 'w-full max-w-sm lg:w-80'} ask-slide-in fixed inset-y-0 right-0 z-50 flex flex-col border-l border-hairline bg-surface transition-[width] duration-300 ease-out lg:static lg:shrink-0`}>
+            <button aria-label="Close source" onClick={() => setSelectedSource(null)} className="ask-fade-in fixed inset-x-0 bottom-14 top-[3.875rem] z-overlay bg-scrim/40 lg:hidden" />
+            <aside className={`${sourceCollapsed ? 'w-12' : 'w-full max-w-sm lg:w-80'} ask-slide-in fixed bottom-14 right-0 top-[3.875rem] z-modal flex flex-col border-l border-hairline bg-surface transition-[width] duration-300 ease-out lg:static lg:shrink-0`}>
               <header className="signal-line flex h-14 shrink-0 items-center gap-2 border-b border-hairline px-3">
                 <span className={`${sourceCollapsed ? 'hidden' : 'flex'} flex-1 items-center gap-2 text-caption font-bold uppercase tracking-widest text-info`}><span className="h-1.5 w-1.5 rounded-full bg-info" /> Source evidence</span>
                 <Button
