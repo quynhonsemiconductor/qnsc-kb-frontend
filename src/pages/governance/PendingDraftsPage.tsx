@@ -605,7 +605,9 @@ export default function PendingDraftsPage() {
   return (
     <div className="page-shell page-stack text-ink">
       <header className="page-hero glass-panel soft-grid signal-line relative overflow-hidden rounded-panel border border-border px-4 py-5 sm:px-6 sm:py-6">
-        <div className="pointer-events-none absolute -right-12 -top-16 hidden h-52 w-52 opacity-65 xl:block"><div className="hero-orb h-full w-full"><div className="orbit-ring" /><div className="orb-core text-xl">Q</div></div></div>
+        {/* Same orb as AskPage carried, bled off the top-right corner of the review
+            header. Removed with the rest of the decoration: a reviewer working a queue
+            needs the queue, not an animation over it. */}
         <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-stone"><FileCheck2 size={14} className="text-info-text" /> Content operations</div>

@@ -151,7 +151,12 @@
   @media (min-width: 1920px) { html { font-size: 112.5%; } }
   @media (min-width: 2560px) { html { font-size: 118.75%; } }
   body { min-width: 320px; background: rgb(var(--background)); color: rgb(var(--foreground)); -webkit-font-smoothing: antialiased; transition: background-color .18s ease, color .18s ease; }
-  body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1; opacity: .22; background-image: radial-gradient(rgb(var(--primary) / .10) 1px, transparent 1px); background-size: 24px 24px; mask-image: linear-gradient(to bottom, black, transparent 68%); }
+  /* A fixed, full-viewport dot grid with a gradient mask used to sit here, behind every
+     screen in the app. It was the last of the atmosphere layers: a 24px indigo dot
+     lattice at .22 opacity, fading out two-thirds down. On a page of dense text it
+     reads as screen dirt rather than texture, and it is one more full-viewport layer
+     the compositor keeps around for no information. The page background is now just
+     the background token. */
   *, *::before, *::after { box-sizing: border-box; }
   button, input, textarea, select { font: inherit; }
   button { -webkit-tap-highlight-color: transparent; }
@@ -168,27 +173,33 @@
   a { color: rgb(var(--primary)); text-decoration: underline; text-underline-offset: 2px; }
 }
 
-@keyframes qnscOrbFloat {
-  0%, 100% { transform: translate3d(0, 0, 0) rotate(-3deg); }
-  50% { transform: translate3d(0, -12px, 0) rotate(3deg); }
-}
-@keyframes qnscOrbSpin { to { transform: rotate(360deg); } }
-@keyframes qnscPulse { 0%, 100% { opacity: .45; transform: scale(.96); } 50% { opacity: 1; transform: scale(1.04); } }
-.hero-orb { position: relative; animation: qnscOrbFloat 7s ease-in-out infinite; }
-.hero-orb::before { content: ''; position: absolute; inset: 12%; border-radius: 999px; background: radial-gradient(circle at 35% 25%, rgb(var(--info) / .95), rgb(var(--primary) / .75) 38%, rgb(var(--primary-strong) / .28) 72%, transparent 74%); filter: blur(1px); box-shadow: 0 0 55px rgb(var(--primary) / .42), 0 0 120px rgb(var(--info) / .16); }
-.hero-orb::after { content: ''; position: absolute; inset: 0; border-radius: 999px; background: radial-gradient(circle at 50% 50%, transparent 48%, rgb(var(--info) / .28) 49%, transparent 50%), radial-gradient(circle at 50% 50%, transparent 66%, rgb(var(--primary) / .4) 67%, transparent 68%); opacity: .9; animation: qnscOrbSpin 18s linear infinite; }
-.orbit-ring { position: absolute; inset: -8%; border: 1px solid rgb(var(--info) / .28); border-radius: 999px; transform: rotate(28deg) skewX(-12deg); animation: qnscOrbSpin 15s linear infinite reverse; }
-.orbit-ring::after { content: ''; position: absolute; top: 4%; left: 16%; width: 9px; height: 9px; border-radius: 999px; background: rgb(var(--info)); box-shadow: 0 0 16px rgb(var(--info) / .85); }
-.orb-core { position: absolute; inset: 28%; z-index: 1; display: grid; place-items: center; border: 1px solid rgb(var(--primary-foreground) / .35); border-radius: 999px; background: radial-gradient(circle at 35% 30%, rgb(var(--primary-foreground) / .25), rgb(var(--primary) / .48)); color: rgb(var(--primary-foreground)); font-family: 'Manrope', sans-serif; font-size: 3rem; font-weight: 800; box-shadow: inset 0 0 25px rgb(var(--primary-foreground) / .16); animation: qnscPulse 3.5s ease-in-out infinite; }
-.float-card { animation: qnscOrbFloat 6s ease-in-out infinite reverse; }
-@media (prefers-reduced-motion: reduce) { .hero-orb, .orbit-ring, .orb-core, .float-card { animation: none !important; } }
+/* DECORATION REMOVED, NAMES KEPT.
+   ----------------------------------------------------------------------------
+   This block held a floating gradient orb with two spinning rings, a scanning
+   light sweep, an animated gradient border and two atmospheric washes. Four of
+   them ran `animation: ... infinite`, so a workspace people read for hours was
+   never still, and none of the five carried information.
 
-@keyframes qnscScan { from { transform: translateX(-120%); } to { transform: translateX(220%); } }
-.workspace-atmosphere { background: radial-gradient(ellipse at 70% 0%, rgb(var(--primary) / .10), transparent 42%), radial-gradient(ellipse at 100% 55%, rgb(var(--info) / .07), transparent 35%); }
-.signal-line { position: relative; overflow: hidden; }
-.signal-line::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 28%; background: linear-gradient(90deg, transparent, rgb(var(--info) / .75), transparent); opacity: .55; animation: qnscScan 7s ease-in-out infinite; }
-.gradient-border { position: relative; border-color: transparent !important; background: linear-gradient(rgb(var(--surface-elevated)), rgb(var(--surface-elevated))) padding-box, linear-gradient(120deg, rgb(var(--primary) / .55), rgb(var(--info) / .45), rgb(var(--border))) border-box; }
-.metric-spark { background: linear-gradient(135deg, rgb(var(--primary) / .16), transparent 50%), linear-gradient(180deg, rgb(var(--surface-elevated)), rgb(var(--surface))); }
+   The class names stay, redefined as flat surfaces, because they are applied
+   across 60+ call sites: deleting the names would mean editing every one of
+   those files in a diff nobody can review, and a missed call site would leave
+   an element with no background at all. Each now resolves to a plain token
+   surface, so a page that still says `glass-panel` gets a flat panel.
+
+   The orb classes are the exception — they are purely ornamental shapes with no
+   layout role, so the three call sites (AskPage, PendingDraftsPage, LoginPage)
+   drop them instead and the definitions are gone.
+
+   `.glass-panel`, `.soft-grid` and `.page-hero` are flattened in
+   `@layer components` below, beside the originals they replace, NOT here: those
+   three are declared inside that layer, and an unlayered rule loses to a layered
+   one no matter where it sits in the file. A flat definition written at this
+   point would be silently overridden by the gradient it was meant to remove.
+   -------------------------------------------------------------------------- */
+.signal-line { position: relative; }
+.gradient-border { position: relative; }
+.float-card { animation: none; }
+.workspace-atmosphere, .metric-spark { background-image: none; }
 
 @layer components {
   .field, .ui-control { @apply w-full min-h-controlMd rounded-control border border-border bg-input px-md text-body text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20; }
@@ -201,22 +212,26 @@
   .ui-icon-button { @apply relative inline-grid min-h-controlMd min-w-controlMd place-items-center rounded-control transition focus-visible:ring-2 focus-visible:ring-ring/20; }
   .ui-icon-button::before { content: ''; position: absolute; inset: -2px; }
   .label { @apply mb-1 block text-[11px] font-semibold uppercase tracking-[.12em] text-muted-foreground; }
-  .mm-card { @apply rounded-2xl border border-border bg-card shadow-[0_16px_42px_rgb(var(--shadow)/.14)]; }
-  .mm-pill { @apply rounded-lg; }
-  .mm-primary { @apply mm-pill bg-primary text-primary-foreground shadow-[0_7px_18px_rgb(var(--shadow)/.16)] transition hover:bg-primary/90; }
-  .mm-secondary { @apply mm-pill border border-border bg-surface text-foreground transition hover:bg-surface-soft; }
+  /* `.mm-card`, `.mm-pill` and `.mm-primary` are deleted: zero call sites in src/, so
+     they shipped in every stylesheet and styled nothing. `.mm-secondary` has one, and
+     keeps its definition minus the `mm-pill` dependency. */
+  .mm-secondary { @apply rounded-lg border border-border bg-surface text-foreground transition hover:bg-surface-soft; }
   .theme-select { @apply cursor-pointer rounded-control border border-border bg-surface px-sm text-body-sm font-semibold text-foreground outline-none transition hover:bg-surface-soft focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20; }
-  .ops-shell-glow { background: radial-gradient(ellipse at top, rgb(var(--primary) / .16), transparent 66%); }
-  /* The header sits on every route and used to carry `backdrop-blur-xl`. A blurred
-     backdrop is re-computed whenever anything behind it moves, and the whole page
-     scrolls behind this one — so it was re-blurring the viewport continuously for a
-     translucency of .78 at its far end. Raised to .94 and the blur dropped. */
-  .ops-header { background: linear-gradient(90deg, rgb(var(--header) / .98), rgb(var(--surface) / .94)); }
+  /* `.ops-shell-glow` deleted — zero call sites, same as the mm-* classes above. */
+  /* The header sits on every route and used to carry `backdrop-blur-xl`, then a
+     two-stop translucent gradient after the blur was dropped. Now opaque and flat:
+     those translucent stops meant the header tinted slightly differently depending on
+     what had scrolled underneath it, so the one piece of furniture present on every
+     route never had a fixed colour. */
+  .ops-header { background: rgb(var(--header)); }
   .ops-sidebar { background: rgb(var(--sidebar)); }
   .ops-sidebar-active { background: rgb(var(--sidebar-active)); }
   .ops-sidebar-hover:hover { background: rgb(var(--sidebar-hover)); }
   .ops-elevated { background: rgb(var(--surface-elevated)); }
-  .soft-grid { background-image: linear-gradient(rgb(var(--border) / .18) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--border) / .18) 1px, transparent 1px); background-size: 32px 32px; }
+  /* A 32px graph-paper grid behind page headers. It implied a plotting surface
+     where nothing was plotted, and at .18 alpha it mostly read as noise under
+     the title. Inert rather than deleted, because 7 call sites still name it. */
+  .soft-grid { background-image: none; }
   /* The knowledge-graph canvas: a dotted, faintly-lit plane rather than a flat panel, so
      the diagram reads as an instrument sitting on a surface instead of nodes floating on
      the page background. Two radial glows (not a blur -- see the backdrop-filter note
@@ -246,7 +261,14 @@
      The shadow's blur radius comes down with it: a 70px spread over a full-width panel
      is a large, repeatedly rasterised area for a shadow that is barely perceptible past
      ~30px. */
-  .glass-panel { background: linear-gradient(135deg, rgb(var(--surface-elevated) / .96), rgb(var(--surface) / .88)); box-shadow: 0 12px 30px rgb(var(--shadow) / .14); }
+  /* FLAT. Was a 135deg gradient between two translucent surfaces under a 30px
+     shadow, on 46 call sites. The translucency meant every panel showed a little
+     of whatever sat behind it, so no panel had one predictable background, and
+     the gradient put the bottom-right corner of every card in a different colour
+     from its top-left. One opaque token surface and one hairline shadow instead:
+     a panel now reads as a sheet of paper, and the content on it carries the
+     hierarchy. The `.page-hero` shadow below collapses for the same reason. */
+  .glass-panel { background: rgb(var(--surface-elevated)); box-shadow: 0 1px 2px rgb(var(--shadow) / .06); }
   /* Login is the primary entry surface, so it uses the full design scale
      rather than the compact workspace-panel scale. */
   .login-panel { zoom: 1; }
@@ -255,18 +277,17 @@
   .page-shell { width: 100%; max-width: 86rem; margin-inline: auto; }
   .page-shell-wide { width: 100%; max-width: 110rem; margin-inline: auto; }
   .page-stack { display: flex; flex-direction: column; gap: 1.25rem; }
-  .page-hero { box-shadow: 0 16px 42px rgb(var(--shadow) / .11); }
-  .ai-workspace-shell {
-    background:
-      radial-gradient(circle at 100% 0%, rgb(var(--info) / .08), transparent 28%),
-      linear-gradient(145deg, rgb(var(--surface-elevated) / .94), rgb(var(--surface) / .78) 58%, rgb(var(--background) / .82));
-    /* This element carries `glass-panel` too, so it used to stack a SECOND
-       backdrop-filter on top of that one — two full-viewport-width blurs on the AI
-       chat, the most interactive surface in the app, and both sat under an opaque
-       `bg-canvas` that made neither of them visible in the first place. The saturate()
-       is kept as a plain filter-free gradient adjustment instead. */
-    box-shadow: 0 10px 26px rgb(var(--shadow) / .13), inset 0 1px 0 rgb(255 255 255 / .1);
-  }
+  /* A 42px drop shadow on the header band of 9 pages, which made the page title
+     float above its own content. A header is not a floating object; it is the
+     top of the page. No shadow — the bottom rule in PageHeader does the work. */
+  .page-hero { box-shadow: none; }
+  /* The AI workspace is where answers are read, so it gets the least treatment of
+     anything in the app: one opaque surface, one hairline. Was a radial glow over a
+     three-stop 145deg gradient, with a 26px drop shadow and an inset white line that
+     only existed to fake a lit top edge — all of it behind streaming text. The inset
+     highlight was also a literal `rgb(255 255 255 / .1)`, which reads as a lit edge on
+     the dark theme and as haze on the light one. */
+  .ai-workspace-shell { background: rgb(var(--surface-elevated)); box-shadow: 0 1px 2px rgb(var(--shadow) / .06); }
   /* `transform` is the only property here the compositor can animate on its own.
      box-shadow cannot be: every frame of the transition repaints the element and its
      48px shadow, and these sit on list items — the health dashboard alone has nine, so

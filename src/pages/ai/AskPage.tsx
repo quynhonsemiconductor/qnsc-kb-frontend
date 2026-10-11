@@ -794,7 +794,11 @@ export default function AskPage() {
               <div className="mx-auto w-full max-w-none px-5 py-8 lg:px-8">
               {isEmpty ? (
                 <div className="relative flex flex-col items-center pt-12 text-center lg:pt-16">
-                  <div className="pointer-events-none absolute left-1/2 top-4 h-52 w-52 -translate-x-1/2 opacity-55"><div className="hero-orb h-full w-full"><div className="orbit-ring" /><div className="orbit-ring" style={{ inset: '8%', animationDuration: '21s' }} /><div className="orb-core text-2xl">Q</div></div></div>
+                  {/* A 208px animated orb — two counter-rotating rings around a pulsing
+                      "Q" — sat at the top of the empty-state panel. It spun forever on
+                      the surface where people wait for an answer, which is the one place
+                      in the app where a moving decoration competes with the thing being
+                      read. The empty state now leads with the suggested questions below. */}
                   <span className="ask-fade-up relative z-10 grid h-11 w-11 place-items-center rounded-xl border border-hairline bg-surface-soft text-minimaxBlue">
                     <Layers size={20} />
                   </span>
