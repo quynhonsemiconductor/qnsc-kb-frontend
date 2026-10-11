@@ -14,6 +14,8 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { ARTICLE_TYPES, SENSITIVITY_LEVELS } from '../../utils/articleTaxonomy'
+import { useLanguage } from '../../i18n/LanguageProvider'
+import { userMessage } from '../../lib/error-handler'
 
 type Department = { id: string; name: string; company_domain: string; active: boolean }
 type UploadResult = { filename: string; status: string; status_code?: number; detail?: { message?: string; code?: string }; id?: string; [key: string]: any }
@@ -37,6 +39,7 @@ export default function ArticleListPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [uploading, setUploading] = useState(false)
   const [selectedArticleIds, setSelectedArticleIds] = useState<string[]>([])
   const [autoTagging, setAutoTagging] = useState(false)
@@ -49,6 +52,7 @@ export default function ArticleListPage() {
   const navigate = useNavigate()
   const dialog = useDialog()
   const { user } = useAuth()
+  const { t } = useLanguage()
   const canManageArticlePermissions = Boolean(user?.permissions?.includes('permission.manage'))
   const [bulkReclassifying, setBulkReclassifying] = useState(false)
 
@@ -68,9 +72,9 @@ export default function ArticleListPage() {
       const result = await getArticles(params)
       if (requestId.current !== currentRequest) return
       setArticles(result)
+      setLoadError('')
     } catch (err) {
-      console.error('Failed to fetch articles', err)
-      if (requestId.current === currentRequest) setArticles([])
+      if (requestId.current === currentRequest) setLoadError(userMessage(err, t))
     } finally {
       if (requestId.current === currentRequest) setLoading(false)
     }
@@ -199,9 +203,11 @@ export default function ArticleListPage() {
 
     {selectedArticleIds.length > 0 && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"><span className="text-sm font-semibold text-foreground">{selectedArticleIds.length} selected</span><div className="flex flex-wrap items-center gap-2"><Button type="button" variant="primary" size="sm" onClick={() => void handleAutoTag()} disabled={autoTagging} loading={autoTagging} icon={<Sparkles size={14} />}>{autoTagging ? 'Suggesting topics…' : 'Suggest topics'}</Button>{canManageArticlePermissions && <><Button type="button" variant="secondary" size="sm" onClick={() => void handleBulkReclassify('type')} disabled={bulkReclassifying}>Change type</Button><Button type="button" variant="secondary" size="sm" onClick={() => void handleBulkReclassify('sensitivity')} disabled={bulkReclassifying}>Change sensitivity</Button></>}</div></div>}
 
+    {loadError && <div role="alert" className="flex flex-col gap-3 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive-text sm:flex-row sm:items-center sm:justify-between"><span>{loadError}</span><Button type="button" variant="secondary" size="sm" onClick={() => void fetchArticlesList()}>Retry</Button></div>}
+
     <section className="overflow-hidden rounded-xl border border-border bg-surface-elevated">
       <div className="flex items-center justify-between border-b border-border px-4 py-3"><div className="flex items-center gap-3"><button type="button" onClick={selectAllOnPage} aria-label="Select all documents on page" className="text-muted-foreground hover:text-primary">{articles.length > 0 && selectedArticleIds.length === articles.length ? <CheckSquare size={17} /> : <Square size={17} />}</button><span className="text-sm font-bold text-foreground">Documents</span></div><span className="text-xs text-muted-foreground">{articles.length ? `${offset + 1}–${offset + articles.length}` : '0'} on this page</span></div>
-      {loading ? <div className="px-4 py-16 text-center text-sm text-muted-foreground">Loading documents…</div> : articles.length === 0 ? <div className="px-4 py-16 text-center"><FileText className="mx-auto text-muted" size={32} /><p className="mt-3 text-sm font-semibold text-foreground">No documents found</p><p className="mt-1 text-xs text-muted-foreground">Try a different filter or create a new document.</p></div> : <div className="space-y-2 p-2">{articles.map(article => { const articleTopics = (article.tags || []).map((tag: any) => typeof tag === 'string' ? tag : tag.tag).filter(Boolean); return <div key={article.id} className="grid gap-3 rounded-xl border border-border bg-surface p-4 shadow-[0_8px_20px_rgb(var(--shadow)/.06)] transition hover:-translate-y-0.5 hover:border-primary/30 hover:bg-surface-soft md:grid-cols-[auto_minmax(0,1.7fr)_minmax(120px,.8fr)_minmax(110px,.7fr)_auto] md:items-center"><button type="button" onClick={() => toggleArticleSelection(article.id)} aria-label={`Select ${article.title}`} className="text-muted-foreground hover:text-primary">{selectedArticleIds.includes(article.id) ? <CheckSquare size={17} className="text-primary" /> : <Square size={17} />}</button><div className="min-w-0"><Link to={`/articles/${article.id}`} className="block truncate text-sm font-bold text-foreground hover:text-primary">{article.title}</Link><p className="mt-1 truncate text-xs text-muted-foreground">{article.owner?.name || article.owner || 'Unassigned'} · v{article.version}</p></div><div className="flex min-w-0 flex-wrap gap-1">{articleTopics.length ? articleTopics.slice(0, 2).map((topic: string) => <Badge key={topic} variant="primary" size="sm">{topic}</Badge>) : <span className="text-xs text-muted">No topic</span>}</div><div><Badge variant="default" size="sm" className="uppercase tracking-wide">{article.status?.replace('_', ' ')}</Badge><p className="mt-1 truncate text-xs text-muted-foreground">{article.dept}</p></div><Link to={`/articles/${article.id}`} className="text-xs font-bold text-primary hover:text-info">Open</Link></div> })}</div>}
+      {loading ? <div role="status" className="px-4 py-16 text-center text-sm text-muted-foreground">Loading documents…</div> : loadError && articles.length === 0 ? null : articles.length === 0 ? <div className="px-4 py-16 text-center"><FileText className="mx-auto text-muted" size={32} /><p className="mt-3 text-sm font-semibold text-foreground">No documents found</p><p className="mt-1 text-xs text-muted-foreground">Try a different filter or create a new document.</p></div> : <div className="space-y-2 p-2">{articles.map(article => { const articleTopics = (article.tags || []).map((tag: any) => typeof tag === 'string' ? tag : tag.tag).filter(Boolean); return <div key={article.id} className="grid gap-3 rounded-xl border border-border bg-surface p-4 shadow-[0_8px_20px_rgb(var(--shadow)/.06)] transition hover:-translate-y-0.5 hover:border-primary/30 hover:bg-surface-soft md:grid-cols-[auto_minmax(0,1.7fr)_minmax(120px,.8fr)_minmax(110px,.7fr)_auto] md:items-center"><button type="button" onClick={() => toggleArticleSelection(article.id)} aria-label={`Select ${article.title}`} className="text-muted-foreground hover:text-primary">{selectedArticleIds.includes(article.id) ? <CheckSquare size={17} className="text-primary" /> : <Square size={17} />}</button><div className="min-w-0"><Link to={`/articles/${article.id}`} className="block truncate text-sm font-bold text-foreground hover:text-primary">{article.title}</Link><p className="mt-1 truncate text-xs text-muted-foreground">{article.owner?.name || article.owner || 'Unassigned'} · v{article.version}</p></div><div className="flex min-w-0 flex-wrap gap-1">{articleTopics.length ? articleTopics.slice(0, 2).map((topic: string) => <Badge key={topic} variant="primary" size="sm">{topic}</Badge>) : <span className="text-xs text-muted">No topic</span>}</div><div><Badge variant="default" size="sm" className="uppercase tracking-wide">{article.status?.replace('_', ' ')}</Badge><p className="mt-1 truncate text-xs text-muted-foreground">{article.dept}</p></div><Link to={`/articles/${article.id}`} className="text-xs font-bold text-primary hover:text-info">Open</Link></div> })}</div>}
       {!loading && articles.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3"><Button type="button" variant="secondary" size="sm" disabled={offset <= 0} onClick={() => { setSelectedArticleIds([]); setOffset(current => Math.max(0, current - PAGE_SIZE)) }} icon={<ArrowLeft size={14} />}>Previous</Button><span className="text-xs text-muted-foreground">Page {Math.floor(offset / PAGE_SIZE) + 1}</span><Button type="button" variant="secondary" size="sm" disabled={articles.length < PAGE_SIZE} onClick={() => { setSelectedArticleIds([]); setOffset(current => current + PAGE_SIZE) }} icon={<ArrowRight size={14} />} iconPosition="right">Next</Button></div>}
     </section>
   </div>

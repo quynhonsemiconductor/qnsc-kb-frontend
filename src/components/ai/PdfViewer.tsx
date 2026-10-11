@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { Download, ExternalLink, FileWarning, Loader2, X } from 'lucide-react'
+import { FocusTrap } from '../ui/FocusTrap'
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 
 interface PdfViewerProps {
   open: boolean
@@ -26,6 +28,7 @@ const INLINE_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'
 
 /** Full-screen source viewer matching the DocNexus review interaction. */
 export default function PdfViewer({ open, fileName, url, mimeType, page, loading = false, onClose }: PdfViewerProps) {
+  useBodyScrollLock(open)
   useEffect(() => {
     if (!open) return
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -48,8 +51,9 @@ export default function PdfViewer({ open, fileName, url, mimeType, page, loading
   const sourceUrl = page && !isImage ? `${url}#page=${page}` : url
 
   return (
-    <div className="fixed inset-0 z-modal flex flex-col bg-scrim/70 p-0 sm:p-6">
-      <button aria-label="Close document" onClick={onClose} className="absolute inset-0" />
+    <div className="fixed inset-0 z-modal flex flex-col bg-scrim/70 p-0 sm:p-6" role="dialog" aria-modal="true" aria-label={`Document preview: ${fileName}`}>
+      <div aria-hidden="true" onClick={onClose} className="absolute inset-0" />
+      <FocusTrap active={open} className="contents">
       <div className="relative mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden border border-hairline bg-surface sm:rounded-xl">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-hairline px-4">
           <p className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{fileName}{page ? ` · Page ${page}` : ''}</p>
@@ -90,6 +94,7 @@ export default function PdfViewer({ open, fileName, url, mimeType, page, loading
           )}
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

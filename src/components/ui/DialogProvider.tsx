@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useId, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react'
 import { FocusTrap } from './FocusTrap'
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 
 type DialogOptions = { title?: string; message: string; confirmLabel?: string; cancelLabel?: string; tone?: 'info' | 'danger' | 'success' }
 type PromptOptions = Omit<DialogOptions, 'message'> & { defaultValue?: string; placeholder?: string; multiline?: boolean; validate?: (value: string) => string | undefined }
@@ -16,6 +17,7 @@ export function useDialog() {
 
 export default function DialogProvider({ children }: { children: React.ReactNode }) {
   const [dialog, setDialog] = useState<DialogState | null>(null)
+  useBodyScrollLock(Boolean(dialog))
   const [promptValue, setPromptValue] = useState('')
   const [promptError, setPromptError] = useState('')
   const open = useCallback((kind: DialogState['kind'], message: string, options: Omit<DialogOptions, 'message'> = {}) => new Promise<boolean>(resolve => setDialog({ kind, message, resolve, ...options })), [])

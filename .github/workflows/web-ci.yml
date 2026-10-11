@@ -68,10 +68,9 @@ jobs:
 
   # Mirrors the backend's `test` job so both repositories present the same gate set.
   #
-  # HONEST CAVEAT: tests/unit/index.test.ts asserts nothing — it is a stub. This job is a
-  # HARNESS, not yet a safety net: it proves the runner works and makes the next real test
-  # run automatically instead of needing this plumbing first. Treat a green tick here as
-  # "nothing was broken by a test", not "the SPA is covered".
+  # Unit coverage focuses on security helpers, request behavior, polling, dates, taxonomy,
+  # and shared UI geometry/scroll-lock logic. Browser-level route coverage remains separate
+  # from this fast deterministic gate.
   test:
     name: Unit tests
     runs-on: ubuntu-latest
