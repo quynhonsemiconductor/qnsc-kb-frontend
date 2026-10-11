@@ -251,6 +251,7 @@ export default function AskPage() {
   const [editTitle, setEditTitle] = useState('')
   const [historyQuery, setHistoryQuery] = useState('')
   const [showAllHistory, setShowAllHistory] = useState(false)
+  const [agentWorkOpen, setAgentWorkOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sourceUrlRef = useRef<string | null>(null)
@@ -615,7 +616,7 @@ export default function AskPage() {
   return (
     <>
       <style>{MOTION_STYLES}</style>
-      <div className="glass-panel ai-workspace-shell relative flex h-full max-h-full min-h-0 overflow-hidden rounded-[18px] border border-border/80 bg-canvas shadow-[0_16px_44px_rgb(var(--shadow)/.13)] lg:rounded-[20px]">
+      <div className="ai-workspace-shell relative -mx-3 -my-4 flex h-[calc(100%+2rem)] max-h-[calc(100%+2rem)] min-h-0 overflow-hidden border-y border-border bg-surface sm:-mx-5 lg:-mx-7">
         {sidebarOpen && (
           <button
             className="ask-fade-in fixed inset-0 z-20 bg-black/35 lg:hidden"
@@ -1047,14 +1048,19 @@ export default function AskPage() {
                     )
                   })}
                   {loading && (
-                    <div className="ask-fade-in flex items-center gap-2 pl-10 text-sm text-steel">
-                      <span className="flex gap-1">
-                        <i className="inline-block h-1.5 w-1.5 rounded-full bg-coral/70" style={{ animation: 'askShimmerDot 1.1s ease-in-out infinite' }} />
-                        <i className="inline-block h-1.5 w-1.5 rounded-full bg-coral/70" style={{ animation: 'askShimmerDot 1.1s ease-in-out infinite', animationDelay: '150ms' }} />
-                        <i className="inline-block h-1.5 w-1.5 rounded-full bg-coral/70" style={{ animation: 'askShimmerDot 1.1s ease-in-out infinite', animationDelay: '300ms' }} />
-                      </span>
-                      {t('search.searching')}
-                    </div>
+                    <section className="ask-fade-in ml-10 max-w-2xl overflow-hidden rounded-xl border border-border bg-surface-elevated">
+                      <button type="button" onClick={() => setAgentWorkOpen(value => !value)} aria-expanded={agentWorkOpen} className="flex min-h-10 w-full items-center gap-2 bg-surface-muted px-3 text-left text-body-sm font-semibold text-foreground">
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-info/25 border-t-info" />
+                        Agent is searching and reading approved sources…
+                        <ChevronDown size={14} className={`ml-auto text-muted transition ${agentWorkOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {agentWorkOpen && <div className="space-y-2 border-t border-border px-3 py-3 font-mono text-caption text-muted-foreground">
+                        <p>✓ Searching the knowledge base</p>
+                        <p>✓ Applying permissions and source status</p>
+                        <p className="text-info-text">→ Reading and comparing the best matches</p>
+                        <p className="opacity-55">○ Preparing a grounded answer</p>
+                      </div>}
+                    </section>
                   )}
                   <div ref={bottomRef} />
                 </div>

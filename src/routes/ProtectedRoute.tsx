@@ -29,7 +29,7 @@ export default function ProtectedRoute({ children, permission }: ProtectedRouteP
   const { t } = useLanguage()
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-100">{t('common.loading')}</div>
+    return <div className="flex h-screen items-center justify-center bg-background text-foreground"><span className="flex items-center gap-2 text-body text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-primary" />{t('common.loading')}</span></div>
   }
 
   if (!isAuthenticated) {
@@ -42,7 +42,7 @@ export default function ProtectedRoute({ children, permission }: ProtectedRouteP
     // request the mounted page fires on the way past is a request made on the strength of
     // unverified permissions. A gated route is not on the hot path, so the wait is cheap.
     if (!verified) {
-      return <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-100">{t('common.loading')}</div>
+      return <div className="flex h-screen items-center justify-center bg-background text-foreground"><span className="flex items-center gap-2 text-body text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-primary" />{t('common.loading')}</span></div>
     }
     if (!user?.permissions?.includes(permission)) {
       return <Navigate to="/" replace />

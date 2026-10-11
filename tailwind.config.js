@@ -56,8 +56,8 @@ export default {
       // serves four DM Mono cuts — so document IDs, source refs and code spans all
       // rendered in a face the product never chose.
       fontFamily: {
-        sans: ['DM Sans', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        display: ['Manrope', 'DM Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['Be Vietnam Pro', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Be Vietnam Pro', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['DM Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       spacing: {

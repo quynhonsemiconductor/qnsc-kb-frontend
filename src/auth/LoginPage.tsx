@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowUpRight, Mail, Monitor, ShieldCheck, Sparkles } from 'lucide-react'
+import { BookOpen, Mail, Monitor, ShieldCheck, Sparkles } from 'lucide-react'
 import { useAuth } from './useAuth'
 import { BrandMarkGlyph } from '../components/ui/BrandMark'
 import { getMicrosoftLoginUrl, getOidcConfig, login as loginApi } from '../api/auth'
@@ -18,8 +18,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [ssoLoading, setSsoLoading] = useState(false)
   const [ssoAvailable, setSsoAvailable] = useState(false)
-  const { login } = useAuth()
-  const { isAuthenticated, loading: authLoading } = useAuth()
+  const { login, isAuthenticated, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const sessionExpired = searchParams.get('expired') === '1'
@@ -27,9 +26,7 @@ export default function LoginPage() {
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
-    getOidcConfig()
-      .then((config) => setSsoAvailable(Boolean(config.entra_enabled)))
-      .catch(() => setSsoAvailable(false))
+    getOidcConfig().then(config => setSsoAvailable(Boolean(config.entra_enabled))).catch(() => setSsoAvailable(false))
   }, [])
 
   useEffect(() => {
@@ -45,15 +42,8 @@ export default function LoginPage() {
       login(loginData.access_token, loginData.user)
       navigate('/')
     } catch (err: unknown) {
-      // 401 keeps the form's own wording: on this screen it means the credentials were
-      // wrong, not that a session expired, and the server's `detail` is English regardless
-      // of the chosen language. Everything else (throttled after repeated attempts, server
-      // down, offline) goes through the shared mapper so a rate limiter's raw "Too Many
-      // Requests" never reaches a Vietnamese-first UI.
       setError(apiErrorStatus(err) === 401 ? t('auth.invalidCredentials') : userMessage(err, t))
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   const handleMicrosoftLogin = async () => {
@@ -68,35 +58,38 @@ export default function LoginPage() {
     }
   }
 
-  return <div className="relative min-h-screen overflow-hidden bg-background lg:grid lg:grid-cols-[1.1fr_.9fr]">
-    <div className="pointer-events-none absolute -left-40 -top-48 h-[560px] w-[560px] rounded-full bg-primary/20 blur-3xl" /><div className="pointer-events-none absolute -bottom-56 right-[-8rem] h-[520px] w-[520px] rounded-full bg-info/10 blur-3xl" />
-    <section className="soft-grid relative hidden min-h-screen flex-col justify-between overflow-hidden border-r border-border px-10 py-10 lg:flex xl:px-16">
-      <div className="relative flex items-center gap-3"><BrandMarkGlyph className="h-11 w-11" title="QNSC" /><div><p className="font-display text-sm font-extrabold tracking-tight text-foreground">QNSC</p><p className="text-caption font-bold uppercase tracking-[.2em] text-stone">Semiconductor</p></div></div>
-      <div className="relative max-w-xl pb-8"><div className="mb-6 inline-flex items-center gap-2 rounded-full border border-success/25 bg-success/10 px-3 py-1.5 text-caption font-bold uppercase tracking-[.15em] text-success"><span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_10px_rgb(var(--success)/.7)]" /> Trusted by your team</div><h1 className="font-display text-5xl font-extrabold leading-[1.02] tracking-[-.06em] text-foreground xl:text-6xl">Turn scattered<br /><span className="text-info">knowledge into momentum.</span></h1><p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">One calm workspace for finding answers, publishing trusted guidance, and keeping every department moving in the same direction.</p><div className="mt-10 grid max-w-lg grid-cols-3 gap-3"><div className="rounded-2xl border border-border bg-surface/60 p-4"><Sparkles size={16} className="text-warning" /><p className="mt-4 text-sm font-bold text-foreground">AI grounded</p><p className="mt-1 text-body-sm leading-4 text-muted-foreground">Answers tied to real sources.</p></div><div className="rounded-2xl border border-border bg-surface/60 p-4"><ShieldCheck size={16} className="text-success" /><p className="mt-4 text-sm font-bold text-foreground">Access aware</p><p className="mt-1 text-body-sm leading-4 text-muted-foreground">Every team sees what matters.</p></div><div className="rounded-2xl border border-border bg-surface/60 p-4"><ArrowUpRight size={16} className="text-info" /><p className="mt-4 text-sm font-bold text-foreground">Always current</p><p className="mt-1 text-body-sm leading-4 text-muted-foreground">Review keeps knowledge alive.</p></div></div></div>
-      {/* The orb and its two floating cards are gone. Beyond the animation, those cards
-          were invented status: "LIVE INDEX / Knowledge synced" and "RAG / 24·7 / Answers
-          grounded" were hardcoded strings on the sign-in screen, shown before anyone had
-          authenticated and with nothing computing them — so they could not have said
-          anything else if the index were stale or the provider down. The sidebar's
-          "Workspace is healthy · LIVE" badge was removed for exactly this reason. */}
-      <p className="relative text-xs font-medium text-stone">A private knowledge system for QNSC teams.</p>
-    </section>
-    <section className="relative flex min-h-screen items-center justify-center px-5 py-24 sm:px-8 lg:px-12">
-      <div className="absolute right-5 top-5 flex items-center gap-2"><label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Monitor size={13} /><Select value={theme} onChange={event => setTheme(event.target.value as ThemePreference)} className="theme-select" aria-label="Appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></Select></label><Select value={language} onChange={event => setLanguage(event.target.value as 'en' | 'vi')} className="theme-select" aria-label={t('language.switch')}><option value="en">English</option><option value="vi">Tiếng Việt</option></Select></div>
-      <form onSubmit={handleSubmit} className="login-panel glass-panel w-full max-w-xl rounded-panel border border-border p-6 shadow-[0_20px_56px_rgb(var(--shadow)/.16)] sm:p-8">
-        <div className="mb-8"><span className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-caption font-extrabold uppercase tracking-[.14em] text-primary"><ShieldCheck size={14} /> Secure sign in</span><h2 className="font-display text-3xl font-extrabold tracking-[-.04em] text-foreground">Welcome back.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{language === 'vi' ? 'Sử dụng tài khoản công ty được cấp.' : 'Sign in to continue to your knowledge workspace.'}</p></div>
-        {sessionExpired && !error && <div className="mb-5 rounded-xl border border-info/20 bg-info/10 p-3 text-sm text-info">{t('auth.sessionExpired')}</div>}
-        {error && <div className="mb-5 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-destructive">{error}</div>}
-        <div className="space-y-4">
-          {ssoAvailable && <>
-            <Button type="button" variant="secondary" size="lg" onClick={() => void handleMicrosoftLogin()} disabled={ssoLoading} loading={ssoLoading} icon={!ssoLoading ? <span className="grid h-4 w-4 grid-cols-2 gap-0.5"><span className="bg-[#f25022]" /><span className="bg-[#7fba00]" /><span className="bg-[#00a4ef]" /><span className="bg-[#ffb900]" /></span> : undefined} className="w-full rounded-xl py-3.5">{ssoLoading ? 'Redirecting…' : t('auth.signInMicrosoft')}</Button>
-            <div className="flex items-center gap-3 text-caption font-bold uppercase tracking-[.14em] text-stone"><span className="h-px flex-1 bg-border" />{t('auth.or')}<span className="h-px flex-1 bg-border" /></div>
-          </>}
-          <Input type="email" label={t('auth.email')} value={email} onChange={e => setEmail(e.target.value)} placeholder="name@company.com" required leftIcon={<Mail size={15} />} /><Input type="password" label={t('auth.password')} value={password} onChange={e => setPassword(e.target.value)} required /><Button type="submit" variant="primary" size="lg" disabled={loading} loading={loading} icon={!loading ? <Mail size={15} /> : undefined} className="mt-3 w-full rounded-xl shadow-[0_10px_22px_rgb(var(--primary)/.24)] hover:-translate-y-0.5">{loading ? t('auth.signingIn') : t('auth.signInEmail')}</Button>
-          <p className="text-center"><Link to="/forgot-password" className="text-sm font-semibold text-primary no-underline hover:underline">{t('auth.forgotPassword')}</Link></p>
+  return <div className="grid min-h-screen bg-background lg:grid-cols-[minmax(24rem,.9fr)_minmax(32rem,1.1fr)]">
+    <aside className="relative hidden overflow-hidden bg-primary px-12 py-10 text-primary-foreground lg:flex lg:flex-col xl:px-16">
+      <div className="flex items-center gap-3"><BrandMarkGlyph className="h-11 w-11" title="QNSC" /><div><p className="font-display text-body-lg font-bold">QNSC Knowledge</p><p className="font-mono text-caption uppercase tracking-[.12em] text-white/55">Enterprise knowledge workspace</p></div></div>
+      <div className="my-auto max-w-lg">
+        <p className="font-mono text-caption uppercase tracking-[.12em] text-white/55">Trusted company knowledge</p>
+        <h1 className="mt-5 font-display text-5xl font-bold leading-[1.08] tracking-[-.045em] text-white">Find the right document. Ask grounded AI. Keep knowledge governed.</h1>
+        <p className="mt-6 max-w-md text-body-lg leading-7 text-white/65">One workspace for approved documents, source-aware answers, and controlled publishing across every department.</p>
+        <div className="mt-10 border-t border-white/15">
+          <div className="flex items-center gap-3 border-b border-white/15 py-4"><BookOpen size={17} className="text-[#c7eb72]" /><div><strong className="block text-body-sm">Document-first discovery</strong><span className="text-body-sm text-white/55">Browse by department, topic and approved source.</span></div></div>
+          <div className="flex items-center gap-3 border-b border-white/15 py-4"><Sparkles size={17} className="text-[#c7eb72]" /><div><strong className="block text-body-sm">Agent assistance</strong><span className="text-body-sm text-white/55">Answers remain connected to accessible evidence.</span></div></div>
+          <div className="flex items-center gap-3 border-b border-white/15 py-4"><ShieldCheck size={17} className="text-[#c7eb72]" /><div><strong className="block text-body-sm">Governed publishing</strong><span className="text-body-sm text-white/55">Review, ownership and permissions stay explicit.</span></div></div>
         </div>
-        <p className="mt-7 border-t border-border pt-5 text-center text-xs leading-relaxed text-muted">Accounts are created by an Admin or CEO. Microsoft SSO will appear here when Entra ID is configured.</p>
+      </div>
+      <p className="text-caption text-white/45">A private knowledge system for QNSC teams.</p>
+    </aside>
+
+    <main className="relative flex min-h-screen items-center justify-center px-5 py-20 sm:px-8 lg:px-12">
+      <div className="absolute right-5 top-5 flex items-center gap-2"><label className="hidden items-center gap-1.5 text-caption font-semibold text-muted-foreground sm:flex"><Monitor size={13} /><Select value={theme} onChange={event => setTheme(event.target.value as ThemePreference)} className="theme-select" aria-label="Appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></Select></label><Select value={language} onChange={event => setLanguage(event.target.value as 'en' | 'vi')} className="theme-select" aria-label={t('language.switch')}><option value="en">English</option><option value="vi">Tiếng Việt</option></Select></div>
+      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-panel border border-border bg-surface-elevated p-6 shadow-popover sm:p-8">
+        <div className="mb-8 lg:hidden"><div className="mb-6 flex items-center gap-3"><BrandMarkGlyph className="h-10 w-10" title="QNSC" /><div><p className="font-display text-body font-bold text-foreground">QNSC Knowledge</p><p className="font-mono text-caption uppercase tracking-[.12em] text-muted">Enterprise workspace</p></div></div></div>
+        <div className="mb-8"><span className="mb-4 inline-flex items-center gap-2 font-mono text-caption font-medium uppercase tracking-[.1em] text-primary-text"><ShieldCheck size={14} />Secure sign in</span><h2 className="font-display text-3xl font-bold tracking-[-.035em] text-foreground">Welcome back.</h2><p className="mt-2 text-body leading-6 text-muted-foreground">{language === 'vi' ? 'Sử dụng tài khoản công ty được cấp.' : 'Sign in to continue to your knowledge workspace.'}</p></div>
+        {sessionExpired && !error && <div className="mb-5 rounded-surface border border-info/20 bg-info/10 p-3 text-body-sm text-info-text">{t('auth.sessionExpired')}</div>}
+        {error && <div className="mb-5 rounded-surface border border-destructive/20 bg-destructive/10 p-3 text-body-sm text-destructive-text">{error}</div>}
+        <div className="space-y-4">
+          {ssoAvailable && <><Button type="button" variant="secondary" size="lg" onClick={() => void handleMicrosoftLogin()} disabled={ssoLoading} loading={ssoLoading} icon={!ssoLoading ? <span className="grid h-4 w-4 grid-cols-2 gap-0.5"><span className="bg-[#f25022]" /><span className="bg-[#7fba00]" /><span className="bg-[#00a4ef]" /><span className="bg-[#ffb900]" /></span> : undefined} className="w-full">{ssoLoading ? 'Redirecting…' : t('auth.signInMicrosoft')}</Button><div className="flex items-center gap-3 font-mono text-caption uppercase tracking-[.1em] text-muted"><span className="h-px flex-1 bg-border" />{t('auth.or')}<span className="h-px flex-1 bg-border" /></div></>}
+          <Input type="email" label={t('auth.email')} value={email} onChange={event => setEmail(event.target.value)} placeholder="name@company.com" required leftIcon={<Mail size={15} />} />
+          <Input type="password" label={t('auth.password')} value={password} onChange={event => setPassword(event.target.value)} required />
+          <Button type="submit" variant="primary" size="lg" disabled={loading} loading={loading} icon={!loading ? <Mail size={15} /> : undefined} className="mt-3 w-full">{loading ? t('auth.signingIn') : t('auth.signInEmail')}</Button>
+          <p className="text-center"><Link to="/forgot-password" className="text-body-sm font-semibold text-primary no-underline hover:underline">{t('auth.forgotPassword')}</Link></p>
+        </div>
+        <p className="mt-7 border-t border-border pt-5 text-center text-caption leading-5 text-muted">Accounts are created by an Admin or CEO. Microsoft SSO appears when Entra ID is configured.</p>
       </form>
-    </section>
+    </main>
   </div>
 }

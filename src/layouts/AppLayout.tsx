@@ -5,21 +5,17 @@ import Header from './Header'
 import { SkipLink } from '../components/ui/SkipLink'
 
 export default function AppLayout() {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const closeMobileNav = useCallback(() => setMobileNavOpen(false), [])
+  const [navigationOpen, setNavigationOpen] = useState(false)
+  const closeNavigation = useCallback(() => setNavigationOpen(false), [])
+
   return (
-    /* `workspace-atmosphere` (two radial gradient washes) dropped with the orb below it:
-       both sat behind every authenticated route, and a knowledge workspace is read for
-       hours at a time. */
-    <div className="relative flex h-screen overflow-hidden bg-canvas text-ink">
+    <div className="flex h-screen min-w-0 flex-col overflow-hidden bg-canvas text-ink">
       <SkipLink />
-      <Sidebar mobileOpen={mobileNavOpen} onClose={closeMobileNav} />
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <Header onMenuClick={() => setMobileNavOpen(true)} />
-        <main id="main-content" className="app-scroll relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-canvas p-2 sm:p-3 lg:p-4">
-          <Outlet />
-        </main>
-      </div>
+      <Header onMenuClick={() => setNavigationOpen(true)} />
+      <Sidebar mobileOpen={navigationOpen} onClose={closeNavigation} />
+      <main id="main-content" className="app-scroll relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-canvas px-3 py-4 pb-20 sm:px-5 md:pb-5 lg:px-7">
+        <Outlet />
+      </main>
     </div>
   )
 }

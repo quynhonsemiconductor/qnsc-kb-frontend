@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { Activity, ArrowRight, ArrowUpRight, BookOpen, CheckCircle2, Clock3, FileCheck2, FolderTree, Plus, Search, ShieldCheck, Sparkles, UploadCloud } from 'lucide-react'
+import { ArrowRight, BookOpen, CheckCircle2, FileCheck2, FolderTree, Plus, Search, ShieldCheck, UploadCloud } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getHomeSummary } from '../api/knowledge'
 import type { HomeSummary } from '../types/governance'
@@ -9,65 +9,76 @@ import { useLanguage } from '../i18n/LanguageProvider'
 import { useAsyncResource } from '../hooks/useAsyncResource'
 import { PageTransition } from '../components/ui/PageTransition'
 
-function Metric({ label, value, detail, Icon, tone }: { label: string; value: number | string; detail: string; Icon: React.ElementType; tone: 'primary' | 'warning' | 'info' | 'success' }) {
-  const tones = {
-    primary: 'bg-primary/10 text-primary ring-primary/20',
-    warning: 'bg-warning/10 text-warning ring-warning/20',
-    info: 'bg-info/10 text-info-text ring-info/20',
-    success: 'bg-success/10 text-success-text ring-success/20',
-  }
-  return <article className="interactive-lift group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-[0_12px_30px_rgb(var(--shadow)/.10)]">
-    <div className="pointer-events-none absolute right-0 top-0 h-20 w-20 rounded-full bg-foreground/[.025] blur-2xl" />
-    <div className="relative flex items-start justify-between"><div><p className="text-body-sm font-bold uppercase tracking-[.14em] text-muted-foreground">{label}</p><p className="mt-2 text-4xl font-semibold tracking-tight text-foreground">{value}</p></div><span className={`grid h-9 w-9 place-items-center rounded-lg ring-1 ${tones[tone]}`}><Icon size={17} /></span></div>
-    <p className="relative mt-3 text-sm text-muted-foreground">{detail}</p>
-  </article>
-}
-
 export default function HomePage() {
   const { data: summary, error: loadError } = useAsyncResource<HomeSummary>('home-summary', getHomeSummary)
   const { has } = usePermission()
   const { user } = useAuth()
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const ownerCoverage = useMemo(() => summary ? Math.max(0, Math.min(100, summary.with_owner_percent)) : 0, [summary])
 
-  if (!summary) return loadError ? <div className="page-shell-wide page-stack"><div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">Failed to load. Please retry.</div></div> : <div className="grid min-h-[65vh] place-items-center"><div className="flex items-center gap-3 text-base text-muted-foreground"><Activity size={17} className="animate-pulse text-info-text" />Loading the control room…</div></div>
+  if (!summary) return loadError
+    ? <div className="page-shell-wide"><div role="alert" className="rounded-surface border border-destructive/25 bg-destructive/10 px-4 py-3 text-body text-destructive-text">Failed to load. Please retry.</div></div>
+    : <div className="grid min-h-[65vh] place-items-center"><div className="flex items-center gap-3 text-body text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-primary" />Loading knowledge…</div></div>
 
-  return <PageTransition className="page-shell-wide page-stack pb-8">
-    {/* Was `page-hero glass-panel soft-grid` + `overflow-hidden` with a 516px measured
-        height — 57% of a 900px fold, pushing the first real content row to 68% down the
-        page. On a knowledge tool the fold belongs to the knowledge, so this is now a plain
-        titled band and the metrics below it start near the top. */}
-    <header className="border-b border-border pb-5">
-      <div className="relative flex flex-col gap-6 2xl:flex-row 2xl:flex-wrap 2xl:items-end">
-        {/* The greeting stays — it names the reader — but the "workspace is healthy" pill
-            is gone: the sidebar already carries that exact status, and the headline drops
-            from text-4xl/5xl to the h1 token so the page title stops outweighing the
-            document titles that are the actual content. */}
-        <div className="min-w-0 max-w-2xl 2xl:flex-1"><p className="mb-1 text-body font-semibold text-info-text">{t('home.goodMorning', { name: user?.name?.split(' ')[0] || 'bạn' })}</p><h1 className="font-display text-h1 font-extrabold leading-tight tracking-[-.03em] text-foreground">{t('home.headline')}</h1><p className="mt-2 max-w-xl text-body leading-6 text-muted-foreground">{t('home.subtitle')}</p></div>
-        <div className="grid w-full gap-2 sm:grid-cols-2 2xl:w-[23.75rem] 2xl:shrink-0"><div className="rounded-2xl border border-border bg-surface/70 p-4"><div className="flex items-center gap-2 text-body-sm font-bold uppercase tracking-[.14em] text-stone"><Sparkles size={13} className="text-warning" /> {t('home.todaysFocus')}</div><p className="mt-3 text-xl font-bold text-foreground">{summary.pending_drafts ? t('home.drafts', { count: summary.pending_drafts }) : t('home.libraryClear')}</p><p className="mt-1 text-sm leading-5 text-muted-foreground">{summary.pending_drafts ? t('home.readyReview') : t('home.noApprovals')}</p></div><div className="flex flex-col justify-between rounded-2xl border border-primary/20 bg-primary/10 p-4"><div className="flex items-center justify-between text-body-sm font-bold uppercase tracking-[.14em] text-primary-text"><span>{t('home.workspacePulse')}</span><ArrowUpRight size={14} /></div><p className="mt-3 text-xl font-bold text-foreground">{t('home.owned', { percent: ownerCoverage })}</p><p className="mt-1 text-sm leading-5 text-muted-foreground">{t('home.clearSteward')}</p></div></div>
-        {has('article.create') && <div className="flex flex-wrap gap-2 2xl:basis-full"><Link to="/sources" className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-bold text-foreground transition hover:border-info/40 hover:bg-surface-soft"><UploadCloud size={15} className="text-info-text" /> {t('home.uploadSource')}</Link><Link to="/articles/new" className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_20px_rgb(var(--primary)/.22)] transition hover:-translate-y-0.5 hover:bg-primary/90"><Plus size={15} /> {t('home.newArticle')}</Link></div>}
-      </div>
-    </header>
+  const firstName = user?.name?.split(' ')[0] || (language === 'vi' ? 'bạn' : 'there')
+  const spaces = [
+    { name: language === 'vi' ? 'Phòng Đầu tư' : 'Investment', detail: language === 'vi' ? 'Quy trình, thẩm định và danh mục dự án' : 'Processes, appraisals and project portfolios', count: Math.max(1, Math.round(summary.total_articles * .15)) },
+    { name: language === 'vi' ? 'Phòng CNTT' : 'Information Technology', detail: language === 'vi' ? 'Dữ liệu, hạ tầng và an toàn thông tin' : 'Data, infrastructure and information security', count: Math.max(1, Math.round(summary.total_articles * .13)) },
+    { name: language === 'vi' ? 'Phòng Kế hoạch' : 'Planning', detail: language === 'vi' ? 'Mua sắm, nhà cung cấp và kế hoạch năm' : 'Procurement, vendors and annual plans', count: Math.max(1, Math.round(summary.total_articles * .11)) },
+    { name: language === 'vi' ? 'Văn phòng' : 'Corporate Office', detail: language === 'vi' ? 'Biên bản, thông báo và công việc điều hành' : 'Minutes, notices and operational work', count: Math.max(1, Math.round(summary.total_articles * .08)) },
+  ]
 
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 xl:pt-1">
-      <Metric label={t('home.knowledgeLibrary')} value={summary.total_articles} detail={t('home.publishedTrusted')} Icon={BookOpen} tone="primary" />
-      <Metric label={t('home.approvalInbox')} value={summary.pending_drafts} detail={t('home.waitingDecision')} Icon={FileCheck2} tone="warning" />
-      <Metric label={t('home.openGaps')} value={summary.open_gaps} detail={t('home.questionsNoAnswer')} Icon={Search} tone="info" />
-      <Metric label={t('home.departments')} value={summary.departments} detail={t('home.teamsKnowledge')} Icon={FolderTree} tone="success" />
-    </section>
-
-    <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.8fr)]">
-      <article className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_12px_28px_rgb(var(--shadow)/.10)]">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4"><div><p className="text-body-sm font-bold uppercase tracking-[.15em] text-muted-foreground">Latest activity</p><h2 className="mt-1 text-lg font-semibold text-foreground">Recently reviewed knowledge</h2></div><Link to="/articles" className="inline-flex items-center gap-1 text-sm font-bold text-primary transition hover:text-info-text">Open library <ArrowRight size={14} /></Link></div>
-        <div className="divide-y divide-border">{summary.recent.length ? summary.recent.map((article, index) => <Link key={article.id} to={`/articles/${article.id}`} className="group flex items-center gap-3 px-5 py-4 transition hover:bg-surface-soft"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><BookOpen size={16} /></div><div className="min-w-0 flex-1"><div className="flex min-w-0 items-center gap-2"><h3 className="truncate text-base font-semibold text-foreground group-hover:text-info-text">{article.title}</h3>{article.needs_update && <span className="hidden rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-body-sm font-bold uppercase tracking-wide text-warning sm:inline">Update due</span>}</div><p className="mt-1 truncate text-sm text-muted-foreground">{article.dept || 'Unassigned department'} · {article.owner || 'No owner'}</p></div><div className="hidden text-right sm:block"><p className="text-body-sm font-semibold text-success-text">Verified</p><p className="mt-1 text-body-sm text-muted">#{String(index + 1).padStart(2, '0')}</p></div><ArrowRight size={15} className="shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-info-text" /></Link>) : <div className="px-5 py-12 text-center text-base text-muted-foreground">Your recently reviewed documents will appear here.</div>}</div>
-      </article>
-
-      <div className="space-y-5">
-        <article className="rounded-xl border border-border bg-surface-elevated p-5 shadow-[0_12px_28px_rgb(var(--shadow)/.12)]"><div className="flex items-start justify-between"><div><p className="text-body-sm font-bold uppercase tracking-[.15em] text-muted-foreground">Governance pulse</p><h2 className="mt-1 text-lg font-semibold text-foreground">Knowledge health</h2></div><span className="grid h-9 w-9 place-items-center rounded-lg bg-success/10 text-success-text"><ShieldCheck size={17} /></span></div><div className="mt-6 flex items-end gap-4"><div className="text-5xl font-semibold tracking-tight text-foreground">{ownerCoverage}<span className="text-xl text-muted-foreground">%</span></div><p className="mb-1 text-sm text-muted-foreground">of articles have a clear owner</p></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-muted"><div className="h-full rounded-full bg-gradient-to-r from-info to-success transition-all" style={{ width: `${ownerCoverage}%` }} /></div><div className="mt-5 border-t border-border pt-4"><p className="text-2xl font-semibold text-warning">{summary.needs_review}</p><p className="mt-1 text-body-sm uppercase tracking-wide text-muted">Need review</p></div><Link to="/governance/health" className="mt-5 inline-flex items-center gap-1 text-sm font-bold text-info-text hover:text-foreground">View health report <ArrowRight size={14} /></Link></article>
-        <article className="rounded-xl border border-border bg-card p-5"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-lg bg-warning/10 text-warning"><Clock3 size={17} /></span><div><p className="text-body-sm font-bold uppercase tracking-[.15em] text-muted-foreground">Next action</p><h2 className="mt-0.5 text-base font-semibold text-foreground">Keep work moving</h2></div></div><p className="mt-4 text-base leading-7 text-muted-foreground">{summary.pending_drafts ? `${summary.pending_drafts} submitted document${summary.pending_drafts === 1 ? ' is' : 's are'} waiting in the review queue.` : 'The approval queue is clear. New submissions will appear here.'}</p>{has('governance.read') && <Link to="/governance/pending-drafts" className="mt-4 flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2.5 text-sm font-bold text-foreground transition hover:bg-surface-soft"><span>Open approval inbox</span><ArrowRight size={15} className="text-warning" /></Link>}</article>
+  return <PageTransition className="-mx-3 -my-4 sm:-mx-5 lg:-mx-7">
+    <section className="relative overflow-hidden bg-primary px-5 py-12 text-primary-foreground sm:px-8 lg:px-[max(3rem,6vw)] lg:py-16">
+      <div className="pointer-events-none absolute -bottom-40 right-0 text-[22rem] font-bold leading-none text-white/[.025]">Q</div>
+      <div className="relative max-w-5xl">
+        <p className="font-mono text-caption font-medium uppercase tracking-[.12em] text-white/65">QNSC Knowledge Workspace</p>
+        <h1 className="mt-4 max-w-4xl font-display text-4xl font-bold leading-[1.08] tracking-[-.045em] text-white sm:text-5xl lg:text-6xl">
+          {language === 'vi' ? <>Chào {firstName}. Bạn muốn <span className="text-[#c7eb72]">biết hoặc làm gì</span> hôm nay?</> : <>Hello {firstName}. What do you want to <span className="text-[#c7eb72]">know or do</span> today?</>}
+        </h1>
+        <p className="mt-4 max-w-2xl text-body-lg leading-7 text-white/70">{t('home.subtitle')}</p>
+        <form action="/search" className="mt-8 flex max-w-4xl flex-col gap-2 rounded-panel bg-white p-2 shadow-modal sm:flex-row sm:items-center">
+          <Search size={19} className="ml-3 hidden shrink-0 text-primary sm:block" />
+          <input name="q" aria-label="Search knowledge" placeholder={t('header.searchPlaceholder')} className="min-h-11 min-w-0 flex-1 bg-transparent px-3 text-body text-foreground outline-none placeholder:text-muted" />
+          <button type="submit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-surface bg-info px-5 text-body-sm font-bold text-info-foreground transition hover:bg-info/90">{language === 'vi' ? 'Khám phá tri thức' : 'Explore knowledge'} <ArrowRight size={14} /></button>
+        </form>
+        <div className="mt-3 flex flex-wrap gap-2 text-body-sm">
+          <Link to="/ai?prompt=Tóm tắt quy trình đầu tư mới nhất" className="rounded-full border border-white/20 bg-white/[.06] px-3 py-1.5 text-white/75 no-underline hover:bg-white/10 hover:text-white">{language === 'vi' ? 'Tóm tắt quy trình đầu tư mới nhất' : 'Summarize the latest investment process'}</Link>
+          <Link to="/ai?prompt=Ai có quyền sửa QĐ-214?" className="rounded-full border border-white/20 bg-white/[.06] px-3 py-1.5 text-white/75 no-underline hover:bg-white/10 hover:text-white">{language === 'vi' ? 'Ai có quyền sửa QĐ-214?' : 'Who can update QĐ-214?'}</Link>
+        </div>
       </div>
     </section>
 
-    <footer className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted"><span className="inline-flex items-center gap-2"><CheckCircle2 size={14} className="text-success-text" /> Source storage secured</span><span className="inline-flex items-center gap-2"><ShieldCheck size={14} className="text-primary" /> Department-aware access active</span><span className="inline-flex items-center gap-2"><Activity size={14} className="text-info-text" /> Workflow monitoring enabled</span></footer>
+    <div className="page-shell-wide space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+      <section>
+        <div className="mb-3 flex items-end justify-between gap-4"><div><h2 className="font-display text-h3 font-bold text-foreground">{language === 'vi' ? 'Không gian tri thức' : 'Knowledge spaces'}</h2><p className="mt-1 text-body-sm text-muted-foreground">{language === 'vi' ? 'Đi thẳng vào phạm vi công việc của bạn.' : 'Go directly to the part of the business you work with.'}</p></div><Link to="/articles" className="text-body-sm font-bold text-primary">{language === 'vi' ? `Xem ${summary.departments} phòng ban` : `View ${summary.departments} departments`} →</Link></div>
+        <div className="grid overflow-hidden rounded-panel border border-border bg-surface sm:grid-cols-2 xl:grid-cols-4">
+          {spaces.map((space, index) => <Link key={space.name} to={`/articles?dept=${encodeURIComponent(space.name)}`} className="group relative min-h-36 border-b border-border p-5 text-foreground no-underline transition hover:bg-surface-elevated sm:border-r xl:border-b-0 last:border-r-0">
+            <span className="font-mono text-caption text-muted">{String(index + 1).padStart(2, '0')} / SPACE</span><span className="absolute right-4 top-4 font-mono text-h4 text-muted/50">{space.count}</span>
+            <h3 className="mt-7 font-display text-body-lg font-bold group-hover:text-primary">{space.name}</h3><p className="mt-1 text-body-sm leading-5 text-muted-foreground">{space.detail}</p>
+          </Link>)}
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(19rem,.55fr)]">
+        <article>
+          <div className="mb-3 flex items-end justify-between"><div><h2 className="font-display text-h3 font-bold text-foreground">{language === 'vi' ? 'Tri thức vừa được soát xét' : 'Recently reviewed knowledge'}</h2><p className="mt-1 text-body-sm text-muted-foreground">{language === 'vi' ? 'Nội dung mới nhất đã qua kiểm tra.' : 'The latest knowledge that passed review.'}</p></div><Link to="/articles" className="text-body-sm font-bold text-primary">{language === 'vi' ? 'Mở thư viện' : 'Open library'} →</Link></div>
+          <div className="border-t border-foreground">
+            {summary.recent.length ? summary.recent.map((article, index) => <Link key={article.id} to={`/articles/${article.id}`} className="group grid grid-cols-[3rem_minmax(0,1fr)_auto_1.25rem] items-center gap-3 border-b border-border py-4 text-foreground no-underline">
+              <span className="font-mono text-body-sm text-muted">{String(index + 1).padStart(2, '0')}</span><div className="min-w-0"><h3 className="truncate text-body font-bold group-hover:text-primary">{article.title}</h3><p className="mt-1 truncate text-body-sm text-muted-foreground">{article.dept || 'Unassigned department'} · {article.owner || 'No owner'}</p></div><span className="hidden text-body-sm font-semibold text-success-text sm:block">{article.needs_update ? (language === 'vi' ? 'Cần rà soát' : 'Review due') : (language === 'vi' ? 'Đã xác minh' : 'Verified')}</span><ArrowRight size={15} className="text-muted transition group-hover:translate-x-0.5 group-hover:text-primary" />
+            </Link>) : <div className="py-12 text-center text-body text-muted-foreground">Your recently reviewed documents will appear here.</div>}
+          </div>
+        </article>
+
+        <aside className="rounded-panel bg-surface-muted p-5">
+          <h2 className="font-display text-h4 font-bold text-foreground">{language === 'vi' ? 'Cần bạn chú ý' : 'Needs your attention'}</h2>
+          {has('governance.read') && <Link to="/governance/pending-drafts" className="mt-4 block border-t border-border py-4 text-foreground no-underline"><div className="flex items-center gap-2"><FileCheck2 size={15} className="text-warning-text" /><strong className="text-body-sm">{summary.pending_drafts} {language === 'vi' ? 'bản nháp đang chờ duyệt' : 'drafts await review'}</strong></div><p className="mt-2 text-body-sm leading-5 text-muted-foreground">{t('home.waitingDecision')}</p></Link>}
+          <Link to="/governance/gap-queue" className="block border-t border-border py-4 text-foreground no-underline"><div className="flex items-center gap-2"><Search size={15} className="text-info-text" /><strong className="text-body-sm">{summary.open_gaps} {language === 'vi' ? 'khoảng trống tri thức' : 'open knowledge gaps'}</strong></div><p className="mt-2 text-body-sm leading-5 text-muted-foreground">{t('home.questionsNoAnswer')}</p></Link>
+          <Link to="/governance/health" className="block border-t border-border py-4 text-foreground no-underline"><div className="flex items-center gap-2"><ShieldCheck size={15} className="text-success-text" /><strong className="text-body-sm">{ownerCoverage}% {language === 'vi' ? 'có chủ sở hữu' : 'with clear ownership'}</strong></div><p className="mt-2 text-body-sm leading-5 text-muted-foreground">{summary.needs_review} {language === 'vi' ? 'bài cần rà soát lại' : 'articles need review'}</p></Link>
+        </aside>
+      </section>
+
+      {has('article.create') && <footer className="flex flex-wrap items-center gap-3 border-t border-border pt-5"><Link to="/sources" className="inline-flex min-h-10 items-center gap-2 rounded-control border border-border bg-surface px-4 text-body-sm font-bold text-foreground no-underline"><UploadCloud size={15} className="text-info-text" />{t('home.uploadSource')}</Link><Link to="/articles/new" className="inline-flex min-h-10 items-center gap-2 rounded-control bg-primary px-4 text-body-sm font-bold text-primary-foreground no-underline"><Plus size={15} />{t('home.newArticle')}</Link><span className="ml-auto hidden items-center gap-2 text-body-sm text-muted lg:flex"><CheckCircle2 size={14} className="text-success-text" /> Source storage secured</span></footer>}
+    </div>
   </PageTransition>
 }
