@@ -3,14 +3,16 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity, AlertTriangle, BookOpen, Bookmark, Bot, ClipboardList, Compass,
   FileArchive, FileText, FolderTree, KeyRound, LogOut, Network, Search,
-  Settings2, Tag, Users, Shield, Sparkles, X, Building2, Home,
+  Settings2, Tag, Users, Shield, Sparkles, X, Building2, Home, Globe, Monitor,
   type LucideIcon,
 } from 'lucide-react'
 import { BrandMarkGlyph } from '../components/ui/BrandMark'
 import { Button } from '../components/ui/Button'
+import { Select } from '../components/ui/Select'
 import { useAuth } from '../auth/useAuth'
 import { useLanguage } from '../i18n/LanguageProvider'
 import { usePermission } from '../hooks/usePermission'
+import { useTheme, type ThemePreference } from '../theme/ThemeProvider'
 import { ChangePasswordModal } from '../auth/ChangePasswordModal'
 
 type IconType = LucideIcon
@@ -26,16 +28,22 @@ function DrawerSection({ title, children }: { title: string; children: React.Rea
 export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
   const { logout, user } = useAuth()
   const location = useLocation()
-  const { t } = useLanguage()
+  const { language, setLanguage, t } = useLanguage()
   const { has } = usePermission()
+  const { theme, setTheme } = useTheme()
   const [passwordOpen, setPasswordOpen] = useState(false)
 
   useEffect(() => { onClose() }, [location.pathname, onClose])
   useEffect(() => {
     if (!mobileOpen) return
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', onKeyDown)
+    }
   }, [mobileOpen, onClose])
 
   return <>
@@ -83,12 +91,22 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
       </nav>
 
       <footer className="border-t border-border p-3">
+        <div className="mb-2 grid grid-cols-2 gap-2 lg:hidden">
+          <label className="min-w-0 rounded-lg border border-border bg-surface px-2 py-1.5">
+            <span className="mb-1 flex items-center gap-1.5 text-caption font-semibold text-muted"><Globe size={12} />{t('language.switch')}</span>
+            <Select value={language} onChange={event => setLanguage(event.target.value as 'en' | 'vi')} size="sm" className="w-full min-w-0 border-0 bg-transparent px-0 text-body-sm font-semibold text-foreground" aria-label={t('language.switch')}><option value="en">English</option><option value="vi">Tiếng Việt</option></Select>
+          </label>
+          <label className="min-w-0 rounded-lg border border-border bg-surface px-2 py-1.5">
+            <span className="mb-1 flex items-center gap-1.5 text-caption font-semibold text-muted"><Monitor size={12} />Appearance</span>
+            <Select value={theme} onChange={event => setTheme(event.target.value as ThemePreference)} size="sm" className="w-full min-w-0 border-0 bg-transparent px-0 text-body-sm font-semibold text-foreground" aria-label="Appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></Select>
+          </label>
+        </div>
         <div className="mb-2 flex items-center gap-2.5 rounded-xl bg-surface-muted px-3 py-3">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary text-caption font-bold text-primary-foreground">{user?.name?.substring(0, 2).toUpperCase() || 'US'}</div>
           <div className="min-w-0"><p className="truncate text-body-sm font-bold text-foreground">{user?.name || 'User'}</p><p className="truncate text-caption text-muted">{user?.role || 'Staff'}</p></div>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Button onClick={() => setPasswordOpen(true)} variant="secondary" size="sm" icon={<KeyRound size={14} />}>{t('auth.changePassword')}</Button>
+          <Button onClick={() => { onClose(); setPasswordOpen(true) }} variant="secondary" size="sm" icon={<KeyRound size={14} />}>{t('auth.changePassword')}</Button>
           <Button onClick={logout} variant="ghost" size="sm" icon={<LogOut size={14} />} className="text-destructive-text">{t('nav.logOut')}</Button>
         </div>
       </footer>

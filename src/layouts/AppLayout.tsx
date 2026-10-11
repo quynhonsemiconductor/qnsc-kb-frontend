@@ -13,7 +13,7 @@ export default function AppLayout() {
       <SkipLink />
       <Header onMenuClick={() => setNavigationOpen(true)} />
       <Sidebar mobileOpen={navigationOpen} onClose={closeNavigation} />
-      <main id="main-content" className="app-scroll relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-canvas px-3 py-4 pb-20 sm:px-5 md:pb-5 lg:px-7">
+      <main id="main-content" className="app-scroll relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-canvas px-3 py-4 pb-20 sm:px-5 lg:px-7 lg:pb-5">
         <Outlet />
       </main>
     </div>
