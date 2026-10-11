@@ -330,13 +330,18 @@ export default function PendingDraftsPage() {
   }
 
   const openReview = (draft: Draft) => {
+    if ((draft.candidate_count || 0) > 1) {
+      navigate(`/governance/pending-drafts/${draft.id}/batch-review`)
+      return
+    }
+    const opensAsUpdate = draft.requires_update_confirmation || draft.similarity_level === 'very_high'
     setSelectedDraft(draft)
     setReviewOpen(true)
     setDepartmentMenuOpen(false)
     setReviewTab('structured')
-    setShowComparison(false)
+    setShowComparison(opensAsUpdate)
     setShowQuality(false)
-    setShowPublishOptions(false)
+    setShowPublishOptions(true)
     setUpdateArticleId(draft.content_metadata?.suggested_update_article_id || '')
     setTreatAsNew(false)
     setSelectedApproverId(draft.assigned_approver_id || '')
@@ -605,7 +610,9 @@ export default function PendingDraftsPage() {
   return (
     <div className="page-shell page-stack text-ink">
       <header className="page-hero glass-panel soft-grid signal-line relative overflow-hidden rounded-panel border border-border px-4 py-5 sm:px-6 sm:py-6">
-        <div className="pointer-events-none absolute -right-12 -top-16 hidden h-52 w-52 opacity-65 xl:block"><div className="hero-orb h-full w-full"><div className="orbit-ring" /><div className="orb-core text-xl">Q</div></div></div>
+        {/* Same orb as AskPage carried, bled off the top-right corner of the review
+            header. Removed with the rest of the decoration: a reviewer working a queue
+            needs the queue, not an animation over it. */}
         <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-stone"><FileCheck2 size={14} className="text-info-text" /> Content operations</div>
@@ -716,7 +723,7 @@ export default function PendingDraftsPage() {
       })}</div>}
       </>}
 
-      {reviewOpen && selectedDraft &&<div className="fixed inset-0 z-50 bg-black/75 p-2 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-labelledby={reviewTitleId}><FocusTrap className="contents"><section className="mx-auto flex h-[calc(100vh-1rem)] max-w-7xl flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl sm:h-[calc(100vh-2rem)]">
+      {reviewOpen && selectedDraft &&<div className="fixed inset-0 z-modal bg-scrim/30 p-0 backdrop-blur-[2px] sm:p-3" role="dialog" aria-modal="true" aria-labelledby={reviewTitleId}><FocusTrap className="contents"><section className="mx-auto flex h-full max-w-[100rem] flex-col overflow-hidden border border-border bg-canvas shadow-modal sm:rounded-panel">
         <header className="flex shrink-0 items-center justify-between gap-4 border-b border-hairline bg-surface px-4 py-3 sm:px-6"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="info" size="sm" className="uppercase tracking-widest">Focused review</Badge>{selectedDraft.similarity_level === 'very_high' && <Badge variant="warning" size="sm" className="uppercase tracking-widest">Possible update</Badge>}</div><h2 id={reviewTitleId} className="mt-1 truncate text-base font-semibold text-ink sm:text-lg">{selectedDraft.title}</h2><p className="mt-1 truncate text-xs text-stone">{selectedDraft.source_ref} · Original source is unchanged</p>{selectedDraft.tags && selectedDraft.tags.length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="text-caption font-semibold uppercase tracking-widest text-stone">AI-suggested tags:</span>{selectedDraft.tags.map(tag => <Badge key={tag} variant="default" size="sm">{tag}</Badge>)}</div>}</div><div className="flex shrink-0 items-center gap-2">{user?.permissions?.includes('ai.ask') && <Button variant="ghost" size="sm" onClick={() => navigate(`/ai?${editableTargetArticle ? `articleId=${encodeURIComponent(editableTargetArticle.id)}&articleTitle=${encodeURIComponent(editableTargetArticle.title)}&` : ''}prompt=${encodeURIComponent(requestDraftPrompt)}`)} icon={<MessageSquare size={13} />}>Ask AI about edit</Button>}{canEditTargetArticle && editableTargetArticle && <Button variant="ghost" size="sm" onClick={() => navigate(`/articles/${editableTargetArticle.id}/edit`)} icon={<Edit3 size={13} />}>Edit source article</Button>}<button onClick={() => setShowQuality(value => !value)} className={`hidden rounded-lg border px-2.5 py-2 text-body-sm font-semibold sm:inline-flex ${showQuality ? 'border-cyan/30 bg-cyan/10 text-info-text' : 'border-hairline text-stone hover:text-ink'}`}>{showQuality ? 'Hide quality' : 'Quality details'}</button>{matches.length > 0 && <button onClick={toggleComparison} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-body-sm font-semibold ${showComparison ? 'border-amber-300/30 bg-amber-400/10 text-warning-text' : 'border-hairline text-stone hover:text-ink'}`}><ArrowLeftRight size={13} />{showComparison ? 'Hide comparison' : 'Compare article'}</button>}<button onClick={closeReview} className="rounded-lg p-2 text-stone hover:bg-surface-soft hover:text-ink" title="Close review"><X size={18} /></button></div></header>
         {showComparison && matches.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-surface-soft px-4 py-2.5 sm:px-6"><span className="mr-1 text-caption font-semibold uppercase tracking-widest text-stone">Related article</span>{matches.map(match => <button key={match.article_id} onClick={() => void loadComparison(selectedDraft.id, match.article_id)} className={`rounded-lg border px-2.5 py-1.5 text-left text-xs transition ${compareArticleId === match.article_id ? 'border-amber-300/40 bg-amber-400/10 text-warning-text' : 'border-hairline bg-canvas text-steel hover:border-amber-300/30 hover:text-ink'}`}><span className="font-semibold">{Math.round(match.score * 100)}%</span> · {match.title}</button>)}</div>}
         {showQuality && <ReviewQuality report={selectedDraft.restructure_report} chunkCount={selectedDraft.restructure_chunk_count} busy={isAiBusy(selectedDraft)} />}

@@ -40,7 +40,7 @@ const sizeStyles: Record<BadgeSize, string> = {
 
 export function Badge({ children, variant = 'default', size = 'sm', dot = false, className = '' }: BadgeProps) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border font-semibold ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-md border font-semibold ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}>
       {dot && <span className={`h-1.5 w-1.5 rounded-full ${dotColors[variant]}`} />}
       {children}
     </span>

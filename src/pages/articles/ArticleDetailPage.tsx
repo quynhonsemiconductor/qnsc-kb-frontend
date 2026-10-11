@@ -133,6 +133,9 @@ export default function ArticleDetailPage() {
   const [following, setFollowing] = useState(false)
   const [history, setHistory] = useState<any[]>([])
   const [showHistory, setShowHistory] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [selectedExcerpt, setSelectedExcerpt] = useState('')
+  const readingRef = useRef<HTMLDivElement>(null)
   const [viewingVersion, setViewingVersion] = useState<any>(null)
   const [compareWithCurrent, setCompareWithCurrent] = useState(false)
   const [editingMetadata, setEditingMetadata] = useState(false)
@@ -394,11 +397,21 @@ export default function ArticleDetailPage() {
 
   const canEdit = canEditArticleForUser(currentUser, article)
   const requestEditPrompt = `I need help identifying who is allowed to change the knowledge-base article "${article.title}" (article ID: ${article.id}). I cannot change it directly. Please explain which role or person owns this responsibility and help me prepare a clear request for them.`
+  const captureExcerpt = () => {
+    const selection = window.getSelection()
+    const excerpt = selection?.toString().trim() || ''
+    const anchor = selection?.anchorNode
+    const anchorElement = anchor?.nodeType === Node.TEXT_NODE ? anchor.parentElement : anchor as Element | null
+    setSelectedExcerpt(excerpt.length >= 8 && anchorElement && readingRef.current?.contains(anchorElement) ? excerpt.slice(0, 600) : '')
+  }
+  const selectedExcerptPrompt = selectedExcerpt
+    ? `Using the article "${article.title}" (article ID: ${article.id}) as context, explain and verify this selected passage:\n\n"${selectedExcerpt}"`
+    : ''
 
   return (
-    <div className="page-shell page-stack">
-      {/* Navigation & Controls */}
-      <div className="page-hero glass-panel soft-grid signal-line relative flex items-center justify-between overflow-hidden rounded-panel border border-border px-4 py-4 sm:px-6">
+    <div className="article-reading-canvas page-shell-wide page-stack">
+      {/* Navigation & contextual controls */}
+      <div className="article-reading-toolbar sticky top-0 z-sticky flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface/95 px-3 py-3 backdrop-blur sm:px-5">
         <Link to="/articles" className="mm-secondary flex items-center gap-1.5 px-3 py-2 text-sm">
           <ArrowLeft size={16} />
           <span>{t('articles.back')}</span>
@@ -431,7 +444,7 @@ export default function ArticleDetailPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setShowHistory(!showHistory)}
+            onClick={() => { setShowHistory(value => !value); setDetailsOpen(true) }}
             aria-label="Version History"
             className={`rounded-xl border p-2 ${
               showHistory 
@@ -468,6 +481,9 @@ export default function ArticleDetailPage() {
               <MessageSquare size={16} /> <span className="hidden sm:inline">Request edit</span>
             </Link>
           )}
+          <Button variant="secondary" size="sm" onClick={() => setDetailsOpen(value => !value)}>
+            {detailsOpen ? 'Hide details' : 'Details'}
+          </Button>
           {article.source_available && (
             <Button
               variant="secondary"
@@ -483,10 +499,10 @@ export default function ArticleDetailPage() {
       </div>
 
       {/* Main Grid split: Content & Sidebar metadata */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        
-        {/* Content body */}
-        <div className="lg:col-span-3 space-y-5">
+      <div className={`grid grid-cols-1 gap-6 ${detailsOpen ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
+
+        {/* Reading canvas */}
+        <div className={`space-y-5 ${detailsOpen ? '' : 'mx-auto w-full max-w-5xl'}`}>
            <div className="glass-panel rounded-panel border border-border p-5 shadow-[0_16px_42px_rgb(var(--shadow)/.1)] md:p-6 space-y-5">
             <div>
               {/* Title & metadata */}
@@ -526,7 +542,7 @@ export default function ArticleDetailPage() {
             </div>
 
             {/* Render Markdown text (simple fallback renderer for preview logic) */}
-            <div className="markdown-surface max-w-none border-t border-border pt-xl">
+            <div ref={readingRef} onMouseUp={captureExcerpt} onKeyUp={captureExcerpt} className="markdown-surface max-w-none border-t border-border pt-xl">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: MarkdownLink }}>{renderedBody || article.body_md}</ReactMarkdown>
             </div>
 
@@ -647,8 +663,11 @@ export default function ArticleDetailPage() {
 
         {/* Sidebar Metadata */}
         <div className="lg:col-span-1 space-y-5">
+          {/* On-demand document utility drawer */}
+          {detailsOpen && <div className="sticky top-20 space-y-4 rounded-panel border border-border bg-surface p-5 shadow-popover">
+            <div className="flex items-center justify-between border-b border-border pb-3"><h2 className="font-display text-body font-bold text-foreground">Document details</h2><button type="button" onClick={() => setDetailsOpen(false)} className="rounded-control px-2 py-1 text-body-sm text-muted hover:bg-surface-soft hover:text-foreground">Close</button></div>
           {/* Attributes card */}
-          <div className="bg-slate-900/30 border border-slate-800/80 rounded-xl p-5 space-y-4">
+          <div className="space-y-4">
             <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-800 pb-2">
               Attributes
             </h3>
@@ -722,9 +741,15 @@ export default function ArticleDetailPage() {
               </div>
             </div>
           )}
+          </div>}
         </div>
 
       </div>
+      {selectedExcerpt && has('ai.ask') && <div className="sticky bottom-4 z-sticky mx-auto flex w-fit max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl bg-foreground px-3 py-2 text-background shadow-popover">
+        <span className="max-w-xs truncate text-body-sm">“{selectedExcerpt}”</span>
+        <Link to={`/ai?articleId=${encodeURIComponent(article.id)}&articleTitle=${encodeURIComponent(article.title)}&prompt=${encodeURIComponent(selectedExcerptPrompt)}`} className="shrink-0 rounded-lg bg-info px-3 py-2 text-body-sm font-bold text-info-foreground no-underline">Ask AI about this passage</Link>
+        <button type="button" onClick={() => setSelectedExcerpt('')} aria-label="Dismiss selection action" className="rounded-md px-1.5 py-1 text-background/65 hover:bg-background/10 hover:text-background">×</button>
+      </div>}
       {sourceViewer && (
         <PdfViewer
           open

@@ -16,6 +16,37 @@
    To refresh: re-fetch the css2 URL that index.html used to reference, drop the files
    into public/fonts/ and regenerate this file. */
 
+/* Be Vietnam Pro · complete Vietnamese-capable faces.
+   These static files are self-hosted so the CSP stays style-src/font-src 'self'. */
+@font-face {
+  font-family: 'Be Vietnam Pro';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/be-vietnam-pro-400.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Be Vietnam Pro';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/be-vietnam-pro-500.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Be Vietnam Pro';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/be-vietnam-pro-600.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Be Vietnam Pro';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/be-vietnam-pro-700.ttf') format('truetype');
+}
+
 /* DM Sans · latin */
 @font-face {
   font-family: 'DM Sans';
