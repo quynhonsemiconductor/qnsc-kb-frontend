@@ -2,15 +2,9 @@ import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
+import type { Citation } from '../../types/ai'
 
-export interface AnswerCitation {
-  source_index?: number
-  article_id: string
-  title: string
-  source_ref: string
-  section_ref?: string
-  page_number?: number
-}
+export type AnswerCitation = Citation
 
 interface AnswerTextProps {
   content: string

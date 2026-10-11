@@ -1,4 +1,6 @@
 import client, { clearExpiredSession, getAccessToken, refreshSession } from './client'
+import type { AIStreamEvent, AnalyticsResult, EvidenceStatus } from '../types/ai'
+import { dispatchAIStreamPayload } from '../lib/ai-stream'
 
 export async function askAI(
   question: string,
@@ -31,6 +33,8 @@ export async function askAIStream(
   retry = true,
   confirmEdit = false,
   editInstruction?: string,
+  onAnalytics?: (results: AnalyticsResult[]) => void,
+  onEvidenceStatus?: (status: EvidenceStatus) => void,
 ) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
   const token = getAccessToken()
@@ -45,7 +49,7 @@ export async function askAIStream(
     signal,
   })
   if (response.status === 401 && retry && await refreshSession()) {
-    return askAIStream(question, conversationId, language, onToken, onSources, onDone, articleId, signal, false, confirmEdit, editInstruction)
+    return askAIStream(question, conversationId, language, onToken, onSources, onDone, articleId, signal, false, confirmEdit, editInstruction, onAnalytics, onEvidenceStatus)
   }
   if (response.status === 401) clearExpiredSession()
   if (!response.ok || !response.body) throw new Error(`AI stream failed (${response.status})`)
@@ -63,11 +67,9 @@ export async function askAIStream(
     } catch {
       return
     }
-    if (payload.type === 'token') onToken(payload.content || '')
-    if (payload.type === 'replace') onToken(`\u0000REPLACE\u0000${payload.content || ''}`)
-    if (payload.type === 'sources') onSources(payload.sources || [])
-    if (payload.type === 'error') throw new Error(payload.detail || 'AI generation failed')
-    if (payload.type === 'done') onDone(payload)
+    dispatchAIStreamPayload(payload as AIStreamEvent, {
+      onToken, onSources, onDone, onAnalytics, onEvidenceStatus,
+    })
   }
   try {
     while (true) {
