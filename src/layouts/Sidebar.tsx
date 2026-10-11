@@ -14,6 +14,8 @@ import { useLanguage } from '../i18n/LanguageProvider'
 import { usePermission } from '../hooks/usePermission'
 import { useTheme, type ThemePreference } from '../theme/ThemeProvider'
 import { ChangePasswordModal } from '../auth/ChangePasswordModal'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
+import { FocusTrap } from '../components/ui/FocusTrap'
 
 type IconType = LucideIcon
 
@@ -34,21 +36,18 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
   const [passwordOpen, setPasswordOpen] = useState(false)
 
   useEffect(() => { onClose() }, [location.pathname, onClose])
+  useBodyScrollLock(mobileOpen)
   useEffect(() => {
     if (!mobileOpen) return
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.body.style.overflow = previousOverflow
-      document.removeEventListener('keydown', onKeyDown)
-    }
+    return () => document.removeEventListener('keydown', onKeyDown)
   }, [mobileOpen, onClose])
 
   return <>
     {mobileOpen && <button type="button" aria-label="Close navigation" onClick={onClose} className="fixed inset-0 z-overlay bg-scrim/35 backdrop-blur-[2px]" />}
-    <aside inert={!mobileOpen} aria-hidden={!mobileOpen} className={`fixed inset-y-0 right-0 z-modal flex w-[min(92vw,22rem)] flex-col border-l border-border bg-surface shadow-modal transition-transform duration-base ease-standard ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+    <FocusTrap active={mobileOpen} className="contents">
+    <aside inert={!mobileOpen} aria-hidden={!mobileOpen} role="dialog" aria-modal={mobileOpen ? 'true' : undefined} aria-label="All navigation" className={`fixed inset-y-0 right-0 z-modal flex w-[min(92vw,22rem)] flex-col border-l border-border bg-surface shadow-modal transition-transform duration-base ease-standard ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}`}>
       <header className="flex min-h-[3.875rem] items-center gap-3 border-b border-border px-4">
         <BrandMarkGlyph className="h-8 w-8" title="QNSC" />
         <div className="min-w-0"><p className="font-display text-body font-bold text-foreground">All navigation</p><p className="text-caption text-muted">Knowledge, governance and administration</p></div>
@@ -111,6 +110,7 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
         </div>
       </footer>
     </aside>
+    </FocusTrap>
     <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
   </>
 }

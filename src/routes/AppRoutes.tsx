@@ -3,6 +3,7 @@ import { Route, Navigate, Outlet, createRoutesFromElements } from 'react-router-
 import AppLayout from '../layouts/AppLayout'
 import ProtectedRoute from './ProtectedRoute'
 import { PageSkeleton } from '../components/ui/Skeleton'
+import RouteErrorPage from './RouteErrorPage'
 
 const LoginPage = lazy(() => import('../auth/LoginPage'))
 const AcceptInvitePage = lazy(() => import('../auth/AcceptInvitePage'))
@@ -43,7 +44,7 @@ const UiCatalogPage = lazy(() => import('../pages/dev/UiCatalogPage'))
 // Suspense stays outside the tree, wrapping every element from the root, so the lazy()
 // page boundaries above still split each page into its own chunk exactly as before.
 export const routes = createRoutesFromElements(
-  <Route element={<Suspense fallback={<PageSkeleton />}><Outlet /></Suspense>}>
+  <Route errorElement={<RouteErrorPage />} element={<Suspense fallback={<PageSkeleton />}><Outlet /></Suspense>}>
     <Route path="/login" element={<LoginPage />} />
     <Route path="/accept-invite" element={<AcceptInvitePage />} />
     <Route path="/forgot-password" element={<ForgotPasswordPage />} />

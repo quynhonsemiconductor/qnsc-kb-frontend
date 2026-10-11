@@ -25,6 +25,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { formatDay } from '../../lib/formatters'
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 
 const similarityStyles: Record<string, string> = {
   very_high: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
@@ -177,6 +178,7 @@ export default function PendingDraftsPage() {
   const [actingDraftId, setActingDraftId] = useState<string | null>(null)
   const [restructuringDraftId, setRestructuringDraftId] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  useBodyScrollLock(reviewOpen)
   const [selectedDraft, setSelectedDraft] = useState<Draft | null>(null)
   const [comparedArticle, setComparedArticle] = useState<ComparedArticle | null>(null)
   const [editableTargetArticle, setEditableTargetArticle] = useState<any | null>(null)
@@ -633,7 +635,7 @@ export default function PendingDraftsPage() {
         </div>
       </header>
 
-      {(message || error) && <div className={`rounded-lg border px-4 py-3 text-sm ${error ? 'border-rose-400/25 bg-rose-500/10 text-rose-200' : 'border-emerald-400/25 bg-emerald-500/10 text-emerald-200'}`}>{error || message}</div>}
+      {(message || error) && <div role={error ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${error ? 'border-destructive/25 bg-destructive/10 text-destructive-text' : 'border-success/25 bg-success/10 text-success-text'}`}>{error || message}</div>}
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="metric-spark interactive-lift rounded-2xl border border-border p-4"><div className="flex items-center justify-between text-muted"><span className="text-xs font-bold uppercase tracking-[.12em]">Awaiting review</span><Clock3 size={16} className="text-info-text" /></div><p className="mt-2 font-display text-3xl font-extrabold text-foreground">{drafts.length}</p><p className="mt-1 text-body-sm text-muted-foreground">New source submissions</p></div>

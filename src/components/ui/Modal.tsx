@@ -1,6 +1,7 @@
 import React, { useEffect, useId } from 'react'
 import { X } from 'lucide-react'
 import { FocusTrap } from './FocusTrap'
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 
 interface ModalProps {
   open: boolean
@@ -11,25 +12,11 @@ interface ModalProps {
   className?: string
 }
 
-// Counts how many modals currently hold the scroll lock. A nested or stacked modal closing
-// used to reset body overflow unconditionally, which unlocked scrolling underneath a parent
-// modal that was still open. Only the last one out restores it.
-let scrollLockCount = 0
-
-function lockBodyScroll() {
-  if (scrollLockCount === 0) document.body.style.overflow = 'hidden'
-  scrollLockCount += 1
-}
-
-function releaseBodyScroll() {
-  scrollLockCount = Math.max(0, scrollLockCount - 1)
-  if (scrollLockCount === 0) document.body.style.overflow = ''
-}
-
 export function Modal({ open, onClose, title, children, size = 'md', className = '' }: ModalProps) {
   // Unique per mounted modal. A hardcoded id made two open modals both label themselves
   // from whichever heading happened to be first in the document.
   const titleId = useId()
+  useBodyScrollLock(open)
 
   useEffect(() => {
     if (!open) return
@@ -37,11 +24,7 @@ export function Modal({ open, onClose, title, children, size = 'md', className =
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', handleEscape)
-    lockBodyScroll()
-    return () => {
-      document.removeEventListener('keydown', handleEscape)
-      releaseBodyScroll()
-    }
+    return () => document.removeEventListener('keydown', handleEscape)
   }, [open, onClose])
 
   if (!open) return null
@@ -58,6 +41,7 @@ export function Modal({ open, onClose, title, children, size = 'md', className =
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? titleId : undefined}
+      aria-label={title ? undefined : 'Dialog'}
     >
       <div
         className="absolute inset-0 bg-background/75 backdrop-blur-sm animate-in fade-in duration-200"
@@ -65,7 +49,7 @@ export function Modal({ open, onClose, title, children, size = 'md', className =
         aria-hidden="true"
       />
       <FocusTrap active={open}>
-        <div className={`relative w-full ${sizes[size]} rounded-panel border border-border bg-surface-elevated p-6 shadow-2xl animate-in fade-in zoom-in-95 slide-in-from-bottom duration-300 ${className}`}>
+        <div className={`dialog-scroll relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto ${sizes[size]} rounded-panel border border-border bg-surface-elevated p-6 shadow-modal animate-in fade-in zoom-in-95 slide-in-from-bottom duration-300 ${className}`}>
           {title && (
             <div className="mb-4 flex items-center justify-between">
               <h2 id={titleId} className="text-h4 font-semibold text-foreground">{title}</h2>

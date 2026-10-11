@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown } from 'lucide-react'
+import { calculateFloatingPosition, getRootFontSize, type FloatingPosition } from '../../lib/floating-position'
 
 type Option = { value: string; label: React.ReactNode; disabled?: boolean }
 type SelectProps = {
@@ -18,13 +19,6 @@ type SelectProps = {
 
 const LISTBOX_MIN_WIDTH_REM = 12
 const LISTBOX_MAX_WIDTH_REM = 24
-const VIEWPORT_PADDING_REM = 0.5
-const LISTBOX_GAP_REM = 0.25
-
-const rootFontSize = () => {
-  const parsed = parseFloat(getComputedStyle(document.documentElement).fontSize)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 16
-}
 
 function getOptions(children: React.ReactNode): Option[] {
   return React.Children.toArray(children).flatMap((child): Option[] => {
@@ -48,7 +42,7 @@ export function Select({ children, value, defaultValue, onChange, disabled = fal
   // Explicit `undefined` rather than a bare call: React 19 dropped the zero-argument
   // useRef overload, so the initial value has to be stated and the type has to admit it.
   const resetTypeAhead = useRef<number | undefined>(undefined)
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 240, openAbove: false })
+  const [position, setPosition] = useState<FloatingPosition>({ top: 0, left: 0, width: 0, maxHeight: 240, openAbove: false })
 
   useEffect(() => setActiveIndex(selectedIndex), [selectedIndex])
   useEffect(() => {
@@ -68,28 +62,18 @@ export function Select({ children, value, defaultValue, onChange, disabled = fal
       const anchor = root.current?.querySelector('button')
       if (!anchor) return
       const rect = anchor.getBoundingClientRect()
-      const rem = rootFontSize()
-      const gap = LISTBOX_GAP_REM * rem
-      const viewportPadding = VIEWPORT_PADDING_REM * rem
-      const roomBelow = window.innerHeight - rect.bottom - gap - viewportPadding
-      const roomAbove = rect.top - gap - viewportPadding
-      const openAbove = roomBelow < 11.25 * rem && roomAbove > roomBelow
-      const maxHeight = Math.max(6 * rem, Math.min(20 * rem, openAbove ? roomAbove : roomBelow))
-      const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2)
-      const preferredWidth = Math.max(rect.width, LISTBOX_MIN_WIDTH_REM * rem)
-      const width = Math.min(preferredWidth, LISTBOX_MAX_WIDTH_REM * rem, availableWidth)
-      // Prefer the trigger's left edge. Near the right viewport edge, align the
-      // listbox's right edge with the trigger instead so every option remains visible.
-      const leftAligned = rect.left
-      const rightAligned = rect.right - width
-      const left = leftAligned + width <= window.innerWidth - viewportPadding ? leftAligned : rightAligned
-      const next = {
-        top: openAbove ? rect.top - gap : rect.bottom + gap,
-        left: Math.min(Math.max(viewportPadding, left), Math.max(viewportPadding, window.innerWidth - width - viewportPadding)),
-        width,
-        maxHeight,
-        openAbove,
-      }
+      const rem = getRootFontSize()
+      const next = calculateFloatingPosition({
+        anchor: rect,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        rem,
+        preferredWidth: Math.max(rect.width, LISTBOX_MIN_WIDTH_REM * rem),
+        minWidthRem: LISTBOX_MIN_WIDTH_REM,
+        maxWidthRem: LISTBOX_MAX_WIDTH_REM,
+        minHeightRem: 6,
+        maxHeightRem: 20,
+      })
       setPosition(current => current.top === next.top && current.left === next.left
         && current.width === next.width && current.maxHeight === next.maxHeight
         && current.openAbove === next.openAbove ? current : next)
