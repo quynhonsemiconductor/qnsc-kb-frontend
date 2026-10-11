@@ -1,8 +1,8 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
-  AlertCircle, AlertTriangle, ArrowLeftRight, Check, CheckCircle2, ChevronDown, Clock3, Edit3, Eye,
-  FileCheck2, FileText, Hash, Layers3, RefreshCw, Search, ShieldCheck, Sparkles, X,
-  MessageSquare, ListChecks, Minus,
+  AlertCircle, AlertTriangle, ArrowLeftRight, Check, CheckCircle2, ChevronDown, Edit3, Eye,
+  FileCheck2, FileText, Hash, Layers3, RefreshCw, Search, ShieldCheck, X,
+  MessageSquare, Minus,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -26,12 +26,8 @@ import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { formatDay } from '../../lib/formatters'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
+import { compareDraftManagementOrder, getDraftManagementStatus, getPublishBlockers } from '../../utils/draftManagement'
 
-const similarityStyles: Record<string, string> = {
-  very_high: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
-  partial: 'border-cyan/30 bg-cyan/10 text-info-text',
-  exact: 'border-rose-400/30 bg-rose-400/10 text-rose-300',
-}
 
 /** `blocked[].code` → the i18n key naming the one thing the reviewer must still do. */
 const blockedActionKeys: Record<string, string> = {
@@ -67,7 +63,6 @@ type Draft = {
   restructure_candidate_md?: string | null
   restructure_decision?: string
   restructure_status?: string
-  restructure_model?: string
   restructure_error?: string
   restructure_report?: RestructureReport | null
   restructure_chunk_count?: number
@@ -104,13 +99,14 @@ type ComparedArticle = {
 }
 
 function ReviewQuality({ report, chunkCount, busy }: { report?: RestructureReport | null; chunkCount?: number; busy: boolean }) {
+  const { t } = useLanguage()
   const percent = (value?: number) => value == null ? '—' : `${Math.round(value * 100)}%`
   const healthy = (value?: number) => value != null && value >= 0.9
   const metrics = [
-    { label: 'Content preserved', value: percent(report?.token_coverage), icon: ShieldCheck, tone: healthy(report?.token_coverage) ? 'text-success-text' : 'text-amber-300' },
-    { label: 'Numeric safety', value: percent(report?.numeric_coverage), icon: Hash, tone: healthy(report?.numeric_coverage) ? 'text-success-text' : 'text-amber-300' },
-    { label: 'Headings', value: report ? String(report.heading_count) : '—', icon: Layers3, tone: 'text-info-text' },
-    { label: 'RAG sections', value: report ? String(chunkCount || 0) : '—', icon: FileText, tone: 'text-violet-300' },
+    { label: t('technical.contentPreserved'), value: percent(report?.token_coverage), icon: ShieldCheck, tone: healthy(report?.token_coverage) ? 'text-success-text' : 'text-amber-300' },
+    { label: t('technical.numericSafety'), value: percent(report?.numeric_coverage), icon: Hash, tone: healthy(report?.numeric_coverage) ? 'text-success-text' : 'text-amber-300' },
+    { label: t('technical.headings'), value: report ? String(report.heading_count) : '—', icon: Layers3, tone: 'text-info-text' },
+    { label: t('technical.sections'), value: report ? String(chunkCount || 0) : '—', icon: FileText, tone: 'text-info-text' },
   ]
 
   return <section className="border-b border-hairline bg-gradient-to-br from-cyan/[0.07] via-surface to-surface-soft px-4 py-3 sm:px-6">
@@ -120,58 +116,22 @@ function ReviewQuality({ report, chunkCount, busy }: { report?: RestructureRepor
           {busy ? <RefreshCw size={17} className="animate-spin" /> : report ? <CheckCircle2 size={17} /> : <AlertCircle size={17} />}
         </div>
         <div>
-          <div className="flex flex-wrap items-center gap-2"><p className="text-xs font-semibold text-ink">Review confidence</p><Badge variant="default" size="sm" className="uppercase tracking-wider">Lossless checks</Badge></div>
-          <p className="mt-1 text-body-sm leading-5 text-steel">{busy ? 'AI is still preparing the reading view. The original remains the source of truth.' : report ? 'Quick signals to verify the AI layout before publishing.' : 'Quality signals will appear when a reading view is available.'}</p>
+          <p className="text-xs font-semibold text-ink">{t('technical.confidence')}</p>
+          <p className="mt-1 text-body-sm leading-5 text-steel">{busy ? t('technical.preparingHelp') : report ? t('technical.confidenceHelp') : t('technical.unavailableHelp')}</p>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[31.875rem]">
         {metrics.map(metric => { const Icon = metric.icon; return <div key={metric.label} className="rounded-xl border border-border bg-canvas/45 px-3 py-2"><div className="flex items-center justify-between gap-2"><span className="truncate text-caption font-semibold uppercase tracking-wider text-stone">{metric.label}</span><Icon size={13} className={metric.tone} /></div><p className={`mt-1 font-display text-lg font-extrabold ${metric.tone}`}>{metric.value}</p></div> })}
       </div>
     </div>
-    {report?.missing_numeric_tokens?.length ? <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-amber-300/20 bg-amber-400/[0.07] px-3 py-2 text-body-sm text-amber-100"><AlertTriangle size={13} className="shrink-0 text-amber-300" /><span className="font-semibold">Numbers to verify:</span>{report.missing_numeric_tokens.slice(0, 8).map(token => <code key={token} className="rounded-md border border-amber-300/20 bg-black/10 px-1.5 py-0.5 text-caption">{token}</code>)}{report.missing_numeric_tokens.length > 8 && <span className="text-warning-text/70">+{report.missing_numeric_tokens.length - 8} more</span>}</div> : null}
+    {report?.missing_numeric_tokens?.length ? <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-warning/20 bg-warning/[0.07] px-3 py-2 text-body-sm text-warning-text"><AlertTriangle size={13} className="shrink-0" /><span className="font-semibold">{t('technical.numbersVerify')}</span>{report.missing_numeric_tokens.slice(0, 8).map(token => <code key={token} className="rounded-md border border-warning/20 bg-black/10 px-1.5 py-0.5 text-caption">{token}</code>)}{report.missing_numeric_tokens.length > 8 && <span>{t('technical.more', { count: report.missing_numeric_tokens.length - 8 })}</span>}</div> : null}
   </section>
 }
 
-//: One stage per draft, in priority order — a draft still formatting has not reached the
-//: point where "needs a version decision" could even be evaluated, so earlier stages
-//: take priority over later ones rather than a draft appearing to qualify for several.
-const BOARD_STAGES = [
-  { key: 'formatting', label: 'Formatting', match: (draft: Draft) => ['queued', 'processing'].includes(draft.restructure_status || '') },
-  { key: 'split_review', label: 'Needs split review', match: (draft: Draft) => (draft.candidate_count || 0) > 1 },
-  { key: 'version_decision', label: 'Needs version decision', match: (draft: Draft) => Boolean(draft.requires_update_confirmation) },
-  { key: 'ready', label: 'Ready for final review', match: () => true },
-] as const
-
-function DraftBoard({ drafts, onOpen }: { drafts: Draft[]; onOpen: (draft: Draft) => void }) {
-  const columns = useMemo(() => {
-    const byStage = new Map<string, Draft[]>(BOARD_STAGES.map(stage => [stage.key, []]))
-    for (const draft of drafts) {
-      const stage = BOARD_STAGES.find(candidate => candidate.match(draft))!
-      byStage.get(stage.key)!.push(draft)
-    }
-    return BOARD_STAGES.map(stage => ({ ...stage, drafts: byStage.get(stage.key) || [] }))
-  }, [drafts])
-
-  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    {columns.map(column => <div key={column.key} className="rounded-xl border border-hairline bg-surface/60 p-3">
-      <div className="mb-3 flex items-center justify-between px-1">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-stone">{column.label}</h3>
-        <Badge variant="default" size="sm">{column.drafts.length}</Badge>
-      </div>
-      <div className="space-y-2">
-        {column.drafts.length === 0
-          ? <p className="px-1 text-body-sm text-stone">Nothing here.</p>
-          : column.drafts.map(draft => <button key={draft.id} type="button" onClick={() => onOpen(draft)} className="block w-full rounded-lg border border-border bg-surface-elevated px-3 py-2 text-left text-xs text-ink transition hover:border-info/40 hover:bg-surface-muted">
-              <p className="truncate font-semibold">{draft.title}</p>
-              <p className="mt-0.5 truncate text-stone">{draft.dept || 'No department yet'}</p>
-            </button>)}
-      </div>
-    </div>)}
-  </div>
-}
+type QueueFilter = 'all' | 'ready' | 'decision' | 'processing'
 
 export default function PendingDraftsPage() {
-  const [viewMode, setViewMode] = useState<'list' | 'board'>('list')
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>('all')
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -186,8 +146,7 @@ export default function PendingDraftsPage() {
   const [compareLoading, setCompareLoading] = useState(false)
   const [reviewTab, setReviewTab] = useState<'structured' | 'candidate' | 'original'>('structured')
   const [showComparison, setShowComparison] = useState(false)
-  const [showQuality, setShowQuality] = useState(false)
-  const [showPublishOptions, setShowPublishOptions] = useState(false)
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false)
   const [docDept, setDocDept] = useState('')
   const [docDepartmentIds, setDocDepartmentIds] = useState<string[]>([])
   const [departmentMenuOpen, setDepartmentMenuOpen] = useState(false)
@@ -208,6 +167,8 @@ export default function PendingDraftsPage() {
   const dialog = useDialog()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const canSelfApprove = Boolean(user?.role === 'Admin' || user?.role === 'CEO' || user?.roles?.some((role: { name?: string }) => role.name === 'Admin' || role.name === 'CEO'))
+  const managementContext = useMemo(() => ({ currentUserId: user?.id, canSelfApprove }), [canSelfApprove, user?.id])
   const visibleDepartments = useMemo(
     () => departments.filter(item => item.active && item.company_domain === user?.company_domain),
     [departments, user?.company_domain],
@@ -250,13 +211,39 @@ export default function PendingDraftsPage() {
     }
   }, [docDepartmentIds.length, reviewOpen, selectedDraft, visibleDepartments])
 
+  const statusById = useMemo(() => new Map(
+    drafts.map(draft => [draft.id, getDraftManagementStatus(draft, managementContext)]),
+  ), [drafts, managementContext])
+  const queueCounts = useMemo(() => {
+    const counts = { all: drafts.length, ready: 0, decision: 0, processing: 0 }
+    for (const draft of drafts) {
+      const state = statusById.get(draft.id)?.state
+      if (state === 'ready') counts.ready += 1
+      else if (state === 'processing') counts.processing += 1
+      else counts.decision += 1
+    }
+    return counts
+  }, [drafts, statusById])
   const filteredDrafts = useMemo(() => drafts.filter((draft) => {
-    const haystack = `${draft.title} ${draft.source_ref} ${draft.summary || ''}`.toLowerCase()
-    return !query.trim() || haystack.includes(query.toLowerCase())
-  }), [drafts, query])
-  const selectedDrafts = useMemo(() => drafts.filter(draft => selectedIds.includes(draft.id)), [drafts, selectedIds])
-  const visibleSelectedCount = filteredDrafts.filter(draft => selectedIds.includes(draft.id)).length
-  const allVisibleSelected = filteredDrafts.length > 0 && visibleSelectedCount === filteredDrafts.length
+    const haystack = `${draft.title} ${draft.source_ref} ${draft.dept || ''} ${draft.summary || ''}`.toLowerCase()
+    const matchesSearch = !query.trim() || haystack.includes(query.trim().toLowerCase())
+    const state = statusById.get(draft.id)?.state
+    const matchesFilter = queueFilter === 'all'
+      || (queueFilter === 'ready' && state === 'ready')
+      || (queueFilter === 'processing' && state === 'processing')
+      || (queueFilter === 'decision' && state !== 'ready' && state !== 'processing')
+    return matchesSearch && matchesFilter
+  }).sort((left, right) => compareDraftManagementOrder(left, right, managementContext)), [drafts, managementContext, query, queueFilter, statusById])
+  const eligibleVisibleDrafts = useMemo(
+    () => filteredDrafts.filter(draft => statusById.get(draft.id)?.bulkEligible),
+    [filteredDrafts, statusById],
+  )
+  useEffect(() => {
+    setSelectedIds(current => current.filter(id => statusById.get(id)?.bulkEligible))
+  }, [statusById])
+  const selectedDrafts = useMemo(() => drafts.filter(draft => selectedIds.includes(draft.id) && statusById.get(draft.id)?.bulkEligible), [drafts, selectedIds, statusById])
+  const visibleSelectedCount = eligibleVisibleDrafts.filter(draft => selectedIds.includes(draft.id)).length
+  const allVisibleSelected = eligibleVisibleDrafts.length > 0 && visibleSelectedCount === eligibleVisibleDrafts.length
   const someVisibleSelected = visibleSelectedCount > 0 && !allVisibleSelected
   // The reviewer's own pick wins; otherwise the batch inherits a department ONLY when every
   // selected draft already agrees on one. A mixed batch leaves this empty so the bar has to
@@ -275,31 +262,23 @@ export default function PendingDraftsPage() {
     const match = visibleDepartments.find(item => item.name === effectiveBulkDept)
     return match ? [match.id] : []
   }, [effectiveBulkDept, visibleDepartments])
-  const updateCount = drafts.filter(draft => draft.requires_update_confirmation).length
-  const relatedCount = drafts.filter(draft => draft.similarity_level === 'partial').length
   const matches = selectedDraft?.similarity_matches || []
-  const canSelfApprove = user?.role === 'Admin' || user?.role === 'CEO' || user?.roles?.some((role: { name?: string }) => role.name === 'Admin' || role.name === 'CEO')
-  const canReviewWithoutAssignment = canSelfApprove
   const assignedToCurrentUser = Boolean(selectedDraft?.assigned_approver_id && selectedDraft.assigned_approver_id === user?.id)
   const canPublishThisDraft = assignedToCurrentUser || canSelfApprove
   const restructureDecisionReady = !selectedDraft?.restructure_candidate_md || selectedDraft.restructure_decision !== 'pending_review'
-  const decisionReady = Boolean(canPublishThisDraft && docDepartmentIds.length && restructureDecisionReady) && (!selectedDraft?.requires_update_confirmation || Boolean(updateArticleId || treatAsNew))
+  const versionDecisionReady = !selectedDraft?.requires_update_confirmation || Boolean(updateArticleId || treatAsNew)
+  const publishBlockers = getPublishBlockers({
+    canPublish: Boolean(canPublishThisDraft),
+    hasDepartment: docDepartmentIds.length > 0,
+    layoutResolved: restructureDecisionReady,
+    versionResolved: versionDecisionReady,
+  })
+  const decisionReady = publishBlockers.length === 0
   const selectedDepartments = visibleDepartments.filter(item => docDepartmentIds.includes(item.id))
   const primaryDepartmentId = visibleDepartments.find(item => item.name === docDept)?.id
   const hasReadingView = (draft: Draft | null | undefined) => Boolean(draft?.restructured_body_md)
   const isAiBusy = (draft: Draft | null | undefined) => ['queued', 'processing'].includes(draft?.restructure_status || '')
-  const aiStatusLabel = (draft: Draft | null | undefined) => {
-    if (draft?.restructure_status === 'queued') return 'AI rewrite queued'
-    if (draft?.restructure_status === 'processing') return 'AI rewriting…'
-    if (draft?.restructure_status === 'llm') return 'AI reading view ready'
-    if (draft?.restructure_status === 'disabled') return 'AI rewrite disabled'
-    // The document arrived with its own headings and tables, so the AI pass was skipped
-    // rather than attempted and fallen back from. 'Lossless reading view ready' would
-    // read as a degraded result when this is the better outcome: the structure came from
-    // the document itself, which is why it cost no tokens and no waiting.
-    if (draft?.restructure_status === 'already_structured') return 'Document structure used as-is'
-    return hasReadingView(draft) ? 'Lossless reading view ready' : 'Original text retained'
-  }
+
   // `restructure_status !== 'llm'` used to gate the retry button, which offered a retry
   // on every terminal state — including the `lossless_ready` that `commit_candidates`
   // stamps on each child of a batch review. Retrying a child re-split it by department,
@@ -352,8 +331,7 @@ export default function PendingDraftsPage() {
     setDepartmentMenuOpen(false)
     setReviewTab('structured')
     setShowComparison(opensAsUpdate)
-    setShowQuality(false)
-    setShowPublishOptions(true)
+    setShowTechnicalDetails(false)
     setUpdateArticleId(draft.content_metadata?.suggested_update_article_id || '')
     setTreatAsNew(false)
     setSelectedApproverId(draft.assigned_approver_id || '')
@@ -395,6 +373,7 @@ export default function PendingDraftsPage() {
     if (actingDraftId) return
     setReviewOpen(false)
     setDepartmentMenuOpen(false)
+    setShowTechnicalDetails(false)
     setSelectedDraft(null)
     setComparedArticle(null)
     setEditableTargetArticle(null)
@@ -412,7 +391,7 @@ export default function PendingDraftsPage() {
       const detail = requestError?.response?.data?.detail
       const message = typeof detail === 'string'
         ? detail
-        : detail?.message || 'The draft could not be approved. Check the update decision and try again.'
+        : detail?.message || t('drafts.approvalFailed')
       // The ACL guard names the exact principals it is waiting on, and where they are
       // fixed. Showing only its one-line message left the reviewer with an instruction
       // and no way to carry it out: nothing said which principal, or that the answer is
@@ -428,7 +407,7 @@ export default function PendingDraftsPage() {
             'Map these in Sources → the connector that delivered this document → Review ACL.',
           ].join('\n')
         : ''
-      await dialog.alert(`${message}${guidance}`, { title: 'Approval failed' })
+      await dialog.alert(`${message}${guidance}`, { title: t('drafts.approvalFailedTitle') })
     } finally { setActingDraftId(null) }
   }
 
@@ -436,11 +415,11 @@ export default function PendingDraftsPage() {
     if (!selectedDraft || !selectedApproverId) return
     const previousApproverId = selectedDraft.assigned_approver_id
     if (previousApproverId === selectedApproverId) {
-      await dialog.alert('Choose a different eligible reviewer before changing the assignment.', { title: 'No change to apply' })
+      await dialog.alert(t('drafts.noAssignmentChange'), { title: t('drafts.noAssignmentChangeTitle') })
       return
     }
     const reason = previousApproverId
-      ? (await dialog.prompt('Explain why the approver is changing:', { title: 'Change approver', confirmLabel: 'Change approver', multiline: true, placeholder: 'Reason for reassignment…', validate: value => value.trim() ? undefined : 'A reassignment reason is required.' }))?.trim()
+      ? (await dialog.prompt(t('drafts.reassignPrompt'), { title: t('drafts.reassignTitle'), confirmLabel: t('drafts.change'), multiline: true, placeholder: t('drafts.reassignPlaceholder'), validate: value => value.trim() ? undefined : t('drafts.reassignRequired') }))?.trim()
       : undefined
     if (previousApproverId && !reason) return
     setActingDraftId(selectedDraft.id)
@@ -450,15 +429,15 @@ export default function PendingDraftsPage() {
       setSelectedDraft(current => current?.id === selectedDraft.id ? { ...current, ...assignment } : current)
       setMessage(previousApproverId ? 'Approver changed and the reassignment was recorded.' : 'Approver assigned. Only that reviewer can publish or reject this draft.')
     } catch {
-      await dialog.alert('The approver could not be assigned. Choose an eligible reviewer and try again.', { title: 'Assignment failed' })
+      await dialog.alert(t('drafts.assignmentFailed'), { title: t('drafts.assignmentFailedTitle') })
     } finally { setActingDraftId(null) }
   }
 
   const handleReject = async (draftId: string) => {
-    if (!(await dialog.confirm('This removes the draft from the active review queue. The original upload remains stored.', { title: 'Reject draft', confirmLabel: 'Reject draft', tone: 'danger' }))) return
-    const reviewNote = (await dialog.prompt('Provide the reason for rejection:', { title: 'Reject draft', confirmLabel: 'Reject draft', tone: 'danger', multiline: true, placeholder: 'Explain what needs to be corrected…', validate: value => value ? undefined : 'A rejection reason is required.' }))?.trim()
+    if (!(await dialog.confirm(t('drafts.rejectConfirm'), { title: t('drafts.rejectTitle'), confirmLabel: t('drafts.reject'), tone: 'danger' }))) return
+    const reviewNote = (await dialog.prompt(t('drafts.rejectReasonPrompt'), { title: t('drafts.rejectTitle'), confirmLabel: t('drafts.reject'), tone: 'danger', multiline: true, placeholder: t('drafts.rejectReasonPlaceholder'), validate: value => value ? undefined : t('drafts.rejectReasonRequired') }))?.trim()
     if (!reviewNote) {
-      await dialog.alert('A rejection reason is required so the author can correct and resubmit the document.', { title: 'Reason required' })
+      await dialog.alert(t('drafts.rejectReasonHelp'), { title: t('drafts.reasonRequiredTitle') })
       return
     }
     setActingDraftId(draftId)
@@ -467,17 +446,18 @@ export default function PendingDraftsPage() {
       setDrafts(current => current.filter(draft => draft.id !== draftId))
       setMessage('Draft rejected. The original source remains stored.')
       closeReview()
-    } catch { await dialog.alert('The draft could not be rejected.', { title: 'Rejection failed' }) } finally { setActingDraftId(null) }
+    } catch { await dialog.alert(t('drafts.rejectionFailed'), { title: t('drafts.rejectionFailedTitle') }) } finally { setActingDraftId(null) }
   }
 
   const toggleDraftSelection = (draftId: string) => {
+    if (!statusById.get(draftId)?.bulkEligible) return
     setSelectedIds(current => current.includes(draftId) ? current.filter(id => id !== draftId) : [...current, draftId])
   }
 
   const toggleAllVisible = () => {
     setSelectedIds(current => allVisibleSelected
-      ? current.filter(id => !filteredDrafts.some(draft => draft.id === id))
-      : [...new Set([...current, ...filteredDrafts.map(draft => draft.id)])])
+      ? current.filter(id => !eligibleVisibleDrafts.some(draft => draft.id === id))
+      : [...new Set([...current, ...eligibleVisibleDrafts.map(draft => draft.id)])])
   }
 
   const clearSelection = () => {
@@ -499,18 +479,19 @@ export default function PendingDraftsPage() {
         clearSelection()
         return
       }
-      if ((event.key === 'x' || event.key === 'X') && focusedDraftId) {
+      if ((event.key === 'x' || event.key === 'X') && focusedDraftId && statusById.get(focusedDraftId)?.bulkEligible) {
         event.preventDefault()
         toggleDraftSelection(focusedDraftId)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [focusedDraftId, reviewOpen, selectedIds.length])
+  }, [focusedDraftId, reviewOpen, selectedIds.length, statusById])
 
   const runBulkDecision = async (decision: 'approve' | 'reject') => {
-    if (!selectedIds.length || bulkRunning) return
-    const count = selectedIds.length
+    const eligibleIds = selectedDrafts.map(draft => draft.id)
+    if (!eligibleIds.length || bulkRunning) return
+    const count = eligibleIds.length
     // The endpoint caps a batch at 100 ids; refusing here explains the limit instead of
     // letting the reviewer read a 422 they cannot act on.
     if (count > 100) {
@@ -556,7 +537,7 @@ export default function PendingDraftsPage() {
     setBulkResult(null)
     try {
       const result = await bulkDecideDrafts({
-        draft_ids: selectedIds,
+        draft_ids: eligibleIds,
         decision,
         ...(decision === 'approve' ? { dept: effectiveBulkDept, department_ids: bulkDepartmentIds } : {}),
         ...(reviewNote ? { review_note: reviewNote } : {}),
@@ -587,8 +568,8 @@ export default function PendingDraftsPage() {
       const detail = requestError?.response?.data?.detail
       const message = typeof detail === 'string'
         ? detail
-        : detail?.message || 'The reading view could not be generated. The original source is still available and unchanged.'
-      await dialog.alert(message, { title: 'Restructuring failed' })
+        : detail?.message || t('drafts.preparationFailed')
+      await dialog.alert(message, { title: t('drafts.preparationFailedTitle') })
     } finally { setRestructuringDraftId(null) }
   }
 
@@ -600,10 +581,10 @@ export default function PendingDraftsPage() {
       setDrafts(current => current.map(item => item.id === selectedDraft.id ? { ...item, ...updated } : item))
       setSelectedDraft(current => current && current.id === selectedDraft.id ? { ...current, ...updated } : current)
       setReviewTab('structured')
-      setMessage(decision === 'keep_ai' ? 'AI layout kept for publication.' : 'Lossless reading view selected for publication.')
+      setMessage(decision === 'keep_ai' ? t('drafts.layoutSaved') : t('drafts.safeVersionSaved'))
     } catch (requestError: any) {
       const detail = requestError?.response?.data?.detail
-      await dialog.alert(typeof detail === 'string' ? detail : 'The reading-view decision could not be saved.', { title: 'Decision failed' })
+      await dialog.alert(typeof detail === 'string' ? detail : t('drafts.layoutDecisionFailed'), { title: t('drafts.layoutDecisionFailedTitle') })
     } finally { setActingDraftId(null) }
   }
 
@@ -621,136 +602,115 @@ export default function PendingDraftsPage() {
 
   return (
     <div className="page-shell page-stack text-ink">
-      <header className="page-hero glass-panel soft-grid signal-line relative overflow-hidden rounded-panel border border-border px-4 py-5 sm:px-6 sm:py-6">
-        {/* Same orb as AskPage carried, bled off the top-right corner of the review
-            header. Removed with the rest of the decoration: a reviewer working a queue
-            needs the queue, not an animation over it. */}
-        <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-stone"><FileCheck2 size={14} className="text-info-text" /> Content operations</div>
-          <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">Pending drafts</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-steel">Open a focused review workspace to read the full upload, compare it with similar active articles, and make the version decision with confidence.</p>
-        </div>
-         <Button variant="secondary" size="sm" onClick={() => void fetchDrafts()} icon={<RefreshCw size={14} />}>Refresh queue</Button>
+      <header className="border-b border-border pb-5">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-caption font-semibold uppercase tracking-[.16em] text-muted"><FileCheck2 size={14} className="text-primary" />{t('drafts.eyebrow')}</div>
+            <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{t('drafts.title')}</h1>
+            <p className="mt-2 max-w-2xl text-body leading-6 text-muted-foreground">{t('drafts.description')}</p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => void fetchDrafts()} icon={<RefreshCw size={14} />}>{t('drafts.refresh')}</Button>
         </div>
       </header>
 
       {(message || error) && <div role={error ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${error ? 'border-destructive/25 bg-destructive/10 text-destructive-text' : 'border-success/25 bg-success/10 text-success-text'}`}>{error || message}</div>}
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="metric-spark interactive-lift rounded-2xl border border-border p-4"><div className="flex items-center justify-between text-muted"><span className="text-xs font-bold uppercase tracking-[.12em]">Awaiting review</span><Clock3 size={16} className="text-info-text" /></div><p className="mt-2 font-display text-3xl font-extrabold text-foreground">{drafts.length}</p><p className="mt-1 text-body-sm text-muted-foreground">New source submissions</p></div>
-        <div className="interactive-lift rounded-2xl border border-warning/20 bg-warning/[0.06] p-4"><div className="flex items-center justify-between text-warning-text"><span className="text-xs font-bold uppercase tracking-[.12em]">Update decisions</span><AlertTriangle size={16} /></div><p className="mt-2 font-display text-3xl font-extrabold text-foreground">{updateCount}</p><p className="mt-1 text-body-sm text-muted-foreground">High similarity documents</p></div>
-        <div className="interactive-lift rounded-2xl border border-info/20 bg-info/[0.06] p-4"><div className="flex items-center justify-between text-info-text"><span className="text-xs font-bold uppercase tracking-[.12em]">Related sources</span><Sparkles size={16} /></div><p className="mt-2 font-display text-3xl font-extrabold text-foreground">{relatedCount}</p><p className="mt-1 text-body-sm text-muted-foreground">Partial content overlap</p></div>
+      <section className="rounded-xl border border-border bg-surface-elevated p-3 sm:p-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex gap-1 overflow-x-auto pb-1" role="tablist" aria-label={t('drafts.filterLabel')}>
+            {([
+              ['all', 'drafts.filterAll'],
+              ['ready', 'drafts.filterReady'],
+              ['decision', 'drafts.filterDecision'],
+              ['processing', 'drafts.filterProcessing'],
+            ] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={queueFilter === key} onClick={() => { setQueueFilter(key); clearSelection() }} className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-body-sm font-semibold transition ${queueFilter === key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-surface-muted hover:text-foreground'}`}><span>{t(label)}</span><span className={`rounded-md px-1.5 py-0.5 font-mono text-caption ${queueFilter === key ? 'bg-primary-foreground/15' : 'bg-surface-muted'}`}>{queueCounts[key]}</span></button>)}
+          </div>
+          <div className="min-w-0 flex-1 xl:max-w-md"><Input value={query} onChange={event => { setQuery(event.target.value); clearSelection() }} placeholder={t('drafts.searchPlaceholder')} leftIcon={<Search size={15} />} /></div>
+        </div>
       </section>
-
-      <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search drafts, filenames, or extracted text…" leftIcon={<Search size={15} />} />
 
       {bulkResult && <section className="rounded-xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${bulkResult.blocked_count ? 'bg-warning/10 text-warning' : 'bg-emerald-400/10 text-success-text'}`}>{bulkResult.blocked_count ? <AlertTriangle size={17} /> : <CheckCircle2 size={17} />}</div>
-            <div>
-              <h2 className="text-sm font-semibold text-ink">{bulkResult.decision === 'approve' ? t('bulk.resultsTitleApprove') : t('bulk.resultsTitleReject')}</h2>
-              <p className="mt-1 text-body-sm text-steel">{t('bulk.resultsSummary', { decided: bulkResult.decided_count, requested: bulkResult.requested, blocked: bulkResult.blocked_count })}</p>
-            </div>
+            <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${bulkResult.blocked_count ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success-text'}`}>{bulkResult.blocked_count ? <AlertTriangle size={17} /> : <CheckCircle2 size={17} />}</div>
+            <div><h2 className="text-sm font-semibold text-ink">{bulkResult.decision === 'approve' ? t('bulk.resultsTitleApprove') : t('bulk.resultsTitleReject')}</h2><p className="mt-1 text-body-sm text-steel">{t('bulk.resultsSummary', { decided: bulkResult.decided_count, requested: bulkResult.requested, blocked: bulkResult.blocked_count })}</p></div>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setBulkResult(null)} icon={<X size={14} />}>{t('common.close')}</Button>
         </div>
-        {bulkResult.blocked_count > 0 && <div className="mt-4 space-y-2">
-          <p className="text-caption font-semibold uppercase tracking-widest text-warning-text">{t('bulk.stillNeedYou', { count: bulkResult.blocked_count })}</p>
-          {bulkResult.blocked.map(item => {
-            const actionKey = item.code ? blockedActionKeys[item.code] : undefined
-            return <div key={item.draft_id} className="rounded-lg border border-warning/25 bg-warning/[0.06] px-3 py-2.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="min-w-0 truncate text-xs font-semibold text-ink">{bulkResult.titles[item.draft_id] || item.draft_id}</p>
-                {item.code && <Badge variant="warning" size="sm" className="uppercase tracking-wide">{item.code}</Badge>}
-              </div>
-              <p className="mt-1 text-body-sm leading-5 text-warning-text">{actionKey ? t(actionKey) : item.reason || t('bulk.blocked.unknown')}</p>
-              {actionKey && item.reason && <p className="mt-0.5 text-caption text-stone">{item.reason}</p>}
-              {item.code === 'batch_review_required' && <Button variant="secondary" size="sm" className="mt-2" onClick={() => navigate(`/governance/pending-drafts/${item.draft_id}/batch-review`)} icon={<Layers3 size={13} />}>{t('bulk.openBatchReview')}</Button>}
-              {item.code === 'update_confirmation_required' && drafts.some(draft => draft.id === item.draft_id) && <Button variant="secondary" size="sm" className="mt-2" onClick={() => { const draft = drafts.find(entry => entry.id === item.draft_id); if (draft) openReview(draft) }} icon={<Eye size={13} />}>{t('bulk.openFullReview')}</Button>}
-            </div>
-          })}
-        </div>}
+        {bulkResult.blocked_count > 0 && <div className="mt-4 space-y-2"><p className="text-caption font-semibold uppercase tracking-widest text-warning-text">{t('bulk.stillNeedYou', { count: bulkResult.blocked_count })}</p>{bulkResult.blocked.map(item => {
+          const actionKey = item.code ? blockedActionKeys[item.code] : undefined
+          return <div key={item.draft_id} className="rounded-lg border border-warning/25 bg-warning/[0.06] px-3 py-2.5"><p className="truncate text-xs font-semibold text-ink">{bulkResult.titles[item.draft_id] || item.draft_id}</p><p className="mt-1 text-body-sm leading-5 text-warning-text">{actionKey ? t(actionKey) : item.reason || t('bulk.blocked.unknown')}</p>{item.code === 'batch_review_required' && <Button variant="secondary" size="sm" className="mt-2" onClick={() => navigate(`/governance/pending-drafts/${item.draft_id}/batch-review`)} icon={<Layers3 size={13} />}>{t('drafts.reviewSections')}</Button>}{item.code === 'update_confirmation_required' && drafts.some(draft => draft.id === item.draft_id) && <Button variant="secondary" size="sm" className="mt-2" onClick={() => { const draft = drafts.find(entry => entry.id === item.draft_id); if (draft) openReview(draft) }} icon={<Eye size={13} />}>{t('drafts.reviewDecision')}</Button>}</div>
+        })}</div>}
       </section>}
 
-      <div className="flex items-center justify-end gap-1 px-1">
-        <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="sm" onClick={() => setViewMode('list')} icon={<ListChecks size={13} />}>List</Button>
-        <Button variant={viewMode === 'board' ? 'secondary' : 'ghost'} size="sm" onClick={() => setViewMode('board')} icon={<Layers3 size={13} />}>Board</Button>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <div><h2 className="text-body font-bold text-foreground">{t('drafts.queueHeading', { count: filteredDrafts.length })}</h2><p className="mt-0.5 text-body-sm text-muted-foreground">{t('drafts.queueHelp')}</p></div>
+        {eligibleVisibleDrafts.length > 0 && <label className="inline-flex cursor-pointer items-center gap-2 text-body-sm font-semibold text-muted-foreground"><input type="checkbox" className="sr-only" checked={allVisibleSelected} onChange={toggleAllVisible} /><span className={`grid h-4 w-4 place-items-center rounded border ${allVisibleSelected || someVisibleSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-input'}`}>{allVisibleSelected ? <Check size={11} strokeWidth={3} /> : someVisibleSelected ? <Minus size={11} strokeWidth={3} /> : null}</span>{t('drafts.selectReady', { count: eligibleVisibleDrafts.length })}</label>}
       </div>
 
-      {viewMode === 'board' && (loading
-        ? <div className="grid min-h-56 place-items-center rounded-xl border border-hairline bg-surface text-sm text-steel"><RefreshCw size={16} className="mr-2 animate-spin" /> Loading review queue…</div>
-        : <DraftBoard drafts={filteredDrafts} onOpen={openReview} />
-      )}
-
-      {viewMode === 'list' && <>
-      {filteredDrafts.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-steel">
-          <input type="checkbox" className="sr-only" checked={allVisibleSelected} onChange={toggleAllVisible} />
-          <span className={`grid h-4 w-4 place-items-center rounded border ${allVisibleSelected || someVisibleSelected ? 'border-info bg-info text-canvas' : 'border-muted bg-input'}`}>{allVisibleSelected ? <Check size={11} strokeWidth={3} /> : someVisibleSelected ? <Minus size={11} strokeWidth={3} /> : null}</span>
-          {t('bulk.selectAllVisible', { count: filteredDrafts.length })}
-        </label>
-        <p className="text-caption text-stone">{t('bulk.keyboardHint')}</p>
-      </div>}
-
-      {selectedIds.length > 0 && <section className="sticky top-2 z-sticky rounded-xl border border-cyan/30 bg-surface-elevated/95 p-4 shadow-lg shadow-black/30 backdrop-blur">
+      {selectedIds.length > 0 && <section className="sticky top-2 z-sticky rounded-xl border border-primary/30 bg-surface-elevated/95 p-4 shadow-popover backdrop-blur">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan/10 text-info-text"><ListChecks size={17} /></div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink">{t('bulk.selectedCount', { count: selectedIds.length })}</p>
-              <p className="mt-0.5 text-body-sm text-stone">{bulkDeptAmbiguous ? t('bulk.deptMixed') : t('bulk.deptResolved', { dept: effectiveBulkDept })}</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Select value={bulkDept} onChange={event => setBulkDept(event.target.value)} className="min-w-52 text-xs" aria-label={t('bulk.deptLabel')}>
-              <option value="">{agreedDept ? t('bulk.deptInherited', { dept: agreedDept }) : t('bulk.deptChoose')}</option>
-              {visibleDepartments.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}
-            </Select>
-            <Button variant="primary" size="sm" onClick={() => void runBulkDecision('approve')} disabled={bulkRunning || bulkDeptAmbiguous} icon={<Check size={14} />}>{bulkRunning ? t('bulk.working') : t('bulk.approveSelected', { count: selectedIds.length })}</Button>
-            <Button variant="danger" size="sm" onClick={() => void runBulkDecision('reject')} disabled={bulkRunning}>{t('bulk.rejectSelected', { count: selectedIds.length })}</Button>
-            <Button variant="ghost" size="sm" onClick={clearSelection} disabled={bulkRunning}>{t('bulk.clearSelection')}</Button>
-          </div>
+          <div className="min-w-0"><p className="text-sm font-semibold text-ink">{t('bulk.selectedCount', { count: selectedIds.length })}</p><p className="mt-0.5 text-body-sm text-stone">{bulkDeptAmbiguous ? t('bulk.deptMixed') : t('bulk.deptResolved', { dept: effectiveBulkDept })}</p></div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end"><Select value={bulkDept} onChange={event => setBulkDept(event.target.value)} className="w-full text-xs sm:w-auto sm:min-w-52" aria-label={t('bulk.deptLabel')}><option value="">{agreedDept ? t('bulk.deptInherited', { dept: agreedDept }) : t('bulk.deptChoose')}</option>{visibleDepartments.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</Select><Button variant="primary" size="sm" onClick={() => void runBulkDecision('approve')} disabled={bulkRunning || bulkDeptAmbiguous} icon={<Check size={14} />}>{bulkRunning ? t('bulk.working') : t('bulk.approveSelected', { count: selectedIds.length })}</Button><Button variant="danger" size="sm" onClick={() => void runBulkDecision('reject')} disabled={bulkRunning}>{t('bulk.rejectSelected', { count: selectedIds.length })}</Button><Button variant="ghost" size="sm" onClick={clearSelection} disabled={bulkRunning}>{t('bulk.clearSelection')}</Button></div>
         </div>
         {bulkDeptAmbiguous && <p className="mt-2 text-body-sm text-warning-text">{t('bulk.deptRequired')}</p>}
       </section>}
 
-      {loading ? <div className="grid min-h-56 place-items-center rounded-xl border border-hairline bg-surface text-sm text-steel"><RefreshCw size={16} className="mr-2 animate-spin" /> Loading review queue…</div> : filteredDrafts.length === 0 ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-hairline bg-surface/50 p-8 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-emerald-400/10 text-success-text"><Check size={24} /></div><h2 className="mt-4 text-base font-semibold">{drafts.length ? 'No drafts match your search' : 'Review queue is clear'}</h2><p className="mt-2 text-sm text-steel">{drafts.length ? 'Try a different title or filename.' : 'New uploads will appear here when they are ready for review.'}</p></div></div> : <div className="space-y-3">{filteredDrafts.map(draft => {
-        const similarity = draft.similarity_level && draft.similarity_level !== 'none' ? draft.similarity_level : null
-        const firstMatch = draft.similarity_matches?.[0]
+      {loading ? <div role="status" className="grid min-h-56 place-items-center rounded-xl border border-border bg-surface text-sm text-muted-foreground"><RefreshCw size={16} className="mr-2 animate-spin" />{t('drafts.loading')}</div> : filteredDrafts.length === 0 ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-border bg-surface/50 p-8 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-success/10 text-success-text"><Check size={24} /></div><h2 className="mt-4 text-base font-semibold">{drafts.length ? t('drafts.noMatch') : t('drafts.empty')}</h2><p className="mt-2 text-sm text-muted-foreground">{drafts.length ? t('drafts.noMatchHelp') : t('drafts.emptyHelp')}</p></div></div> : <div className="overflow-hidden rounded-xl border border-border bg-surface-elevated">{filteredDrafts.map(draft => {
+        const status = statusById.get(draft.id)!
         const selected = selectedIds.includes(draft.id)
-        return <article key={draft.id} tabIndex={0} onFocus={() => setFocusedDraftId(draft.id)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedDraftId(current => current === draft.id ? null : current) }} className={`rounded-xl border bg-surface-elevated p-5 shadow-sm outline-none transition hover:border-info/40 hover:bg-surface-muted hover:shadow-lg hover:shadow-black/20 ${selected ? 'border-cyan/50 bg-surface-muted' : 'border-border'} ${focusedDraftId === draft.id ? 'ring-1 ring-cyan/40' : ''}`}>
-          <div className="flex items-start gap-3">
-          <label className="mt-0.5 inline-flex cursor-pointer items-center" title={t('bulk.selectDraft')}>
-            <input type="checkbox" className="sr-only" checked={selected} onChange={() => toggleDraftSelection(draft.id)} aria-label={t('bulk.selectDraftNamed', { title: draft.title })} />
-            <span className={`grid h-4 w-4 place-items-center rounded border ${selected ? 'border-info bg-info text-canvas' : 'border-muted bg-input'}`}>{selected && <Check size={11} strokeWidth={3} />}</span>
-          </label>
-          <div className="min-w-0 flex-1">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-soft text-info-text"><FileText size={18} /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-sm font-semibold text-ink">{draft.title}</h2>{similarity && <Badge variant={similarity === 'very_high' ? 'warning' : 'info'} size="sm" className="uppercase tracking-wide">{similarity === 'very_high' ? 'Possible update' : 'Related content'}</Badge>}{(draft.candidate_count || 0) > 1 && <Badge variant="primary" size="sm" className="uppercase tracking-wide">{draft.candidate_count} split candidates</Badge>}</div><p className="mt-1 truncate text-xs text-stone">{draft.source_ref} · {formatDay(draft.created_at)}</p></div></div><div className="flex flex-wrap justify-end gap-2">{(draft.candidate_count || 0) > 1 && <Button variant="secondary" size="sm" onClick={() => navigate(`/governance/pending-drafts/${draft.id}/batch-review`)} icon={<Layers3 size={14} />}>Batch review</Button>}<Button variant="primary" size="sm" onClick={() => openReview(draft)} icon={<Eye size={14} />}>Open full review</Button>{isAiBusy(draft) ? <Badge variant="info" size="sm" dot>{draft.restructure_status === 'queued' ? 'AI queued' : 'AI formatting…'}</Badge> : canRetryAiFormat(draft) && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(draft)} disabled={restructuringDraftId === draft.id} icon={<Sparkles size={14} />}>{restructuringDraftId === draft.id ? 'Formatting…' : 'Retry AI format'}</Button>}<Button variant="ghost" size="sm" onClick={() => void handleReject(draft.id)} disabled={actingDraftId === draft.id} className="hover:text-rose-300">Reject</Button></div></div>
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-steel">{draft.content_metadata?.submission_kind === 'manual' && <Badge variant="info" size="sm" className="uppercase tracking-wide">Manual submission</Badge>}{draft.content_metadata?.submission_kind === 'manual_update' && <Badge variant="warning" size="sm" className="uppercase tracking-wide">Manual update</Badge>}{firstMatch ? <><ArrowLeftRight size={13} className="text-amber-300" /><span>{Math.round(firstMatch.score * 100)}% similar to <strong className="font-medium text-warning-text">{firstMatch.title}</strong></span></> : <span>No significant overlap detected</span>}<span className="text-stone">·</span><span className={draft.restructure_status === 'llm' ? 'text-success-text' : isAiBusy(draft) ? 'text-info-text' : hasReadingView(draft) ? 'text-info-text' : 'text-amber-300'}>{aiStatusLabel(draft)}</span></div>
-          {draft.restructure_error && <p className="mt-2 line-clamp-2 text-xs text-warning-text">{draft.restructure_error}</p>}
-          </div></div>
+        const statusLabel = status.state === 'processing' ? t('drafts.statusProcessing') : status.state === 'split_review' ? t('drafts.statusSections') : status.state === 'ready' ? t('drafts.statusReady') : t('drafts.statusDecision')
+        const reason = status.reason === 'possible_update' ? t('drafts.reasonUpdate') : status.reason === 'layout_choice' ? t('drafts.reasonLayout') : status.reason === 'missing_department' ? t('drafts.reasonDepartment') : status.reason === 'needs_approver' ? t('drafts.reasonApprover') : status.reason === 'assigned_elsewhere' ? t('drafts.reasonAssigned') : status.state === 'split_review' ? t('drafts.reasonSections', { count: draft.candidate_count || 0 }) : status.state === 'processing' ? t('drafts.reasonProcessing') : t('drafts.reasonReady')
+        const tone = status.state === 'ready' ? 'success' : status.state === 'processing' ? 'default' : 'warning'
+        const actionLabel = status.action === 'review_sections' ? t('drafts.reviewSections') : status.action === 'review_decision' ? t('drafts.reviewDecision') : status.action === 'wait' ? t('drafts.preparing') : t('drafts.review')
+        return <article key={draft.id} tabIndex={0} onFocus={() => setFocusedDraftId(draft.id)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedDraftId(current => current === draft.id ? null : current) }} className={`grid gap-4 border-b border-border p-4 outline-none transition last:border-b-0 hover:bg-surface-muted/60 lg:grid-cols-[auto_minmax(0,1.4fr)_minmax(15rem,.8fr)_auto] lg:items-center ${selected ? 'bg-primary/5' : ''} ${focusedDraftId === draft.id ? 'ring-1 ring-inset ring-primary/30' : ''}`}>
+          <div className="w-5">{status.bulkEligible && <label className="inline-flex cursor-pointer" title={t('bulk.selectDraft')}><input type="checkbox" className="sr-only" checked={selected} onChange={() => toggleDraftSelection(draft.id)} aria-label={t('bulk.selectDraftNamed', { title: draft.title })} /><span className={`grid h-4 w-4 place-items-center rounded border ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-input'}`}>{selected && <Check size={11} strokeWidth={3} />}</span></label>}</div>
+          <div className="min-w-0"><h3 className="truncate text-sm font-semibold text-foreground">{draft.title}</h3><p className="mt-1 truncate text-body-sm text-muted-foreground">{draft.source_ref}</p><div className="mt-2 flex flex-wrap items-center gap-2 text-caption text-muted"><span>{draft.dept || t('drafts.noDepartment')}</span><span aria-hidden="true">·</span><span>{t('drafts.submittedOn', { date: formatDay(draft.created_at) })}</span></div></div>
+          <div className="min-w-0"><Badge variant={tone} size="sm">{statusLabel}</Badge><p className="mt-1.5 text-body-sm leading-5 text-muted-foreground">{reason}</p></div>
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end"><Button variant="primary" size="sm" onClick={() => openReview(draft)} disabled={status.action === 'wait'} icon={status.action === 'review_sections' ? <Layers3 size={14} /> : status.action === 'wait' ? <RefreshCw size={14} className="animate-spin" /> : <Eye size={14} />}>{actionLabel}</Button>{status.action !== 'wait' && <Button variant="ghost" size="sm" onClick={() => void handleReject(draft.id)} disabled={actingDraftId === draft.id}>{t('drafts.reject')}</Button>}{canRetryAiFormat(draft) && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(draft)} disabled={restructuringDraftId === draft.id} aria-label={t('drafts.retryPreparation')} icon={<RefreshCw size={13} />} />}</div>
         </article>
       })}</div>}
-      </>}
 
       {reviewOpen && selectedDraft &&<div className="fixed inset-0 z-modal bg-scrim/30 p-0 backdrop-blur-[2px] sm:p-3" role="dialog" aria-modal="true" aria-labelledby={reviewTitleId}><FocusTrap className="contents"><section className="mx-auto flex h-full max-w-[100rem] flex-col overflow-hidden border border-border bg-canvas shadow-modal sm:rounded-panel">
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-hairline bg-surface px-4 py-3 sm:px-6"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="info" size="sm" className="uppercase tracking-widest">Focused review</Badge>{selectedDraft.similarity_level === 'very_high' && <Badge variant="warning" size="sm" className="uppercase tracking-widest">Possible update</Badge>}</div><h2 id={reviewTitleId} className="mt-1 truncate text-base font-semibold text-ink sm:text-lg">{selectedDraft.title}</h2><p className="mt-1 truncate text-xs text-stone">{selectedDraft.source_ref} · Original source is unchanged</p>{selectedDraft.tags && selectedDraft.tags.length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="text-caption font-semibold uppercase tracking-widest text-stone">AI-suggested tags:</span>{selectedDraft.tags.map(tag => <Badge key={tag} variant="default" size="sm">{tag}</Badge>)}</div>}</div><div className="flex shrink-0 items-center gap-2">{user?.permissions?.includes('ai.ask') && <Button variant="ghost" size="sm" onClick={() => navigate(`/ai?${editableTargetArticle ? `articleId=${encodeURIComponent(editableTargetArticle.id)}&articleTitle=${encodeURIComponent(editableTargetArticle.title)}&` : ''}prompt=${encodeURIComponent(requestDraftPrompt)}`)} icon={<MessageSquare size={13} />}>Ask AI about edit</Button>}{canEditTargetArticle && editableTargetArticle && <Button variant="ghost" size="sm" onClick={() => navigate(`/articles/${editableTargetArticle.id}/edit`)} icon={<Edit3 size={13} />}>Edit source article</Button>}<button onClick={() => setShowQuality(value => !value)} className={`hidden rounded-lg border px-2.5 py-2 text-body-sm font-semibold sm:inline-flex ${showQuality ? 'border-cyan/30 bg-cyan/10 text-info-text' : 'border-hairline text-stone hover:text-ink'}`}>{showQuality ? 'Hide quality' : 'Quality details'}</button>{matches.length > 0 && <button onClick={toggleComparison} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-body-sm font-semibold ${showComparison ? 'border-amber-300/30 bg-amber-400/10 text-warning-text' : 'border-hairline text-stone hover:text-ink'}`}><ArrowLeftRight size={13} />{showComparison ? 'Hide comparison' : 'Compare article'}</button>}<button onClick={closeReview} className="rounded-lg p-2 text-stone hover:bg-surface-soft hover:text-ink" title="Close review"><X size={18} /></button></div></header>
-        {showComparison && matches.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-surface-soft px-4 py-2.5 sm:px-6"><span className="mr-1 text-caption font-semibold uppercase tracking-widest text-stone">Related article</span>{matches.map(match => <button key={match.article_id} onClick={() => void loadComparison(selectedDraft.id, match.article_id)} className={`rounded-lg border px-2.5 py-1.5 text-left text-xs transition ${compareArticleId === match.article_id ? 'border-amber-300/40 bg-amber-400/10 text-warning-text' : 'border-hairline bg-canvas text-steel hover:border-amber-300/30 hover:text-ink'}`}><span className="font-semibold">{Math.round(match.score * 100)}%</span> · {match.title}</button>)}</div>}
-        {showQuality && <ReviewQuality report={selectedDraft.restructure_report} chunkCount={selectedDraft.restructure_chunk_count} busy={isAiBusy(selectedDraft)} />}
-        {selectedDraft.restructure_candidate_md && <section className="flex shrink-0 flex-col gap-3 border-b border-amber-300/20 bg-gradient-to-r from-amber-400/[0.09] via-surface to-cyan/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div className="flex min-w-0 items-start gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-400/10 text-amber-300"><Sparkles size={17} /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-xs font-semibold text-ink">AI layout needs your decision</p><Badge variant="warning" size="sm" className="uppercase tracking-wider">Candidate retained</Badge></div><p className="mt-1 text-body-sm leading-5 text-steel">The safety check found content that may have changed. Inspect the candidate, then choose which version will be published.</p></div></div><div className="flex shrink-0 flex-wrap gap-2"><Button variant="secondary" size="sm" onClick={() => setReviewTab('candidate')}>Review AI candidate</Button><Button variant="ghost" size="sm" onClick={() => void handleRestructureDecision('keep_lossless')} disabled={Boolean(actingDraftId) || selectedDraft.restructure_decision === 'lossless_kept'}>Use lossless view</Button><Button variant="primary" size="sm" onClick={() => void handleRestructureDecision('keep_ai')} disabled={Boolean(actingDraftId) || selectedDraft.restructure_decision === 'ai_kept'} icon={<Check size={13} />}>Keep AI layout</Button></div></section>}
+        <header className="shrink-0 border-b border-border bg-surface px-4 py-3 sm:px-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="info" size="sm">{t('drafts.reviewing')}</Badge>{selectedDraft.requires_update_confirmation && <Badge variant="warning" size="sm">{t('drafts.statusDecision')}</Badge>}</div><h2 id={reviewTitleId} className="mt-1 truncate text-base font-semibold text-foreground sm:text-lg">{selectedDraft.title}</h2><p className="mt-1 truncate text-body-sm text-muted-foreground">{selectedDraft.source_ref} · {t('drafts.sourceSafe')}</p></div>
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">{matches.length > 0 && <Button variant="ghost" size="sm" onClick={toggleComparison} icon={<ArrowLeftRight size={13} />}>{showComparison ? t('drafts.hideComparison') : t('drafts.compare')}</Button>}<Button variant="ghost" size="sm" onClick={() => setShowTechnicalDetails(value => !value)}>{showTechnicalDetails ? t('drafts.hideTechnicalDetails') : t('drafts.technicalDetails')}</Button><button type="button" onClick={closeReview} className="ui-icon-button ui-button-sm text-muted-foreground hover:bg-surface-soft hover:text-foreground" aria-label={t('common.close')}><X size={18} /></button></div>
+          </div>
+          <ol className="mt-3 grid grid-cols-3 overflow-hidden rounded-lg border border-border bg-background text-center text-caption font-semibold text-muted-foreground"><li className="border-r border-border bg-primary/10 px-2 py-1.5 text-primary-text">{t('drafts.reviewStepRead')}</li><li className="border-r border-border px-2 py-1.5">{t('drafts.reviewStepCheck')}</li><li className="px-2 py-1.5">{t('drafts.reviewStepDecide')}</li></ol>
+        </header>
+        {showComparison && matches.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-surface-soft px-4 py-2.5 sm:px-6"><span className="mr-1 text-caption font-semibold uppercase tracking-widest text-stone">{t('drafts.relatedDocument')}</span>{matches.map(match => <button key={match.article_id} onClick={() => void loadComparison(selectedDraft.id, match.article_id)} className={`rounded-lg border px-2.5 py-1.5 text-left text-xs transition ${compareArticleId === match.article_id ? 'border-amber-300/40 bg-amber-400/10 text-warning-text' : 'border-hairline bg-canvas text-steel hover:border-amber-300/30 hover:text-ink'}`}><span className="font-semibold">{Math.round(match.score * 100)}%</span> · {match.title}</button>)}</div>}
+        {showTechnicalDetails && <section className="shrink-0 border-b border-border bg-surface-soft">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-3 sm:px-6">{user?.permissions?.includes('ai.ask') && <Button variant="ghost" size="sm" onClick={() => navigate(`/ai?${editableTargetArticle ? `articleId=${encodeURIComponent(editableTargetArticle.id)}&articleTitle=${encodeURIComponent(editableTargetArticle.title)}&` : ''}prompt=${encodeURIComponent(requestDraftPrompt)}`)} icon={<MessageSquare size={13} />}>{t('drafts.askAi')}</Button>}{canEditTargetArticle && editableTargetArticle && <Button variant="ghost" size="sm" onClick={() => navigate(`/articles/${editableTargetArticle.id}/edit`)} icon={<Edit3 size={13} />}>{t('drafts.editSource')}</Button>}{canRetryAiFormat(selectedDraft) && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(selectedDraft)} disabled={restructuringDraftId === selectedDraft.id} icon={<RefreshCw size={13} />}>{t('drafts.retryPreparation')}</Button>}<span className="ml-auto font-mono text-caption text-muted">{selectedDraft.restructure_status || 'unknown'}</span></div>
+          <ReviewQuality report={selectedDraft.restructure_report} chunkCount={selectedDraft.restructure_chunk_count} busy={isAiBusy(selectedDraft)} />
+          {selectedDraft.restructure_error && <p className="border-t border-warning/20 px-4 py-2 text-body-sm text-warning-text sm:px-6">{selectedDraft.restructure_error}</p>}
+        </section>}
         <div className={`grid min-h-0 flex-1 grid-cols-1 ${showComparison ? 'lg:grid-cols-2' : ''}`}>
-          <section className="flex min-h-0 flex-col border-b border-hairline lg:border-b-0 lg:border-r"><div className="flex shrink-0 items-center justify-between border-b border-hairline px-4 py-2.5 sm:px-6"><div><p className="text-caption font-semibold uppercase tracking-widest text-info-text">Incoming document</p><p className={`mt-1 text-xs ${selectedDraft.restructure_status === 'llm' || selectedDraft.restructure_status === 'llm_reviewed' ? 'text-success-text' : isAiBusy(selectedDraft) ? 'text-info-text' : hasReadingView(selectedDraft) ? 'text-info-text' : 'text-amber-300'}`}>{reviewTab === 'candidate' ? 'AI candidate — not yet selected' : reviewTab === 'structured' ? (selectedDraft.restructure_status === 'llm' || selectedDraft.restructure_status === 'llm_reviewed' ? 'AI reading view' : isAiBusy(selectedDraft) ? aiStatusLabel(selectedDraft) : selectedDraft.restructure_status === 'already_structured' ? 'Document structure used as-is' : hasReadingView(selectedDraft) ? 'Lossless reading view' : 'Original extracted text') : 'Original extracted text'}</p></div><div className="flex items-center gap-2"><div className="flex rounded-lg border border-hairline bg-surface p-0.5"><button onClick={() => setReviewTab('structured')} className={`rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'structured' ? 'bg-cyan/15 text-info-text' : 'text-stone hover:text-ink'}`}>Reading view</button>{selectedDraft.restructure_candidate_md && <button onClick={() => setReviewTab('candidate')} className={`rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'candidate' ? 'bg-amber-400/15 text-warning-text' : 'text-stone hover:text-ink'}`}>AI candidate</button>}<button onClick={() => setReviewTab('original')} className={`rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'original' ? 'bg-surface-soft text-ink' : 'text-stone hover:text-ink'}`}>Original</button></div>{isAiBusy(selectedDraft) ? <span className="inline-flex items-center gap-1 rounded-md border border-cyan/30 bg-cyan/10 px-2 py-1 text-body-sm font-semibold text-info-text"><RefreshCw size={12} className="animate-spin" /> {selectedDraft.restructure_status === 'queued' ? 'Queued' : 'Formatting…'}</span> : canRetryAiFormat(selectedDraft) && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(selectedDraft)} disabled={restructuringDraftId === selectedDraft.id} icon={<Sparkles size={12} />}>{restructuringDraftId === selectedDraft.id ? 'Formatting…' : 'Retry AI'}</Button>}</div></div>{selectedDraft.restructure_error && <div className="border-b border-amber-400/20 bg-amber-400/[0.06] px-4 py-2 text-body-sm leading-5 text-warning-text sm:px-6">{selectedDraft.restructure_error}</div>}{isAiBusy(selectedDraft) && <div className="flex items-start gap-2 border-b border-cyan/20 bg-cyan/[0.06] px-4 py-2 text-body-sm leading-5 text-info-text sm:px-6"><RefreshCw size={13} className="mt-0.5 shrink-0 animate-spin" /><span>AI reading view is being prepared in the background. The original extracted text is available now.</span></div>}<div className="ask-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{renderMarkdown(reviewTab === 'candidate' ? (selectedDraft.restructure_candidate_md || 'No AI candidate available.') : reviewTab === 'structured' ? (selectedDraft.restructured_body_md || selectedDraft.summary || 'No extracted text available.') : (selectedDraft.summary || 'No extracted text available.'))}</div></section>
-          {showComparison && <section className="flex min-h-0 flex-col"><div className="flex shrink-0 items-center gap-3 border-b border-hairline px-4 py-2.5 sm:px-6"><ArrowLeftRight size={15} className="text-amber-300" /><div><p className="text-caption font-semibold uppercase tracking-widest text-amber-300">Existing active article</p><p className="mt-1 truncate text-xs text-steel">{comparedArticle?.title || (matches.length ? 'Loading comparison…' : 'No high-similarity article selected')}</p></div></div><div className="ask-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{compareLoading ? <div className="flex h-full items-center justify-center text-sm text-steel"><RefreshCw size={16} className="mr-2 animate-spin" /> Loading existing article…</div> : comparedArticle ? <>{renderMarkdown(comparedArticle.body_md)}<div className="mt-6 border-t border-hairline pt-3 text-xs text-stone">Version {comparedArticle.version} · {comparedArticle.lifecycle_status}</div></> : <div className="flex h-full items-center justify-center text-center text-sm text-stone">{matches.length ? 'Select a similar article above to compare its full content.' : 'This draft has no high-similarity active article.'}</div>}</div></section>}
+          <section className="flex min-h-0 flex-col border-b border-border lg:border-b-0 lg:border-r">
+            <div className="flex shrink-0 flex-col gap-2 border-b border-border px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <p className="text-caption font-semibold uppercase tracking-widest text-primary-text">{t('drafts.incomingDocument')}</p>
+              <div className="flex overflow-x-auto rounded-lg border border-border bg-surface p-0.5"><button type="button" onClick={() => setReviewTab('structured')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'structured' ? 'bg-primary/10 text-primary-text' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.readingView')}</button>{selectedDraft.restructure_candidate_md && <button type="button" onClick={() => setReviewTab('candidate')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'candidate' ? 'bg-warning/10 text-warning-text' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.preparedVersion')}</button>}<button type="button" onClick={() => setReviewTab('original')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'original' ? 'bg-surface-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.originalVersion')}</button></div>
+            </div>
+            {isAiBusy(selectedDraft) && <div role="status" className="flex items-start gap-2 border-b border-info/20 bg-info/[0.06] px-4 py-2 text-body-sm leading-5 text-info-text sm:px-6"><RefreshCw size={13} className="mt-0.5 shrink-0 animate-spin" /><span>{t('drafts.preparingReadingView')}</span></div>}
+            <div className="ask-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{renderMarkdown(reviewTab === 'candidate' ? (selectedDraft.restructure_candidate_md || t('drafts.noExtractedText')) : reviewTab === 'structured' ? (selectedDraft.restructured_body_md || selectedDraft.summary || t('drafts.noExtractedText')) : (selectedDraft.summary || t('drafts.noExtractedText')))}</div>
+          </section>
+          {showComparison && <section className="flex min-h-0 flex-col"><div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-2.5 sm:px-6"><ArrowLeftRight size={15} className="text-warning-text" /><div className="min-w-0"><p className="text-caption font-semibold uppercase tracking-widest text-warning-text">{t('drafts.relatedDocument')}</p><p className="mt-1 truncate text-xs text-muted-foreground">{comparedArticle?.title || (matches.length ? t('drafts.loadingComparison') : t('drafts.noComparison'))}</p></div></div><div className="ask-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{compareLoading ? <div role="status" className="flex h-full items-center justify-center text-sm text-muted-foreground"><RefreshCw size={16} className="mr-2 animate-spin" />{t('drafts.loadingComparison')}</div> : comparedArticle ? <>{renderMarkdown(comparedArticle.body_md)}<div className="mt-6 border-t border-border pt-3 text-xs text-muted-foreground">Version {comparedArticle.version} · {comparedArticle.lifecycle_status}</div></> : <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">{matches.length ? t('drafts.chooseComparison') : t('drafts.noComparison')}</div>}</div></section>}
         </div>
-        <footer className="flex shrink-0 flex-col gap-3 border-t border-hairline bg-surface px-4 py-3 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-semibold text-ink">Publication decision</p><p className="mt-0.5 text-body-sm text-stone">{selectedDepartments.length ? `${selectedDepartments.length} department${selectedDepartments.length === 1 ? '' : 's'} selected` : 'Department required'}{selectedDraft.assigned_approver_id ? ' · Assigned reviewer only' : ''}</p></div><Button variant="ghost" size="sm" onClick={() => setShowPublishOptions(value => !value)} icon={<ChevronDown size={13} className={`transition ${showPublishOptions ? 'rotate-180' : ''}`} />} iconPosition="right">{showPublishOptions ? 'Hide options' : 'Publishing options'}</Button></div>
-          {showPublishOptions && <>
-          {!selectedDraft.assigned_approver_id ? <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-warning-text">Assign approver:</span>{canReviewWithoutAssignment && <span className="text-xs text-success-text">You can publish directly.</span>}<Select value={selectedApproverId} onChange={event => setSelectedApproverId(event.target.value)} className="min-w-56 text-xs"><option value="">Select an eligible reviewer</option>{approvers.map(approver => <option key={approver.id} value={approver.id}>{approver.name} · {approver.email}</option>)}</Select><Button variant="primary" size="sm" onClick={() => void handleAssignApprover()} disabled={!selectedApproverId || Boolean(actingDraftId)}>Assign</Button></div> : <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-success-text">Approver assigned. Only that reviewer can publish or reject this draft.</span><Select aria-label="Change assigned approver" value={selectedApproverId} onChange={event => setSelectedApproverId(event.target.value)} className="min-w-56 text-xs"><option value="">Select a different reviewer</option>{approvers.map(approver => <option key={approver.id} value={approver.id}>{approver.name} · {approver.email}</option>)}</Select><Button variant="secondary" size="sm" onClick={() => void handleAssignApprover()} disabled={!selectedApproverId || selectedApproverId === selectedDraft.assigned_approver_id || Boolean(actingDraftId)}>Change approver</Button></div>}
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">{isManualUpdate ? <span className="text-xs font-semibold text-warning-text">This revision will replace its original article after approval.</span> : selectedDraft.requires_update_confirmation ? <><span className="text-xs font-semibold text-warning-text">Version decision:</span><Button variant={!treatAsNew && updateArticleId ? 'secondary' : 'ghost'} size="sm" onClick={() => { setUpdateArticleId(compareArticleId || matches[0]?.article_id || ''); setTreatAsNew(false) }} className={!treatAsNew && updateArticleId ? 'border-amber-300/40 bg-amber-400/10 text-warning-text' : ''}>Update selected article</Button><Button variant={treatAsNew ? 'secondary' : 'ghost'} size="sm" onClick={() => { setTreatAsNew(true); setUpdateArticleId('') }} className={treatAsNew ? 'border-cyan/30 bg-cyan/10 text-info-text' : ''}>Publish as new</Button></> : <span className="text-xs text-steel">Ready to publish as a new active document.</span>}<div className="relative min-w-64"><label className="mb-1 block text-caption font-semibold uppercase tracking-widest text-stone">Publish to departments</label><button ref={departmentMenuAnchor} type="button" onClick={() => setDepartmentMenuOpen(open => !open)} disabled={!visibleDepartments.length} className="field flex min-h-9 w-full items-center gap-2 py-1.5 text-left text-xs disabled:opacity-50"><span className="flex min-w-0 flex-1 flex-wrap gap-1">{selectedDepartments.length ? selectedDepartments.map(item => <span key={item.id} className="rounded-md border border-cyan/25 bg-cyan/10 px-1.5 py-0.5 text-body-sm text-info-text">{item.name}</span>) : <span className="text-stone">Select departments</span>}</span><ChevronDown size={14} className={`shrink-0 text-stone transition ${departmentMenuOpen ? 'rotate-180' : ''}`} /></button><FloatingPanel anchorRef={departmentMenuAnchor} open={departmentMenuOpen} onClose={() => setDepartmentMenuOpen(false)} className="border-border bg-surface-elevated p-1.5 shadow-2xl shadow-modal"><div className="border-b border-hairline px-2.5 py-2"><p className="text-xs font-semibold text-ink">Choose departments</p><p className="mt-0.5 text-body-sm text-stone">The submitted department remains primary.</p></div><div className="py-1">{visibleDepartments.map(item => { const selected = docDepartmentIds.includes(item.id); const primary = item.id === primaryDepartmentId; return <button type="button" key={item.id} onClick={() => toggleDepartment(item.id)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-steel transition hover:bg-surface-soft hover:text-ink"><span className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${selected ? 'border-info bg-info text-info-foreground' : 'border-border bg-transparent'}`}>{selected && <Check size={11} strokeWidth={3} />}</span><span className="min-w-0 flex-1 truncate">{item.name}</span>{primary && <span className="rounded-full bg-amber-400/10 px-1.5 py-0.5 text-caption font-semibold text-warning-text">Primary</span>}</button> })}</div><button type="button" onClick={() => setDepartmentMenuOpen(false)} className="mt-1 w-full rounded-lg border border-hairline px-2.5 py-1.5 text-body-sm font-semibold text-info-text hover:bg-cyan/10">Done</button></FloatingPanel></div><span className="text-body-sm text-stone">{selectedDepartments.length} selected</span></div>
-          </>}
-          <div className="flex shrink-0 justify-end gap-2"><Button variant="danger" size="sm" onClick={() => void handleReject(selectedDraft.id)} disabled={!canPublishThisDraft || Boolean(actingDraftId)}>Reject</Button><Button variant="primary" size="sm" onClick={() => void handleConfirmApprove()} disabled={!decisionReady || Boolean(actingDraftId)} icon={<Check size={14} />}>{actingDraftId ? 'Publishing…' : 'Publish document'}</Button></div>
+        <footer className="shrink-0 border-t border-border bg-surface px-4 py-3 sm:px-6">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <section aria-labelledby="publish-check-heading">
+              <div className="flex items-center gap-2"><span className="grid h-6 w-6 place-items-center rounded-md bg-primary/10 text-caption font-bold text-primary-text">2</span><h3 id="publish-check-heading" className="text-sm font-semibold text-foreground">{t('drafts.checkHeading')}</h3></div>
+              {publishBlockers.length > 0 ? <ul className="mt-2 grid gap-1 text-body-sm text-warning-text sm:grid-cols-2">{publishBlockers.map(blocker => <li key={blocker} className="flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /><span>{t(`drafts.blocker${blocker === 'reviewer' ? 'Reviewer' : blocker === 'department' ? 'Department' : blocker === 'layout' ? 'Layout' : 'Version'}`)}</span></li>)}</ul> : <p className="mt-1.5 flex items-center gap-1.5 text-body-sm text-success-text"><CheckCircle2 size={13} />{t('drafts.checkReady')}</p>}
+            </section>
+            <div className="flex flex-wrap justify-end gap-2"><Button variant="danger" size="sm" onClick={() => void handleReject(selectedDraft.id)} disabled={!canPublishThisDraft || Boolean(actingDraftId)}>{t('drafts.reject')}</Button><Button variant="primary" size="sm" onClick={() => void handleConfirmApprove()} disabled={!decisionReady || Boolean(actingDraftId)} icon={<Check size={14} />}>{actingDraftId ? t('drafts.publishing') : t('drafts.publish')}</Button></div>
+          </div>
+          <div className="mt-3 space-y-3 border-t border-border pt-3">
+            {!selectedDraft.assigned_approver_id && !canSelfApprove && <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><span className="text-body-sm font-semibold text-warning-text">{t('drafts.blockerReviewer')}</span><Select value={selectedApproverId} onChange={event => setSelectedApproverId(event.target.value)} className="w-full text-xs sm:w-64"><option value="">{t('drafts.selectReviewer')}</option>{approvers.map(approver => <option key={approver.id} value={approver.id}>{approver.name} · {approver.email}</option>)}</Select><Button variant="secondary" size="sm" onClick={() => void handleAssignApprover()} disabled={!selectedApproverId || Boolean(actingDraftId)}>{t('drafts.assign')}</Button></div>}
+            {selectedDraft.assigned_approver_id && <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><span className="text-body-sm text-muted-foreground">{t('drafts.assignedReviewer')}</span><Select aria-label={t('drafts.assignedReviewer')} value={selectedApproverId} onChange={event => setSelectedApproverId(event.target.value)} className="w-full text-xs sm:w-64"><option value="">{t('drafts.selectAnotherReviewer')}</option>{approvers.map(approver => <option key={approver.id} value={approver.id}>{approver.name} · {approver.email}</option>)}</Select><Button variant="ghost" size="sm" onClick={() => void handleAssignApprover()} disabled={!selectedApproverId || selectedApproverId === selectedDraft.assigned_approver_id || Boolean(actingDraftId)}>{t('drafts.change')}</Button></div>}
+            {selectedDraft.requires_update_confirmation && !isManualUpdate && <div className="flex flex-wrap items-center gap-2"><span className="text-body-sm font-semibold text-warning-text">{t('drafts.blockerVersion')}</span><Button variant={!treatAsNew && updateArticleId ? 'secondary' : 'ghost'} size="sm" onClick={() => { const targetId = updateArticleId || compareArticleId || selectedDraft.content_metadata?.suggested_update_article_id || matches[0]?.article_id; if (targetId) { setUpdateArticleId(targetId); setTreatAsNew(false) } }} disabled={!updateArticleId && !compareArticleId && !selectedDraft.content_metadata?.suggested_update_article_id && !matches[0]?.article_id}>{t('drafts.updateExisting')}</Button><Button variant={treatAsNew ? 'secondary' : 'ghost'} size="sm" onClick={() => { setTreatAsNew(true); setUpdateArticleId('') }}>{t('drafts.publishNew')}</Button></div>}
+            {selectedDraft.restructure_candidate_md && selectedDraft.restructure_decision === 'pending_review' && <div className="flex flex-wrap items-center gap-2"><span className="text-body-sm font-semibold text-warning-text">{t('drafts.blockerLayout')}</span><Button variant="secondary" size="sm" onClick={() => { setReviewTab('original'); void handleRestructureDecision('keep_lossless') }} disabled={Boolean(actingDraftId)}>{t('drafts.useSafeVersion')}</Button><Button variant="primary" size="sm" onClick={() => { setReviewTab('candidate'); void handleRestructureDecision('keep_ai') }} disabled={Boolean(actingDraftId)}>{t('drafts.usePreparedVersion')}</Button></div>}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><span className="text-body-sm font-semibold text-foreground">{t('drafts.publishingDepartments')}</span><div className="relative min-w-0 flex-1 sm:max-w-sm"><button ref={departmentMenuAnchor} type="button" onClick={() => setDepartmentMenuOpen(open => !open)} disabled={!visibleDepartments.length} className="field flex min-h-9 w-full items-center gap-2 py-1.5 text-left text-xs disabled:opacity-50"><span className="min-w-0 flex-1 truncate">{selectedDepartments.length ? selectedDepartments.map(item => item.name).join(', ') : t('drafts.noDepartment')}</span><ChevronDown size={14} className={`shrink-0 transition ${departmentMenuOpen ? 'rotate-180' : ''}`} /></button><FloatingPanel anchorRef={departmentMenuAnchor} open={departmentMenuOpen} onClose={() => setDepartmentMenuOpen(false)} className="p-1.5"><div className="py-1">{visibleDepartments.map(item => { const selected = docDepartmentIds.includes(item.id); const primary = item.id === primaryDepartmentId; return <button type="button" key={item.id} onClick={() => toggleDepartment(item.id)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-muted-foreground hover:bg-surface-soft hover:text-foreground"><span className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}>{selected && <Check size={11} strokeWidth={3} />}</span><span className="min-w-0 flex-1 truncate">{item.name}</span>{primary && <span className="text-caption font-semibold text-warning-text">{t('drafts.primaryDepartment')}</span>}</button> })}</div><button type="button" onClick={() => setDepartmentMenuOpen(false)} className="w-full rounded-lg border border-border px-2.5 py-1.5 text-body-sm font-semibold text-primary-text hover:bg-primary/10">{t('common.confirm')}</button></FloatingPanel></div></div>
+          </div>
         </footer>
       </section></FocusTrap></div>}
     </div>
