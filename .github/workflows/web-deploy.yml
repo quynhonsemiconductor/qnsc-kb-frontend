@@ -79,8 +79,34 @@ jobs:
             exit 1
           fi
           echo "Waiting on Web · CI run $ID …"
-          gh run watch --repo "$GITHUB_REPOSITORY" "$ID" --exit-status
-          echo "Web · CI succeeded; deploy may proceed."
+          # `gh run watch` polls the run's JOBS endpoint every three seconds. GitHub can
+          # transiently return HTTP 500 from that endpoint even after every job succeeds;
+          # one such response made a green main fail its deploy gate. Poll the run-level
+          # endpoint instead, retrying transport/API failures while preserving fail-closed
+          # semantics for a real CI failure or a run that never reaches a terminal state.
+          for attempt in $(seq 1 150); do
+            STATE=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ID" \
+                      --jq '.status + "|" + (.conclusion // "")') || STATE=""
+            if [ -z "$STATE" ]; then
+              echo "::warning::Could not read Web · CI run $ID (attempt $attempt/150); retrying."
+              sleep 10
+              continue
+            fi
+            STATUS=${STATE%%|*}
+            CONCLUSION=${STATE#*|}
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "Web · CI succeeded; deploy may proceed."
+                exit 0
+              fi
+              echo "::error::Web · CI run $ID completed with conclusion '$CONCLUSION' — blocking deploy."
+              exit 1
+            fi
+            echo "Web · CI run $ID is $STATUS (attempt $attempt/150)."
+            sleep 10
+          done
+          echo "::error::Timed out waiting for Web · CI run $ID — blocking deploy."
+          exit 1
 
   deploy:
     needs: [wait-for-ci]
