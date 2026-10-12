@@ -16,6 +16,12 @@ export async function downloadArticleSource(id: string) {
   return { url: URL.createObjectURL(response.data), type }
 }
 
+export async function downloadEvidencePreview(articleId: string, evidenceId: string) {
+  const response = await client.get(`/articles/${articleId}/evidence/${evidenceId}/preview`, { responseType: 'blob' })
+  const type = String(response.data?.type || response.headers?.['content-type'] || '').split(';')[0].trim()
+  return { url: URL.createObjectURL(response.data), type }
+}
+
 export async function getRelatedArticles(id: string, limit = 6) {
   const response = await client.get(`/articles/${id}/related`, { params: { limit } })
   return response.data

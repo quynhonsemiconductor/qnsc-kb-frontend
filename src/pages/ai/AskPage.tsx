@@ -4,34 +4,24 @@ import remarkGfm from 'remark-gfm'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertCircle, ArrowUp, BookOpen, Bot, Check, ChevronDown, ChevronLeft, ChevronRight,
-  Copy, ExternalLink, FileText, Layers, List, MessageSquare, Pencil, Search as SearchIcon,
+  Copy, ExternalLink, FileImage, FileSpreadsheet, FileText, Layers, List, MessageSquare, Pencil, Search as SearchIcon,
   Plus, Sparkles, Square, ThumbsDown, ThumbsUp, Trash2, User as UserIcon, X,
 } from 'lucide-react'
 import {
   askAIStream, createConversation, deleteConversation, getConversationMessages,
   getConversations, renameConversation, submitAIFeedback,
 } from '../../api/ai'
-import { createArticleEditRequest, downloadArticleSource } from '../../api/articles'
+import { createArticleEditRequest, downloadArticleSource, downloadEvidencePreview } from '../../api/articles'
 import PdfViewer from '../../components/ai/PdfViewer'
 import AnswerText, { type AnswerCitation } from '../../components/ai/AnswerText'
 import AnswerSections from '../../components/ai/AnswerSections'
+import AnalysisResults from '../../components/ai/AnalysisResults'
+import EvidenceTable from '../../components/ai/EvidenceTable'
+import type { AnalyticsResult, Citation, EvidenceStatus } from '../../types/ai'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
-
-interface Citation {
-  source_index?: number
-  article_id: string
-  title: string
-  section_ref?: string
-  source_ref: string
-  excerpt?: string
-  highlight_text?: string
-  highlight_texts?: string[]
-  page_number?: number
-  source_url?: string
-}
 
 interface Message {
   id?: string
@@ -54,6 +44,8 @@ interface Message {
   editInstruction?: string
   clarificationOptions?: string[]
   confidence?: 'low' | 'normal'
+  analyticsResults?: AnalyticsResult[]
+  evidenceStatus?: EvidenceStatus
   // Populated only when the backend's CLAIM_VERIFICATION_ENABLED flag is on (off by
   // default). Absent, not an empty array, on any answer the flag did not run for --
   // treat that as "not checked", not "every claim confirmed".
@@ -255,6 +247,7 @@ export default function AskPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sourceUrlRef = useRef<string | null>(null)
+  const viewerOwnedUrlRef = useRef<string | null>(null)
   const sourceTypeRef = useRef<string>('')
   const abortRef = useRef<AbortController | null>(null)
   const chatDesktopRef = useRef(typeof window !== 'undefined' && window.innerWidth >= 1024)
@@ -304,6 +297,8 @@ export default function AskPage() {
         originalInformation: actionData.original_information,
         willUpdate: actionData.will_update,
         editInstruction: actionData.edit_instruction,
+        analyticsResults: item.analytics_results || actionData.analytics_results || [],
+        evidenceStatus: item.evidence_status || actionData.evidence_status,
       }
       })
       setMessages(mappedMessages)
@@ -377,6 +372,7 @@ export default function AskPage() {
     return () => {
       abortRef.current?.abort()
       if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current)
+      if (viewerOwnedUrlRef.current) URL.revokeObjectURL(viewerOwnedUrlRef.current)
     }
   }, [])
 
@@ -388,6 +384,9 @@ export default function AskPage() {
   }, [question])
 
   useEffect(() => {
+    // A viewer may hold the same preview URL. Close it before revoking that URL when the
+    // selected citation changes, otherwise the modal remains open on a dead blob.
+    setViewerSource(null)
     if (sourceUrlRef.current) {
       URL.revokeObjectURL(sourceUrlRef.current)
       sourceUrlRef.current = null
@@ -402,7 +401,11 @@ export default function AskPage() {
     let active = true
     setSourceLoading(true)
     setSourceError('')
-    downloadArticleSource(selectedSource.article_id)
+    const visualEvidence = selectedSource.evidence_id && selectedSource.evidence_kind !== 'table'
+    const loadPreview = visualEvidence
+      ? downloadEvidencePreview(selectedSource.article_id, selectedSource.evidence_id as string)
+      : downloadArticleSource(selectedSource.article_id)
+    loadPreview
       .then(({ url, type }) => {
         if (!active) {
           URL.revokeObjectURL(url)
@@ -437,6 +440,25 @@ export default function AskPage() {
 
   const openSourceViewer = (citation: Citation) => {
     if (sourceUrlRef.current) setViewerSource({ citation, url: sourceUrlRef.current, type: sourceTypeRef.current })
+  }
+
+  const openOriginalSource = async (citation: Citation) => {
+    try {
+      const source = await downloadArticleSource(citation.article_id)
+      if (viewerOwnedUrlRef.current) URL.revokeObjectURL(viewerOwnedUrlRef.current)
+      viewerOwnedUrlRef.current = source.url
+      setViewerSource({ citation, url: source.url, type: source.type })
+    } catch {
+      setSourceError(t('chat.sourceLoadFailed'))
+    }
+  }
+
+  const closeSourceViewer = () => {
+    setViewerSource(null)
+    if (viewerOwnedUrlRef.current) {
+      URL.revokeObjectURL(viewerOwnedUrlRef.current)
+      viewerOwnedUrlRef.current = null
+    }
   }
 
   const handleAsk = async (
@@ -515,6 +537,8 @@ export default function AskPage() {
             editInstruction,
             clarificationOptions: data.clarification_options || undefined,
             confidence: data.confidence,
+            analyticsResults: data.analytics_results || actionData.analytics_results || message.analyticsResults || [],
+            evidenceStatus: data.evidence_status || actionData.evidence_status || message.evidenceStatus,
             unverifiedClaims: data.unverified_claims,
           } : message))
         },
@@ -523,6 +547,8 @@ export default function AskPage() {
         true,
         confirmEdit,
         confirmedInstruction,
+        (results) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, analyticsResults: results } : message)),
+        (status) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, evidenceStatus: status } : message)),
       )
       await refreshConversations()
     } catch (requestError: any) {
@@ -612,6 +638,7 @@ export default function AskPage() {
   }
 
   const isEmpty = messages.length === 0
+  const activeEvidenceStatus = [...messages].reverse().find((message) => message.sender === 'ai')?.evidenceStatus
 
   return (
     <>
@@ -957,8 +984,25 @@ export default function AskPage() {
                               )
                             )}
                             {isStreamingThis && <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-coral align-text-bottom" />}
+                            {!isStreamingThis && message.evidenceStatus?.fallback_reason && (
+                              <p className="mt-3 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning-text">
+                                {t('chat.evidenceFallbackSafe')}
+                              </p>
+                            )}
                           </div>
                         </div>
+                        <AnalysisResults
+                          results={message.analyticsResults || []}
+                          citations={message.citations || []}
+                          onCitationClick={setSelectedSource}
+                          labels={{
+                            title: t('chat.analysisResult'), formula: t('chat.formula'), rowsUsed: t('chat.rowsUsed'), details: t('chat.calculationDetails'),
+                            operations: {
+                              count: t('chat.operation.count'), sum: t('chat.operation.sum'), average: t('chat.operation.average'), median: t('chat.operation.median'),
+                              min: t('chat.operation.min'), max: t('chat.operation.max'), difference: t('chat.operation.difference'), percentage_change: t('chat.operation.percentage_change'),
+                            },
+                          }}
+                        />
                         {message.citations && message.citations.length > 0 && (
                           <div className="mt-4 border-t border-hairline pt-4 pl-10">
                             <button
@@ -980,9 +1024,13 @@ export default function AskPage() {
                                     className="ask-fade-up flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-surface hover:shadow-sm"
                                   >
                                     <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-info/20 text-body-sm font-semibold text-info transition-transform duration-150 group-hover:scale-105">{citation.source_index ?? citationIndex + 1}</span>
-                                    <FileText size={14} className="shrink-0 text-stone" />
-                                    <span className="truncate text-body text-steel">{citation.title}</span>
-                                    <span className="ml-auto shrink-0 text-body-sm text-stone">{citation.section_ref || 'General'}</span>
+                                    {citation.evidence_kind === 'table'
+                                      ? <FileSpreadsheet size={14} className="shrink-0 text-success" />
+                                      : citation.evidence_kind
+                                        ? <FileImage size={14} className="shrink-0 text-info" />
+                                        : <FileText size={14} className="shrink-0 text-stone" />}
+                                    <span className="min-w-0 flex-1 truncate text-body text-steel">{citation.evidence_label || citation.title}</span>
+                                    <span className="ml-auto shrink-0 text-body-sm text-stone">{citation.evidence_kind ? t(`chat.evidence.${citation.evidence_kind}`) : (citation.section_ref || t('chat.general'))}</span>
                                   </button>
                                 ))}
                               </div>
@@ -1051,14 +1099,14 @@ export default function AskPage() {
                     <section className="ask-fade-in ml-10 max-w-2xl overflow-hidden rounded-xl border border-border bg-surface-elevated">
                       <button type="button" onClick={() => setAgentWorkOpen(value => !value)} aria-expanded={agentWorkOpen} className="flex min-h-10 w-full items-center gap-2 bg-surface-muted px-3 text-left text-body-sm font-semibold text-foreground">
                         <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-info/25 border-t-info" />
-                        Agent is searching and reading approved sources…
+                        {t('chat.agentSearching')}…
                         <ChevronDown size={14} className={`ml-auto text-muted transition ${agentWorkOpen ? 'rotate-180' : ''}`} />
                       </button>
                       {agentWorkOpen && <div className="space-y-2 border-t border-border px-3 py-3 font-mono text-caption text-muted-foreground">
-                        <p>✓ Searching the knowledge base</p>
-                        <p>✓ Applying permissions and source status</p>
-                        <p className="text-info-text">→ Reading and comparing the best matches</p>
-                        <p className="opacity-55">○ Preparing a grounded answer</p>
+                        <p>✓ {t('chat.agentSearching')}</p>
+                        {activeEvidenceStatus?.stage && ['reading_evidence', 'calculating', 'answering'].includes(activeEvidenceStatus.stage) && <p>✓ {t('chat.agentReadingEvidence')}</p>}
+                        {activeEvidenceStatus?.stage && ['calculating', 'answering'].includes(activeEvidenceStatus.stage) && <p>✓ {t('chat.agentCalculating')}</p>}
+                        <p className="text-info-text">→ {t('chat.agentAnswering')}</p>
                       </div>}
                     </section>
                   )}
@@ -1180,8 +1228,30 @@ export default function AskPage() {
                         <p className="mt-0.5 text-body-sm text-stone">{selectedSource.section_ref || 'General section'}{selectedSource.page_number ? ` · Page ${selectedSource.page_number}` : ''}</p>
                      </div></div>
                     </div>
+                    {selectedSource.evidence_kind === 'table' && selectedSource.evidence_table && (
+                      <div className="mt-5">
+                        <p className="mb-2 flex items-center gap-2 text-caption font-bold uppercase tracking-widest text-stone"><FileSpreadsheet size={13} className="text-success" /> {t('chat.tableEvidence')}</p>
+                        <EvidenceTable
+                          table={selectedSource.evidence_table}
+                          label={selectedSource.evidence_label || t('chat.tableEvidence')}
+                          rowSummaryTemplate={t('chat.tableRowSummary')}
+                        />
+                      </div>
+                    )}
+                    {selectedSource.evidence_kind && selectedSource.evidence_kind !== 'table' && (
+                      <div className="mt-5">
+                        <p className="mb-2 flex items-center gap-2 text-caption font-bold uppercase tracking-widest text-stone"><FileImage size={13} className="text-info" /> {t('chat.visualEvidence')}</p>
+                        {sourceLoading ? (
+                          <div role="status" className="grid h-40 place-items-center rounded-xl bg-canvas text-xs text-stone">{t('chat.loadingEvidence')}</div>
+                        ) : sourceUrl ? (
+                          <button type="button" onClick={() => openSourceViewer(selectedSource)} className="block w-full overflow-hidden rounded-xl border border-hairline bg-white focus-visible:ring-2 focus-visible:ring-ring" aria-label={t('chat.openVisualEvidence')}>
+                            <img src={sourceUrl} alt={selectedSource.evidence_label || selectedSource.title} className="max-h-72 w-full object-contain" />
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
                     <div className="mt-5">
-                       <p className="mb-2 flex items-center gap-2 text-caption font-bold uppercase tracking-widest text-stone"><span className="h-1.5 w-1.5 rounded-full bg-warning" /> Highlighted passage</p>
+                       <p className="mb-2 flex items-center gap-2 text-caption font-bold uppercase tracking-widest text-stone"><span className="h-1.5 w-1.5 rounded-full bg-warning" /> {t('chat.highlightedPassage')}</p>
                       <blockquote className="rounded-r-md border-l-2 border-minimaxBlue bg-canvas px-4 py-3 text-xs leading-relaxed text-steel transition-colors">
                         <HighlightedSourceText text={selectedSource.excerpt || ''} highlights={selectedSource.highlight_texts} highlight={selectedSource.highlight_text} />
                       </blockquote>
@@ -1198,8 +1268,26 @@ export default function AskPage() {
                       onClick={() => openSourceViewer(selectedSource)}
                       className="ask-press w-full rounded-lg bg-ink text-primary-foreground hover:bg-charcoal hover:shadow-md"
                     >
-                      {sourceLoading ? 'Loading source…' : selectedSource.page_number ? `View PDF · page ${selectedSource.page_number}` : 'View original source'}
+                      {sourceLoading
+                        ? 'Loading source…'
+                        : selectedSource.evidence_kind && selectedSource.evidence_kind !== 'table'
+                          ? t('chat.openVisualEvidence')
+                          : selectedSource.page_number
+                            ? `View PDF · page ${selectedSource.page_number}`
+                            : 'View original source'}
                     </Button>
+                    {selectedSource.evidence_kind && selectedSource.evidence_kind !== 'table' && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<FileText size={13} />}
+                        iconPosition="right"
+                        onClick={() => void openOriginalSource(selectedSource)}
+                        className="ask-press w-full rounded-lg"
+                      >
+                        {t('chat.openOriginalSource')}
+                      </Button>
+                    )}
                     <Button
                       variant="secondary"
                       size="sm"
@@ -1217,7 +1305,7 @@ export default function AskPage() {
           </>
         )}
 
-        {viewerSource && <PdfViewer open fileName={viewerSource.citation.title} url={viewerSource.url} mimeType={viewerSource.type} page={viewerSource.citation.page_number} onClose={() => setViewerSource(null)} />}
+        {viewerSource && <PdfViewer open fileName={viewerSource.citation.title} url={viewerSource.url} mimeType={viewerSource.type} page={viewerSource.citation.page_number} onClose={closeSourceViewer} />}
       </div>
     </>
   )
