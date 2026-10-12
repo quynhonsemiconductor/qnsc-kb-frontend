@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { dispatchAIStreamPayload } from '../../src/lib/ai-stream'
 import type { AIStreamHandlers } from '../../src/lib/ai-stream'
+import {
+  buildAIAskPayload,
+  collapseDuplicateFailedRetries,
+  resetFailedMessageForRetry,
+} from '../../src/lib/ai-retry'
 
 const handlers = (): AIStreamHandlers => ({
   onToken: vi.fn(),
@@ -42,5 +47,48 @@ describe('AI stream additions', () => {
     const callbacks = handlers()
     expect(() => dispatchAIStreamPayload({ type: 'future_event' } as never, callbacks)).not.toThrow()
     expect(() => dispatchAIStreamPayload({ type: 'error', detail: 'Provider unavailable' }, callbacks)).toThrow('Provider unavailable')
+  })
+
+  it('marks an explicit failed-turn retry in the request payload', () => {
+    expect(buildAIAskPayload({
+      question: 'Có bao nhiêu nội dung trong Luật PTDNNVV',
+      conversationId: 'conversation-1',
+      language: 'vi',
+      retryFailed: true,
+    })).toEqual(expect.objectContaining({
+      conversation_id: 'conversation-1',
+      retry_failed: true,
+    }))
+  })
+
+  it('collapses repeated legacy failed attempts into one logical turn', () => {
+    const question = 'Có bao nhiêu nội dung trong Luật PTDNNVV'
+    const history = Array.from({ length: 5 }, (_, attempt) => [
+      { role: 'user', content: question, attempt },
+      { role: 'assistant', content: 'AI generation failed. Please try again.', failed: true, attempt },
+    ]).flat()
+
+    const collapsed = collapseDuplicateFailedRetries(history)
+
+    expect(collapsed).toHaveLength(2)
+    expect(collapsed[0]).toMatchObject({ role: 'user', content: question, attempt: 4 })
+    expect(collapsed[1]).toMatchObject({ role: 'assistant', failed: true, attempt: 4 })
+  })
+
+  it('resets the same failed bubble instead of creating another message', () => {
+    const failed = {
+      id: 'assistant-1',
+      text: 'AI generation failed. Please try again.',
+      citations: [{ article_id: 'a1' }],
+      failed: true,
+      action: 'old-action',
+      analyticsResults: [{ result: 'stale' }],
+    }
+
+    const reset = resetFailedMessageForRetry(failed, 'Retry this')
+
+    expect(reset.id).toBe('assistant-1')
+    expect(reset).toMatchObject({ text: '', citations: [], failed: false, retryQuestion: 'Retry this', analyticsResults: [] })
+    expect(reset.action).toBeUndefined()
   })
 })
