@@ -1,6 +1,7 @@
 import client, { clearExpiredSession, getAccessToken, refreshSession } from './client'
 import type { AIStreamEvent, AnalyticsResult, EvidenceStatus } from '../types/ai'
 import { dispatchAIStreamPayload } from '../lib/ai-stream'
+import { buildAIAskPayload } from '../lib/ai-retry'
 
 export async function askAI(
   question: string,
@@ -35,6 +36,7 @@ export async function askAIStream(
   editInstruction?: string,
   onAnalytics?: (results: AnalyticsResult[]) => void,
   onEvidenceStatus?: (status: EvidenceStatus) => void,
+  retryFailed = false,
 ) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
   const token = getAccessToken()
@@ -45,11 +47,19 @@ export async function askAIStream(
     // as Axios does, otherwise a cross-origin deployment cannot recover a
     // streamed request after the short-lived access token expires.
     credentials: 'include',
-    body: JSON.stringify({ question, conversation_id: conversationId, language, article_id: articleId || undefined, confirm_edit: confirmEdit, edit_instruction: editInstruction || undefined }),
+    body: JSON.stringify(buildAIAskPayload({
+      question,
+      conversationId,
+      language,
+      articleId,
+      confirmEdit,
+      editInstruction,
+      retryFailed,
+    })),
     signal,
   })
   if (response.status === 401 && retry && await refreshSession()) {
-    return askAIStream(question, conversationId, language, onToken, onSources, onDone, articleId, signal, false, confirmEdit, editInstruction, onAnalytics, onEvidenceStatus)
+    return askAIStream(question, conversationId, language, onToken, onSources, onDone, articleId, signal, false, confirmEdit, editInstruction, onAnalytics, onEvidenceStatus, retryFailed)
   }
   if (response.status === 401) clearExpiredSession()
   if (!response.ok || !response.body) throw new Error(`AI stream failed (${response.status})`)

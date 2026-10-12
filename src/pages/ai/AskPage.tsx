@@ -18,6 +18,7 @@ import AnswerSections from '../../components/ai/AnswerSections'
 import AnalysisResults from '../../components/ai/AnalysisResults'
 import EvidenceTable from '../../components/ai/EvidenceTable'
 import type { AnalyticsResult, Citation, EvidenceStatus } from '../../types/ai'
+import { collapseDuplicateFailedRetries, resetFailedMessageForRetry } from '../../lib/ai-retry'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
 import { Button } from '../../components/ui/Button'
@@ -272,7 +273,7 @@ export default function AskPage() {
     setError('')
     if (window.innerWidth < 1024) setSidebarOpen(false)
     try {
-      const history = await getConversationMessages(id)
+      const history = collapseDuplicateFailedRetries(await getConversationMessages(id))
       const mappedMessages: Message[] = history.map((item: any, index: number) => {
         const actionData = item.action_data || {}
         // A turn the server recorded as failed is restored as a failure, with the
@@ -463,10 +464,17 @@ export default function AskPage() {
 
   const handleAsk = async (
     value = question,
-    editOptions?: { confirmEdit?: boolean; articleId?: string; editInstruction?: string },
+    editOptions?: {
+      confirmEdit?: boolean
+      articleId?: string
+      editInstruction?: string
+      retryMessageId?: string
+    },
   ) => {
     const query = value.trim()
     if (!query || loading) return
+    const retryMessageId = editOptions?.retryMessageId
+    const retryFailed = Boolean(retryMessageId)
     const confirmsPendingEdit = Boolean(
       pendingEditConfirmation
       && /^(yes|yeah|yep|ok|okay|confirm|đúng|có|co|xác nhận|đồng ý)(\s|[.!?]|$)/i.test(query),
@@ -481,8 +489,16 @@ export default function AskPage() {
     setLoading(true)
     setError('')
     setQuestion('')
-    setMessages((previous) => [...previous, { sender: 'user', text: query }])
-    let assistantMessageId = ''
+    let assistantMessageId = retryMessageId || ''
+    if (retryFailed) {
+      setMessages((previous) => previous.map((message) =>
+        message.id === retryMessageId
+          ? resetFailedMessageForRetry(message, query)
+          : message,
+      ))
+    } else {
+      setMessages((previous) => [...previous, { sender: 'user', text: query }])
+    }
     try {
       let activeId = conversationId
       if (!activeId) {
@@ -490,8 +506,10 @@ export default function AskPage() {
         activeId = conversation.id
         setConversationId(activeId)
       }
-      assistantMessageId = `ai-${Date.now()}`
-      setMessages((previous) => [...previous, { id: assistantMessageId, sender: 'ai', text: '', citations: [] }])
+      if (!retryFailed) {
+        assistantMessageId = `ai-${Date.now()}`
+        setMessages((previous) => [...previous, { id: assistantMessageId, sender: 'ai', text: '', citations: [] }])
+      }
       await askAIStream(
         query,
         activeId ?? undefined,
@@ -549,6 +567,7 @@ export default function AskPage() {
         confirmedInstruction,
         (results) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, analyticsResults: results } : message)),
         (status) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, evidenceStatus: status } : message)),
+        retryFailed,
       )
       await refreshConversations()
     } catch (requestError: any) {
@@ -930,16 +949,21 @@ export default function AskPage() {
                                     stayed the on-primary token, measured at 1.46:1. A solid
                                     danger button is 8.01:1 dark / 4.51:1 light and matches
                                     every other destructive action in the app. */}
-                                <Button
-                                  variant="danger"
-                                  size="sm"
-                                  icon={<ArrowUp size={12} />}
-                                  iconPosition="right"
-                                  onClick={() => void handleAsk(message.retryQuestion || '')}
-                                  className="mt-2"
-                                >
-                                  Try again
-                                </Button>
+                                {index === messages.length - 1 && (
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    icon={<ArrowUp size={12} />}
+                                    iconPosition="right"
+                                    onClick={() => void handleAsk(
+                                      message.retryQuestion || '',
+                                      { retryMessageId: messageId },
+                                    )}
+                                    className="mt-2"
+                                  >
+                                    Try again
+                                  </Button>
+                                )}
                               </div>
                             ) : isNoAnswer ? (
                               <p className="text-body italic leading-6 text-stone">{message.text}</p>
