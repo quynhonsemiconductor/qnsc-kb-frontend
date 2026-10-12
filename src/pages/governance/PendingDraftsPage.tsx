@@ -1,14 +1,14 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
-  AlertCircle, AlertTriangle, ArrowLeftRight, Check, CheckCircle2, ChevronDown, Edit3, Eye,
-  FileCheck2, FileText, Hash, Layers3, RefreshCw, Search, ShieldCheck, X,
+  AlertCircle, AlertTriangle, ArrowLeftRight, Check, CheckCircle2, ChevronDown, Download, Edit3, Eye,
+  FileCheck2, FileText, FileWarning, Hash, Layers3, Maximize2, RefreshCw, Search, ShieldCheck, X,
   MessageSquare, Minus,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useNavigate } from 'react-router-dom'
 import {
-  approveDraft, assignDraftApprover, bulkDecideDrafts, decideRestructure, getDraftComparison, getEligibleApprovers, getPendingDraft, getPendingDrafts, rejectDraft, restructureDraft,
+  approveDraft, assignDraftApprover, bulkDecideDrafts, decideRestructure, downloadPendingDraftSource, getDraftComparison, getEligibleApprovers, getPendingDraft, getPendingDrafts, rejectDraft, restructureDraft,
   type BulkDecideResult,
 } from '../../api/governance'
 import { listDepartments } from '../../api/auth'
@@ -27,6 +27,8 @@ import { Badge } from '../../components/ui/Badge'
 import { formatDay } from '../../lib/formatters'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 import { compareDraftManagementOrder, getDraftManagementStatus, getPreparationCompletion, getPublishBlockers, isPreparationQueueState } from '../../utils/draftManagement'
+import { sourceFileNameFromRef, sourcePreviewMode } from '../../utils/sourcePreview'
+import PdfViewer from '../../components/ai/PdfViewer'
 
 
 /** `blocked[].code` → the i18n key naming the one thing the reviewer must still do. */
@@ -146,7 +148,17 @@ export default function PendingDraftsPage() {
   const [editableTargetArticle, setEditableTargetArticle] = useState<any | null>(null)
   const [compareArticleId, setCompareArticleId] = useState('')
   const [compareLoading, setCompareLoading] = useState(false)
-  const [reviewTab, setReviewTab] = useState<'structured' | 'candidate' | 'original'>('structured')
+  // 'file' is the stored upload itself and is the DEFAULT: extraction keeps only text, so a
+  // document that is mostly screenshots lost almost everything it showed, and a reviewer
+  // approved it without ever seeing that. 'structured'/'candidate'/'extracted' stay
+  // available because a human still has to confirm the text that gets indexed and later
+  // cited by RAG — the original is what the document IS, the Markdown is what search knows.
+  const [reviewTab, setReviewTab] = useState<'file' | 'structured' | 'candidate' | 'extracted'>('file')
+  const [sourceFile, setSourceFile] = useState<{ url: string; type: string } | null>(null)
+  const [sourceLoading, setSourceLoading] = useState(false)
+  const [sourceUnavailable, setSourceUnavailable] = useState(false)
+  const [sourceMaximised, setSourceMaximised] = useState(false)
+  const sourceUrlRef = useRef<string | null>(null)
   const [showComparison, setShowComparison] = useState(false)
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false)
   const [docDept, setDocDept] = useState('')
@@ -348,7 +360,8 @@ export default function PendingDraftsPage() {
       setSelectedDraft(detail)
       setReviewOpen(true)
       setDepartmentMenuOpen(false)
-      setReviewTab('structured')
+      setReviewTab('file')
+      void loadSourceFile(detail.id)
       setShowComparison(opensAsUpdate)
       setShowTechnicalDetails(false)
       setUpdateArticleId(detail.content_metadata?.suggested_update_article_id || '')
@@ -375,6 +388,42 @@ export default function PendingDraftsPage() {
     }
   }
 
+  /**
+   * Load the stored upload for the primary review pane.
+   *
+   * The previous blob URL is revoked before the next one replaces it: each object URL pins
+   * its blob in memory until revoked, and a reviewer opens many drafts in one sitting.
+   * A 404 is the API's ordinary answer for "no stored file", so it sets `unavailable`
+   * rather than surfacing an error the reviewer can do nothing about.
+   */
+  const releaseSourceFile = () => {
+    if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current)
+    sourceUrlRef.current = null
+    setSourceFile(null)
+  }
+
+  const loadSourceFile = async (draftId: string) => {
+    releaseSourceFile()
+    setSourceUnavailable(false)
+    setSourceLoading(true)
+    try {
+      const { url, type } = await downloadPendingDraftSource(draftId)
+      sourceUrlRef.current = url
+      setSourceFile({ url, type })
+    } catch {
+      setSourceUnavailable(true)
+    } finally {
+      setSourceLoading(false)
+    }
+  }
+
+  // Revoke on unmount as well. Closing the review covers the normal path, but navigating
+  // away with the overlay open would otherwise leak the blob for the rest of the session.
+  useEffect(() => () => {
+    if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current)
+    sourceUrlRef.current = null
+  }, [])
+
   // Referenced by the review overlay's aria-labelledby, so the dialog is announced by
   // the draft title instead of being an unlabelled region.
   const reviewTitleId = useId()
@@ -397,6 +446,9 @@ export default function PendingDraftsPage() {
     setSelectedDraft(null)
     setComparedArticle(null)
     setEditableTargetArticle(null)
+    setSourceMaximised(false)
+    setSourceUnavailable(false)
+    releaseSourceFile()
   }
 
   const handleConfirmApprove = async () => {
@@ -620,6 +672,42 @@ export default function PendingDraftsPage() {
     </div>
   )
 
+  /**
+   * The stored upload, rendered in the pane rather than in `PdfViewer`.
+   *
+   * `PdfViewer` is a fixed-inset modal with its OWN FocusTrap and its own window-level
+   * Escape handler, and this review screen is already an overlay with both. Nesting them
+   * made one Escape press close the viewer AND the review behind it, and left two focus
+   * traps competing for Tab. So the pane renders inline with the same allow-list, and the
+   * modal is kept for the explicit "expand" action, where being on top IS the intent.
+   *
+   * `embed`, not `iframe`: Chrome refuses to render a blob: PDF inside a nested iframe in
+   * some configurations, and `embed` is what the browser's own PDF plugin path expects.
+   */
+  const renderSourceFile = () => {
+    const fileName = sourceFileNameFromRef(selectedDraft?.source_ref)
+    const mode = sourcePreviewMode({
+      loading: sourceLoading,
+      unavailable: sourceUnavailable,
+      url: sourceFile?.url,
+      mimeType: sourceFile?.type,
+    })
+
+    if (mode === 'unavailable') {
+      return <div className="grid h-full place-items-center px-6 text-center"><div className="max-w-sm space-y-2"><FileWarning size={22} className="mx-auto text-muted" /><p className="text-body font-semibold text-foreground">{t('drafts.sourceFileUnavailable')}</p><p className="text-body-sm leading-5 text-muted-foreground">{t('drafts.sourceFileUnavailableHelp')}</p></div></div>
+    }
+    if (mode === 'loading') {
+      return <div role="status" className="grid h-full place-items-center text-body-sm text-muted-foreground"><span className="flex items-center gap-2"><RefreshCw size={15} className="animate-spin" />{t('drafts.loadingSourceFile')}</span></div>
+    }
+    if (mode === 'download') {
+      return <div className="grid h-full place-items-center px-6 text-center"><div className="max-w-sm space-y-3"><FileWarning size={22} className="mx-auto text-muted" /><p className="text-body font-semibold text-foreground">{t('drafts.sourceFileNotPreviewable')}</p><p className="text-body-sm leading-5 text-muted-foreground">{t('drafts.sourceFileNotPreviewableHelp')}</p><a href={sourceFile!.url} download={fileName} className="inline-flex min-h-10 items-center gap-2 rounded-control bg-primary px-4 text-body-sm font-bold text-primary-foreground no-underline"><Download size={14} />{t('drafts.downloadSourceFile')}</a></div></div>
+    }
+    if (mode === 'image') {
+      return <div className="h-full overflow-auto bg-white p-4"><img src={sourceFile!.url} alt={fileName} className="mx-auto max-w-full object-contain" /></div>
+    }
+    return <embed src={sourceFile!.url} type={sourceFile!.type || 'application/pdf'} title={fileName} className="size-full bg-white" />
+  }
+
   return (
     <div className="page-shell page-stack text-ink">
       <header className="border-b border-border pb-5">
@@ -709,10 +797,15 @@ export default function PendingDraftsPage() {
           <section className="flex min-h-0 flex-col border-b border-border lg:border-b-0 lg:border-r">
             <div className="flex shrink-0 flex-col gap-2 border-b border-border px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <p className="text-caption font-semibold uppercase tracking-widest text-primary-text">{t('drafts.incomingDocument')}</p>
-              <div className="flex overflow-x-auto rounded-lg border border-border bg-surface p-0.5"><button type="button" onClick={() => setReviewTab('structured')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'structured' ? 'bg-primary/10 text-primary-text' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.readingView')}</button>{selectedDraft.restructure_candidate_md && <button type="button" onClick={() => setReviewTab('candidate')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'candidate' ? 'bg-warning/10 text-warning-text' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.preparedVersion')}</button>}<button type="button" onClick={() => setReviewTab('original')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'original' ? 'bg-surface-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.originalVersion')}</button></div>
+              <div className="flex items-center gap-2">
+                {reviewTab === 'file' && sourceFile && <Button variant="ghost" size="sm" onClick={() => setSourceMaximised(true)} icon={<Maximize2 size={13} />}>{t('drafts.expandFile')}</Button>}
+                <div className="flex overflow-x-auto rounded-lg border border-border bg-surface p-0.5"><button type="button" onClick={() => setReviewTab('file')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'file' ? 'bg-primary/10 text-primary-text' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.originalFile')}</button><button type="button" onClick={() => setReviewTab('structured')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'structured' ? 'bg-primary/10 text-primary-text' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.readingView')}</button>{selectedDraft.restructure_candidate_md && <button type="button" onClick={() => setReviewTab('candidate')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'candidate' ? 'bg-warning/10 text-warning-text' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.preparedVersion')}</button>}<button type="button" onClick={() => setReviewTab('extracted')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'extracted' ? 'bg-surface-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.extractedText')}</button></div>
+              </div>
             </div>
             {isAiBusy(selectedDraft) && <div role="status" className="flex items-start gap-2 border-b border-info/20 bg-info/[0.06] px-4 py-2 text-body-sm leading-5 text-info-text sm:px-6"><RefreshCw size={13} className="mt-0.5 shrink-0 animate-spin" /><span>{t('drafts.preparingReadingView')}</span></div>}
-            <div className="ask-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{renderMarkdown(reviewTab === 'candidate' ? (selectedDraft.restructure_candidate_md || t('drafts.noExtractedText')) : reviewTab === 'structured' ? (selectedDraft.restructured_body_md || selectedDraft.summary || t('drafts.noExtractedText')) : (selectedDraft.summary || t('drafts.noExtractedText')))}</div>
+            {reviewTab === 'file'
+              ? <div className="min-h-0 flex-1 bg-surface-muted">{renderSourceFile()}</div>
+              : <div className="ask-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{renderMarkdown(reviewTab === 'candidate' ? (selectedDraft.restructure_candidate_md || t('drafts.noExtractedText')) : reviewTab === 'structured' ? (selectedDraft.restructured_body_md || selectedDraft.summary || t('drafts.noExtractedText')) : (selectedDraft.summary || t('drafts.noExtractedText')))}</div>}
           </section>
           {showComparison && <section className="flex min-h-0 flex-col"><div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-2.5 sm:px-6"><ArrowLeftRight size={15} className="text-warning-text" /><div className="min-w-0"><p className="text-caption font-semibold uppercase tracking-widest text-warning-text">{t('drafts.relatedDocument')}</p><p className="mt-1 truncate text-xs text-muted-foreground">{comparedArticle?.title || (matches.length ? t('drafts.loadingComparison') : t('drafts.noComparison'))}</p></div></div><div className="ask-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{compareLoading ? <div role="status" className="flex h-full items-center justify-center text-sm text-muted-foreground"><RefreshCw size={16} className="mr-2 animate-spin" />{t('drafts.loadingComparison')}</div> : comparedArticle ? <>{renderMarkdown(comparedArticle.body_md)}<div className="mt-6 border-t border-border pt-3 text-xs text-muted-foreground">Version {comparedArticle.version} · {comparedArticle.lifecycle_status}</div></> : <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">{matches.length ? t('drafts.chooseComparison') : t('drafts.noComparison')}</div>}</div></section>}
         </div>
@@ -728,11 +821,24 @@ export default function PendingDraftsPage() {
             {!selectedDraft.assigned_approver_id && !canSelfApprove && <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><span className="text-body-sm font-semibold text-warning-text">{t('drafts.blockerReviewer')}</span><Select value={selectedApproverId} onChange={event => setSelectedApproverId(event.target.value)} className="w-full text-xs sm:w-64"><option value="">{t('drafts.selectReviewer')}</option>{approvers.map(approver => <option key={approver.id} value={approver.id}>{approver.name} · {approver.email}</option>)}</Select><Button variant="secondary" size="sm" onClick={() => void handleAssignApprover()} disabled={!selectedApproverId || Boolean(actingDraftId)}>{t('drafts.assign')}</Button></div>}
             {selectedDraft.assigned_approver_id && <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><span className="text-body-sm text-muted-foreground">{t('drafts.assignedReviewer')}</span><Select aria-label={t('drafts.assignedReviewer')} value={selectedApproverId} onChange={event => setSelectedApproverId(event.target.value)} className="w-full text-xs sm:w-64"><option value="">{t('drafts.selectAnotherReviewer')}</option>{approvers.map(approver => <option key={approver.id} value={approver.id}>{approver.name} · {approver.email}</option>)}</Select><Button variant="ghost" size="sm" onClick={() => void handleAssignApprover()} disabled={!selectedApproverId || selectedApproverId === selectedDraft.assigned_approver_id || Boolean(actingDraftId)}>{t('drafts.change')}</Button></div>}
             {selectedDraft.requires_update_confirmation && !isManualUpdate && <div className="flex flex-wrap items-center gap-2"><span className="text-body-sm font-semibold text-warning-text">{t('drafts.blockerVersion')}</span><Button variant={!treatAsNew && updateArticleId ? 'secondary' : 'ghost'} size="sm" onClick={() => { const targetId = updateArticleId || compareArticleId || selectedDraft.content_metadata?.suggested_update_article_id || matches[0]?.article_id; if (targetId) { setUpdateArticleId(targetId); setTreatAsNew(false) } }} disabled={!updateArticleId && !compareArticleId && !selectedDraft.content_metadata?.suggested_update_article_id && !matches[0]?.article_id}>{t('drafts.updateExisting')}</Button><Button variant={treatAsNew ? 'secondary' : 'ghost'} size="sm" onClick={() => { setTreatAsNew(true); setUpdateArticleId('') }}>{t('drafts.publishNew')}</Button></div>}
-            {selectedDraft.restructure_candidate_md && selectedDraft.restructure_decision === 'pending_review' && <div className="flex flex-wrap items-center gap-2"><span className="text-body-sm font-semibold text-warning-text">{t('drafts.blockerLayout')}</span><Button variant="secondary" size="sm" onClick={() => { setReviewTab('original'); void handleRestructureDecision('keep_lossless') }} disabled={Boolean(actingDraftId)}>{t('drafts.useSafeVersion')}</Button><Button variant="primary" size="sm" onClick={() => { setReviewTab('candidate'); void handleRestructureDecision('keep_ai') }} disabled={Boolean(actingDraftId)}>{t('drafts.usePreparedVersion')}</Button></div>}
+            {selectedDraft.restructure_candidate_md && selectedDraft.restructure_decision === 'pending_review' && <div className="flex flex-wrap items-center gap-2"><span className="text-body-sm font-semibold text-warning-text">{t('drafts.blockerLayout')}</span><Button variant="secondary" size="sm" onClick={() => { setReviewTab('structured'); void handleRestructureDecision('keep_lossless') }} disabled={Boolean(actingDraftId)}>{t('drafts.useSafeVersion')}</Button><Button variant="primary" size="sm" onClick={() => { setReviewTab('candidate'); void handleRestructureDecision('keep_ai') }} disabled={Boolean(actingDraftId)}>{t('drafts.usePreparedVersion')}</Button></div>}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><span className="text-body-sm font-semibold text-foreground">{t('drafts.publishingDepartments')}</span><div className="relative min-w-0 flex-1 sm:max-w-sm"><button ref={departmentMenuAnchor} type="button" onClick={() => setDepartmentMenuOpen(open => !open)} disabled={!visibleDepartments.length} className="field flex min-h-9 w-full items-center gap-2 py-1.5 text-left text-xs disabled:opacity-50"><span className="min-w-0 flex-1 truncate">{selectedDepartments.length ? selectedDepartments.map(item => item.name).join(', ') : t('drafts.noDepartment')}</span><ChevronDown size={14} className={`shrink-0 transition ${departmentMenuOpen ? 'rotate-180' : ''}`} /></button><FloatingPanel anchorRef={departmentMenuAnchor} open={departmentMenuOpen} onClose={() => setDepartmentMenuOpen(false)} className="p-1.5"><div className="py-1">{visibleDepartments.map(item => { const selected = docDepartmentIds.includes(item.id); const primary = item.id === primaryDepartmentId; return <button type="button" key={item.id} onClick={() => toggleDepartment(item.id)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-muted-foreground hover:bg-surface-soft hover:text-foreground"><span className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}>{selected && <Check size={11} strokeWidth={3} />}</span><span className="min-w-0 flex-1 truncate">{item.name}</span>{primary && <span className="text-caption font-semibold text-warning-text">{t('drafts.primaryDepartment')}</span>}</button> })}</div><button type="button" onClick={() => setDepartmentMenuOpen(false)} className="w-full rounded-lg border border-border px-2.5 py-1.5 text-body-sm font-semibold text-primary-text hover:bg-primary/10">{t('common.confirm')}</button></FloatingPanel></div></div>
           </div>
         </footer>
       </section></FocusTrap></div>}
+
+      {/* Stacked deliberately here, and only on request: the pane above is the default
+          surface, so the modal's own focus trap and Escape handler are only in play while
+          the reviewer has asked for a bigger view of the file. */}
+      {sourceMaximised && sourceFile && selectedDraft && (
+        <PdfViewer
+          open
+          fileName={sourceFileNameFromRef(selectedDraft.source_ref)}
+          url={sourceFile.url}
+          mimeType={sourceFile.type}
+          onClose={() => setSourceMaximised(false)}
+        />
+      )}
     </div>
   )
 }

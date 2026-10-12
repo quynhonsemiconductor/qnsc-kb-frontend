@@ -47,6 +47,24 @@ export async function getPendingDraft(id: string, includeContent = true) {
   return response.data
 }
 
+/**
+ * Fetch the original uploaded file for a draft under review.
+ *
+ * Mirrors `downloadArticleSource`: the API decides the media type and whether the file may
+ * be shown inline, and this returns a `blob:` URL the caller owns. The caller MUST revoke
+ * it — see the `sourceUrlRef` pattern in the review page and in ArticleDetailPage.
+ *
+ * Throws on 404, which is the API's answer for "this draft has no stored file".
+ */
+export async function downloadPendingDraftSource(id: string, page?: number) {
+  const response = await client.get(`/governance/pending-drafts/${id}/source`, {
+    responseType: 'blob',
+    ...(page ? { params: { page } } : {}),
+  })
+  const type = String(response.data?.type || response.headers?.['content-type'] || '').split(';')[0].trim()
+  return { url: URL.createObjectURL(response.data), type }
+}
+
 export async function approveDraft(id: string, dept: string, departmentIds: string[] = [], updateArticleId?: string, treatAsNew = false) {
   const response = await client.post(`/governance/pending-drafts/${id}/approve`, {
     dept,

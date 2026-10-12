@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Download, ExternalLink, FileWarning, Loader2, X } from 'lucide-react'
 import { FocusTrap } from '../ui/FocusTrap'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
+import { canInlineSourceType } from '../../utils/sourcePreview'
 
 interface PdfViewerProps {
   open: boolean
@@ -14,17 +15,9 @@ interface PdfViewerProps {
   onClose: () => void
 }
 
-/**
- * Types this viewer will render inline, and the only ones the API ever serves inline.
- *
- * The server allow-lists exactly these (`_SAFE_SOURCE_MEDIA_TYPES` in source_storage.py)
- * and returns everything else as `application/octet-stream; attachment`. All of them are
- * inert as documents: an image cannot script, and a PDF is drawn by the browser's own
- * viewer, which runs in its own process and cannot touch this origin. The check is
- * repeated here rather than assumed, because this component receives a blob: URL and a
- * blob: URL carries no headers to enforce anything with.
- */
-const INLINE_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'text/plain']
+/* The inline allow-list lives in utils/sourcePreview.ts, shared with the pending-draft
+   review pane, which renders the same stored sources without this modal. Two copies of a
+   security allow-list eventually disagree, and the disagreement is the vulnerability. */
 
 /** Full-screen source viewer matching the DocNexus review interaction. */
 export default function PdfViewer({ open, fileName, url, mimeType, page, loading = false, onClose }: PdfViewerProps) {
@@ -44,7 +37,7 @@ export default function PdfViewer({ open, fileName, url, mimeType, page, loading
   // An unknown type is only unknown because an older caller did not pass one. Treating
   // that as "not renderable" would break every such caller, so fall back to the PDF
   // viewer, which is what this component has always been used for.
-  const canInline = !type || INLINE_TYPES.includes(type)
+  const canInline = canInlineSourceType(type)
   const isImage = type.startsWith('image/')
   // #page is a PDF viewer instruction; on an image it is a fragment the browser keeps in
   // the URL and ignores.
