@@ -8,7 +8,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useNavigate } from 'react-router-dom'
 import {
-  approveDraft, assignDraftApprover, bulkDecideDrafts, decideRestructure, getDraftComparison, getEligibleApprovers, getPendingDrafts, rejectDraft, restructureDraft,
+  approveDraft, assignDraftApprover, bulkDecideDrafts, decideRestructure, getDraftComparison, getEligibleApprovers, getPendingDraft, getPendingDrafts, rejectDraft, restructureDraft,
   type BulkDecideResult,
 } from '../../api/governance'
 import { listDepartments } from '../../api/auth'
@@ -61,6 +61,7 @@ type Draft = {
   summary?: string
   restructured_body_md?: string
   restructure_candidate_md?: string | null
+  has_restructure_candidate?: boolean
   restructure_decision?: string
   restructure_status?: string
   restructure_error?: string
@@ -137,6 +138,7 @@ export default function PendingDraftsPage() {
   const [query, setQuery] = useState('')
   const [actingDraftId, setActingDraftId] = useState<string | null>(null)
   const [restructuringDraftId, setRestructuringDraftId] = useState<string | null>(null)
+  const [reviewLoadingId, setReviewLoadingId] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
   useBodyScrollLock(reviewOpen)
   const [selectedDraft, setSelectedDraft] = useState<Draft | null>(null)
@@ -182,7 +184,11 @@ export default function PendingDraftsPage() {
       // Decided drafts leave the queue; keep only ids that still need a decision so the
       // action bar count never promises work that is already published.
       setSelectedIds(current => current.filter(id => nextDrafts.some(item => item.id === id)))
-      setSelectedDraft(current => current ? nextDrafts.find(item => item.id === current.id) || current : current)
+      setSelectedDraft(current => {
+        if (!current) return current
+        const metadata = nextDrafts.find(item => item.id === current.id)
+        return metadata ? { ...current, ...metadata } : current
+      })
       setError('')
     } catch { setError('Could not load the review queue.') } finally {
       if (showLoading) setLoading(false)
@@ -320,39 +326,44 @@ export default function PendingDraftsPage() {
     } finally { setCompareLoading(false) }
   }
 
-  const openReview = (draft: Draft) => {
+  const openReview = async (draft: Draft) => {
     if ((draft.candidate_count || 0) > 1) {
       navigate(`/governance/pending-drafts/${draft.id}/batch-review`)
       return
     }
-    const opensAsUpdate = draft.requires_update_confirmation || draft.similarity_level === 'very_high'
-    setSelectedDraft(draft)
-    setReviewOpen(true)
-    setDepartmentMenuOpen(false)
-    setReviewTab('structured')
-    setShowComparison(opensAsUpdate)
-    setShowTechnicalDetails(false)
-    setUpdateArticleId(draft.content_metadata?.suggested_update_article_id || '')
-    setTreatAsNew(false)
-    setSelectedApproverId(draft.assigned_approver_id || '')
-    setEditableTargetArticle(null)
-    const metadataIds = (draft.content_metadata?.department_ids || []).map(String).filter(id => visibleDepartments.some(item => item.id === id))
-    const fallbackId = draft.dept && visibleDepartments.find(item => item.name === draft.dept)?.id
-    const initialIds = metadataIds.length ? metadataIds : fallbackId ? [fallbackId] : []
-    setDocDepartmentIds(initialIds)
-    setDocDept(visibleDepartments.find(item => item.id === initialIds[0])?.name || '')
-    setComparedArticle(null)
-    const targetArticleId = draft.content_metadata?.suggested_update_article_id
-    if (targetArticleId) {
-      void getArticle(targetArticleId).then(setEditableTargetArticle).catch(() => setEditableTargetArticle(null))
+    setReviewLoadingId(draft.id)
+    setError('')
+    try {
+      const detail: Draft = await getPendingDraft(draft.id)
+      const opensAsUpdate = detail.requires_update_confirmation || detail.similarity_level === 'very_high'
+      setSelectedDraft(detail)
+      setReviewOpen(true)
+      setDepartmentMenuOpen(false)
+      setReviewTab('structured')
+      setShowComparison(opensAsUpdate)
+      setShowTechnicalDetails(false)
+      setUpdateArticleId(detail.content_metadata?.suggested_update_article_id || '')
+      setTreatAsNew(false)
+      setSelectedApproverId(detail.assigned_approver_id || '')
+      setEditableTargetArticle(null)
+      const metadataIds = (detail.content_metadata?.department_ids || []).map(String).filter(id => visibleDepartments.some(item => item.id === id))
+      const fallbackId = detail.dept && visibleDepartments.find(item => item.name === detail.dept)?.id
+      const initialIds = metadataIds.length ? metadataIds : fallbackId ? [fallbackId] : []
+      setDocDepartmentIds(initialIds)
+      setDocDept(visibleDepartments.find(item => item.id === initialIds[0])?.name || '')
+      setComparedArticle(null)
+      const targetArticleId = detail.content_metadata?.suggested_update_article_id
+      if (targetArticleId) {
+        void getArticle(targetArticleId).then(setEditableTargetArticle).catch(() => setEditableTargetArticle(null))
+      }
+      void getEligibleApprovers(detail.id).then(setApprovers).catch(() => setApprovers([]))
+      const firstMatch = detail.similarity_matches?.[0]
+      if (firstMatch) void loadComparison(detail.id, firstMatch.article_id)
+    } catch {
+      setError('Could not load this document for review.')
+    } finally {
+      setReviewLoadingId(null)
     }
-    void getEligibleApprovers(draft.id).then((eligible) => {
-      setApprovers(eligible)
-    }).catch(() => {
-      setApprovers([])
-    })
-    const firstMatch = draft.similarity_matches?.[0]
-    if (firstMatch) void loadComparison(draft.id, firstMatch.article_id)
   }
 
   // Referenced by the review overlay's aria-labelledby, so the dialog is announced by
@@ -659,15 +670,15 @@ export default function PendingDraftsPage() {
       {loading ? <div role="status" className="grid min-h-56 place-items-center rounded-xl border border-border bg-surface text-sm text-muted-foreground"><RefreshCw size={16} className="mr-2 animate-spin" />{t('drafts.loading')}</div> : filteredDrafts.length === 0 ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-border bg-surface/50 p-8 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-success/10 text-success-text"><Check size={24} /></div><h2 className="mt-4 text-base font-semibold">{drafts.length ? t('drafts.noMatch') : t('drafts.empty')}</h2><p className="mt-2 text-sm text-muted-foreground">{drafts.length ? t('drafts.noMatchHelp') : t('drafts.emptyHelp')}</p></div></div> : <div className="overflow-hidden rounded-xl border border-border bg-surface-elevated">{filteredDrafts.map(draft => {
         const status = statusById.get(draft.id)!
         const selected = selectedIds.includes(draft.id)
-        const statusLabel = status.state === 'processing' ? t('drafts.statusProcessing') : status.state === 'split_review' ? t('drafts.statusSections') : status.state === 'ready' ? t('drafts.statusReady') : t('drafts.statusDecision')
-        const reason = status.reason === 'possible_update' ? t('drafts.reasonUpdate') : status.reason === 'layout_choice' ? t('drafts.reasonLayout') : status.reason === 'missing_department' ? t('drafts.reasonDepartment') : status.reason === 'needs_approver' ? t('drafts.reasonApprover') : status.reason === 'assigned_elsewhere' ? t('drafts.reasonAssigned') : status.state === 'split_review' ? t('drafts.reasonSections', { count: draft.candidate_count || 0 }) : status.state === 'processing' ? t('drafts.reasonProcessing') : t('drafts.reasonReady')
+        const statusLabel = status.state === 'processing' ? t('drafts.statusProcessing') : status.state === 'stalled' ? t('drafts.statusStalled') : status.state === 'split_review' ? t('drafts.statusSections') : status.state === 'ready' ? t('drafts.statusReady') : t('drafts.statusDecision')
+        const reason = status.reason === 'possible_update' ? t('drafts.reasonUpdate') : status.reason === 'layout_choice' ? t('drafts.reasonLayout') : status.reason === 'missing_department' ? t('drafts.reasonDepartment') : status.reason === 'needs_approver' ? t('drafts.reasonApprover') : status.reason === 'assigned_elsewhere' ? t('drafts.reasonAssigned') : status.state === 'split_review' ? t('drafts.reasonSections', { count: draft.candidate_count || 0 }) : status.state === 'processing' ? t('drafts.reasonProcessing') : status.state === 'stalled' ? t('drafts.reasonStalled') : t('drafts.reasonReady')
         const tone = status.state === 'ready' ? 'success' : status.state === 'processing' ? 'default' : 'warning'
-        const actionLabel = status.action === 'review_sections' ? t('drafts.reviewSections') : status.action === 'review_decision' ? t('drafts.reviewDecision') : status.action === 'wait' ? t('drafts.preparing') : t('drafts.review')
+        const actionLabel = status.action === 'retry' ? t('drafts.retryPreparation') : status.action === 'review_sections' ? t('drafts.reviewSections') : status.action === 'review_decision' ? t('drafts.reviewDecision') : status.action === 'wait' ? t('drafts.preparing') : t('drafts.review')
         return <article key={draft.id} tabIndex={0} onFocus={() => setFocusedDraftId(draft.id)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedDraftId(current => current === draft.id ? null : current) }} className={`grid gap-4 border-b border-border p-4 outline-none transition last:border-b-0 hover:bg-surface-muted/60 lg:grid-cols-[auto_minmax(0,1.4fr)_minmax(15rem,.8fr)_auto] lg:items-center ${selected ? 'bg-primary/5' : ''} ${focusedDraftId === draft.id ? 'ring-1 ring-inset ring-primary/30' : ''}`}>
           <div className="w-5">{status.bulkEligible && <label className="inline-flex cursor-pointer" title={t('bulk.selectDraft')}><input type="checkbox" className="sr-only" checked={selected} onChange={() => toggleDraftSelection(draft.id)} aria-label={t('bulk.selectDraftNamed', { title: draft.title })} /><span className={`grid h-4 w-4 place-items-center rounded border ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-input'}`}>{selected && <Check size={11} strokeWidth={3} />}</span></label>}</div>
           <div className="min-w-0"><h3 className="truncate text-sm font-semibold text-foreground">{draft.title}</h3><p className="mt-1 truncate text-body-sm text-muted-foreground">{draft.source_ref}</p><div className="mt-2 flex flex-wrap items-center gap-2 text-caption text-muted"><span>{draft.dept || t('drafts.noDepartment')}</span><span aria-hidden="true">·</span><span>{t('drafts.submittedOn', { date: formatDay(draft.created_at) })}</span></div></div>
           <div className="min-w-0"><Badge variant={tone} size="sm">{statusLabel}</Badge><p className="mt-1.5 text-body-sm leading-5 text-muted-foreground">{reason}</p></div>
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end"><Button variant="primary" size="sm" onClick={() => openReview(draft)} disabled={status.action === 'wait'} icon={status.action === 'review_sections' ? <Layers3 size={14} /> : status.action === 'wait' ? <RefreshCw size={14} className="animate-spin" /> : <Eye size={14} />}>{actionLabel}</Button>{status.action !== 'wait' && <Button variant="ghost" size="sm" onClick={() => void handleReject(draft.id)} disabled={actingDraftId === draft.id}>{t('drafts.reject')}</Button>}{canRetryAiFormat(draft) && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(draft)} disabled={restructuringDraftId === draft.id} aria-label={t('drafts.retryPreparation')} icon={<RefreshCw size={13} />} />}</div>
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end"><Button variant="primary" size="sm" onClick={() => status.action === 'retry' ? void handleRestructure(draft) : void openReview(draft)} disabled={status.action === 'wait' || reviewLoadingId === draft.id || restructuringDraftId === draft.id} loading={reviewLoadingId === draft.id || restructuringDraftId === draft.id} icon={status.action === 'retry' ? <RefreshCw size={14} /> : status.action === 'review_sections' ? <Layers3 size={14} /> : status.action === 'wait' ? <RefreshCw size={14} className="animate-spin" /> : <Eye size={14} />}>{actionLabel}</Button>{status.action !== 'wait' && status.action !== 'retry' && <Button variant="ghost" size="sm" onClick={() => void handleReject(draft.id)} disabled={actingDraftId === draft.id}>{t('drafts.reject')}</Button>}{status.action !== 'retry' && canRetryAiFormat(draft) && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(draft)} disabled={restructuringDraftId === draft.id} aria-label={t('drafts.retryPreparation')} icon={<RefreshCw size={13} />} />}</div>
         </article>
       })}</div>}
 

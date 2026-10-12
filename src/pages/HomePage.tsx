@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { ArrowRight, BookOpen, CheckCircle2, FileCheck2, FolderTree, Plus, Search, ShieldCheck, UploadCloud } from 'lucide-react'
+import { ArrowRight, BookOpen, CheckCircle2, FileCheck2, FolderTree, Plus, Search, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getHomeSummary } from '../api/knowledge'
 import type { HomeSummary } from '../types/governance'
@@ -78,7 +78,7 @@ export default function HomePage() {
         </aside>
       </section>
 
-      {has('article.create') && <footer className="flex flex-wrap items-center gap-3 border-t border-border pt-5"><Link to="/sources" className="inline-flex min-h-10 items-center gap-2 rounded-control border border-border bg-surface px-4 text-body-sm font-bold text-foreground no-underline"><UploadCloud size={15} className="text-info-text" />{t('home.uploadSource')}</Link><Link to="/articles/new" className="inline-flex min-h-10 items-center gap-2 rounded-control bg-primary px-4 text-body-sm font-bold text-primary-foreground no-underline"><Plus size={15} />{t('home.newArticle')}</Link><span className="ml-auto hidden items-center gap-2 text-body-sm text-muted lg:flex"><CheckCircle2 size={14} className="text-success-text" /> Source storage secured</span></footer>}
+      {has('article.create') && <footer className="flex flex-wrap items-center gap-3 border-t border-border pt-5"><Link to="/articles/new" className="inline-flex min-h-10 items-center gap-2 rounded-control bg-primary px-4 text-body-sm font-bold text-primary-foreground no-underline"><Plus size={15} />{t('home.newArticle')}</Link><span className="ml-auto hidden items-center gap-2 text-body-sm text-muted lg:flex"><CheckCircle2 size={14} className="text-success-text" /> Source storage secured</span></footer>}
     </div>
   </PageTransition>
 }

@@ -40,6 +40,13 @@ export async function getPendingDrafts(status?: string) {
   return response.data
 }
 
+export async function getPendingDraft(id: string, includeContent = true) {
+  const response = await client.get(`/governance/pending-drafts/${id}/detail`, {
+    params: { include_content: includeContent },
+  })
+  return response.data
+}
+
 export async function approveDraft(id: string, dept: string, departmentIds: string[] = [], updateArticleId?: string, treatAsNew = false) {
   const response = await client.post(`/governance/pending-drafts/${id}/approve`, {
     dept,

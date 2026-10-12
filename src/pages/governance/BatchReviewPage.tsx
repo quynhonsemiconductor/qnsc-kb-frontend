@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ArrowLeft, Building2, Check, CheckCircle2, FileText, GitMerge, Lightbulb, Plus, Scissors, Sparkles, Trash2, Type } from 'lucide-react'
-import { commitDraftCandidates, getDraftCandidates, getPendingDrafts, reviewDraftCandidate } from '../../api/governance'
+import { commitDraftCandidates, getDraftCandidates, getPendingDraft, reviewDraftCandidate } from '../../api/governance'
 import { createDepartment, listDepartments } from '../../api/auth'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
@@ -42,7 +42,7 @@ export default function BatchReviewPage() {
 
   const load = async (showLoading = true) => {
     if (showLoading) setLoading(true)
-    try { const [nextCandidates, nextDepartments, drafts] = await Promise.all([getDraftCandidates(id), listDepartments(), getPendingDrafts('pending')]); setCandidates(normalizeCandidates(nextCandidates)); setDepartments(nextDepartments); setFormatting(['queued', 'processing'].includes(drafts.find((draft: { id: string; restructure_status?: string }) => draft.id === id)?.restructure_status || '')); setError('') }
+    try { const [nextCandidates, nextDepartments, draft] = await Promise.all([getDraftCandidates(id), listDepartments(), getPendingDraft(id, false)]); setCandidates(normalizeCandidates(nextCandidates)); setDepartments(nextDepartments); setFormatting(['queued', 'processing'].includes(draft.restructure_status || '')); setError('') }
     catch { setError(t('sections.loadFailed')) }
     finally { if (showLoading) setLoading(false) }
   }
