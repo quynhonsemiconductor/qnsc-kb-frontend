@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareDraftManagementOrder, getDraftManagementStatus, getPublishBlockers, type ManageableDraft } from '../../src/utils/draftManagement'
+import { compareDraftManagementOrder, getDraftManagementStatus, getPreparationCompletion, getPublishBlockers, isPreparationQueueState, type ManageableDraft } from '../../src/utils/draftManagement'
 
 const context = { currentUserId: 'reviewer-1', canSelfApprove: false }
 const draft = (overrides: Partial<ManageableDraft> = {}): ManageableDraft => ({
@@ -73,18 +73,62 @@ describe('publish readiness', () => {
   })
 })
 
+describe('preparation transitions', () => {
+  const processing = (id: string) => draft({ id, restructure_status: 'processing' })
+
+  it('reports the terminal destination for a completed preparation', () => {
+    expect(getPreparationCompletion(
+      [processing('ready')],
+      [draft({ id: 'ready', restructure_status: 'lossless_ready' })],
+      context,
+    )).toEqual({ count: 1, destination: 'ready' })
+
+    expect(getPreparationCompletion(
+      [processing('sections')],
+      [draft({ id: 'sections', restructure_status: 'lossless_ready', candidate_count: 2 })],
+      context,
+    )).toEqual({ count: 1, destination: 'split_review' })
+  })
+
+  it('reports mixed destinations for preparations finishing together', () => {
+    expect(getPreparationCompletion(
+      [processing('ready'), processing('decision')],
+      [
+        draft({ id: 'ready', restructure_status: 'llm' }),
+        draft({ id: 'decision', restructure_status: 'llm', requires_update_confirmation: true }),
+      ],
+      context,
+    )).toEqual({ count: 2, destination: 'mixed' })
+  })
+
+  it('does not report interrupted or missing drafts as completed', () => {
+    expect(getPreparationCompletion(
+      [processing('stalled')],
+      [draft({ id: 'stalled', restructure_status: 'stalled' })],
+      context,
+    )).toBeNull()
+    expect(getPreparationCompletion([processing('missing')], [], context)).toBeNull()
+    expect(isPreparationQueueState('stalled')).toBe(true)
+  })
+})
+
 describe('draft management ordering', () => {
-  it('orders sections, decisions, ready drafts, then processing and keeps oldest first', () => {
+  it('orders every state from latest to oldest', () => {
     const items = [
-      draft({ id: 'processing', restructure_status: 'queued' }),
-      draft({ id: 'ready-new', created_at: '2026-01-03T00:00:00Z' }),
-      draft({ id: 'decision', requires_update_confirmation: true }),
-      draft({ id: 'sections', candidate_count: 2 }),
+      draft({ id: 'processing', created_at: '2026-01-02T00:00:00Z', restructure_status: 'queued' }),
+      draft({ id: 'ready-new', created_at: '2026-01-05T00:00:00Z' }),
+      draft({ id: 'decision', created_at: '2026-01-04T00:00:00Z', requires_update_confirmation: true }),
+      draft({ id: 'sections', created_at: '2026-01-03T00:00:00Z', candidate_count: 2 }),
       draft({ id: 'ready-old', created_at: '2026-01-01T00:00:00Z' }),
     ]
 
-    expect(items.sort((left, right) => compareDraftManagementOrder(left, right, context)).map(item => item.id)).toEqual([
-      'sections', 'decision', 'ready-old', 'ready-new', 'processing',
+    expect(items.sort(compareDraftManagementOrder).map(item => item.id)).toEqual([
+      'ready-new', 'decision', 'sections', 'processing', 'ready-old',
     ])
+  })
+
+  it('uses the id as a deterministic tie-breaker', () => {
+    const items = [draft({ id: 'b' }), draft({ id: 'a' })]
+    expect(items.sort(compareDraftManagementOrder).map(item => item.id)).toEqual(['a', 'b'])
   })
 })

@@ -99,12 +99,38 @@ export function getPublishBlockers({
   return blockers
 }
 
-export function compareDraftManagementOrder(
-  left: ManageableDraft,
-  right: ManageableDraft,
+export function isPreparationQueueState(state: DraftQueueState | undefined): boolean {
+  return state === 'processing' || state === 'stalled'
+}
+
+export type PreparationCompletionDestination = 'ready' | 'decision' | 'split_review' | 'mixed'
+
+export type PreparationCompletion = {
+  count: number
+  destination: PreparationCompletionDestination
+}
+
+export function getPreparationCompletion(
+  previous: ManageableDraft[],
+  current: ManageableDraft[],
   context: DraftManagementContext,
-) {
-  const priority = getDraftManagementStatus(left, context).priority - getDraftManagementStatus(right, context).priority
-  if (priority !== 0) return priority
-  return Date.parse(left.created_at) - Date.parse(right.created_at)
+): PreparationCompletion | null {
+  const previousById = new Map(previous.map(draft => [draft.id, draft]))
+  const destinations = current.flatMap((draft) => {
+    const before = previousById.get(draft.id)
+    if (!before || !['queued', 'processing'].includes(before.restructure_status || '')) return []
+    const state = getDraftManagementStatus(draft, context).state
+    return state === 'ready' || state === 'decision' || state === 'split_review' ? [state] : []
+  })
+  if (!destinations.length) return null
+  const first = destinations[0]
+  return {
+    count: destinations.length,
+    destination: destinations.every(destination => destination === first) ? first : 'mixed',
+  }
+}
+
+export function compareDraftManagementOrder(left: ManageableDraft, right: ManageableDraft) {
+  const created = Date.parse(right.created_at) - Date.parse(left.created_at)
+  return created || left.id.localeCompare(right.id)
 }

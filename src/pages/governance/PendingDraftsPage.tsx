@@ -26,7 +26,7 @@ import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { formatDay } from '../../lib/formatters'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
-import { compareDraftManagementOrder, getDraftManagementStatus, getPublishBlockers } from '../../utils/draftManagement'
+import { compareDraftManagementOrder, getDraftManagementStatus, getPreparationCompletion, getPublishBlockers, isPreparationQueueState } from '../../utils/draftManagement'
 
 
 /** `blocked[].code` → the i18n key naming the one thing the reviewer must still do. */
@@ -165,6 +165,7 @@ export default function PendingDraftsPage() {
   const [bulkRunning, setBulkRunning] = useState(false)
   const [bulkResult, setBulkResult] = useState<(BulkDecideResult & { titles: Record<string, string> }) | null>(null)
   const [focusedDraftId, setFocusedDraftId] = useState<string | null>(null)
+  const previousDrafts = useRef<Draft[] | null>(null)
   const { t } = useLanguage()
   const dialog = useDialog()
   const navigate = useNavigate()
@@ -180,7 +181,15 @@ export default function PendingDraftsPage() {
     if (showLoading) setLoading(true)
     try {
       const nextDrafts: Draft[] = await getPendingDrafts('pending')
+      const completion = previousDrafts.current
+        ? getPreparationCompletion(previousDrafts.current, nextDrafts, managementContext)
+        : null
+      previousDrafts.current = nextDrafts
       setDrafts(nextDrafts)
+      if (queueFilter === 'processing' && completion) {
+        setQueueFilter('all')
+        setMessage(t(`drafts.preparationComplete.${completion.destination}`, { count: completion.count }))
+      }
       // Decided drafts leave the queue; keep only ids that still need a decision so the
       // action bar count never promises work that is already published.
       setSelectedIds(current => current.filter(id => nextDrafts.some(item => item.id === id)))
@@ -225,7 +234,7 @@ export default function PendingDraftsPage() {
     for (const draft of drafts) {
       const state = statusById.get(draft.id)?.state
       if (state === 'ready') counts.ready += 1
-      else if (state === 'processing') counts.processing += 1
+      else if (isPreparationQueueState(state)) counts.processing += 1
       else counts.decision += 1
     }
     return counts
@@ -236,10 +245,10 @@ export default function PendingDraftsPage() {
     const state = statusById.get(draft.id)?.state
     const matchesFilter = queueFilter === 'all'
       || (queueFilter === 'ready' && state === 'ready')
-      || (queueFilter === 'processing' && state === 'processing')
-      || (queueFilter === 'decision' && state !== 'ready' && state !== 'processing')
+      || (queueFilter === 'processing' && isPreparationQueueState(state))
+      || (queueFilter === 'decision' && state !== 'ready' && !isPreparationQueueState(state))
     return matchesSearch && matchesFilter
-  }).sort((left, right) => compareDraftManagementOrder(left, right, managementContext)), [drafts, managementContext, query, queueFilter, statusById])
+  }).sort(compareDraftManagementOrder), [drafts, query, queueFilter, statusById])
   const eligibleVisibleDrafts = useMemo(
     () => filteredDrafts.filter(draft => statusById.get(draft.id)?.bulkEligible),
     [filteredDrafts, statusById],
