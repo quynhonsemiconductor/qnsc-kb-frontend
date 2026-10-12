@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react'
 import { ArrowRight, BookOpen, CheckCircle2, FileCheck2, FolderTree, Plus, Search, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { getHomeSummary } from '../api/knowledge'
+import { getHomeSummary, getKnowledgeCatalog } from '../api/knowledge'
+import type { KnowledgeCatalogResponse } from '../api/knowledge'
 import type { HomeSummary } from '../types/governance'
 import { usePermission } from '../hooks/usePermission'
 import { useAuth } from '../auth/useAuth'
@@ -11,6 +12,7 @@ import { PageTransition } from '../components/ui/PageTransition'
 
 export default function HomePage() {
   const { data: summary, error: loadError } = useAsyncResource<HomeSummary>('home-summary', getHomeSummary)
+  const { data: catalog, error: catalogError, reload: reloadCatalog } = useAsyncResource<KnowledgeCatalogResponse>('home-catalog', getKnowledgeCatalog)
   const { has } = usePermission()
   const { user } = useAuth()
   const { t, language } = useLanguage()
@@ -21,12 +23,14 @@ export default function HomePage() {
     : <div className="grid min-h-[65vh] place-items-center"><div className="flex items-center gap-3 text-body text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-primary" />Loading knowledge…</div></div>
 
   const firstName = user?.name?.split(' ')[0] || (language === 'vi' ? 'bạn' : 'there')
-  const spaces = [
-    { name: language === 'vi' ? 'Phòng Đầu tư' : 'Investment', detail: language === 'vi' ? 'Quy trình, thẩm định và danh mục dự án' : 'Processes, appraisals and project portfolios', count: Math.max(1, Math.round(summary.total_articles * .15)) },
-    { name: language === 'vi' ? 'Phòng CNTT' : 'Information Technology', detail: language === 'vi' ? 'Dữ liệu, hạ tầng và an toàn thông tin' : 'Data, infrastructure and information security', count: Math.max(1, Math.round(summary.total_articles * .13)) },
-    { name: language === 'vi' ? 'Phòng Kế hoạch' : 'Planning', detail: language === 'vi' ? 'Mua sắm, nhà cung cấp và kế hoạch năm' : 'Procurement, vendors and annual plans', count: Math.max(1, Math.round(summary.total_articles * .11)) },
-    { name: language === 'vi' ? 'Văn phòng' : 'Corporate Office', detail: language === 'vi' ? 'Biên bản, thông báo và công việc điều hành' : 'Minutes, notices and operational work', count: Math.max(1, Math.round(summary.total_articles * .08)) },
-  ]
+  const departments = (catalog?.departments ?? []).filter((department) => department.name !== 'Unassigned')
+  const spaces = departments.slice(0, 4).map((department) => ({
+    ...department,
+    detail: language === 'vi'
+      ? `${department.count} tài liệu đã xuất bản bạn có quyền truy cập`
+      : `${department.count} published document${department.count === 1 ? '' : 's'} you can access`,
+  }))
+  const departmentCount = catalog ? departments.length : summary.departments
 
   return <PageTransition className="-mx-3 -my-4 sm:-mx-5 lg:-mx-7">
     <section className="relative overflow-hidden bg-primary px-5 py-12 text-primary-foreground sm:px-8 lg:px-[max(3rem,6vw)] lg:py-16">
@@ -51,13 +55,15 @@ export default function HomePage() {
 
     <div className="page-shell-wide space-y-8 px-4 py-8 sm:px-6 lg:px-8">
       <section>
-        <div className="mb-3 flex items-end justify-between gap-4"><div><h2 className="font-display text-h3 font-bold text-foreground">{language === 'vi' ? 'Không gian tri thức' : 'Knowledge spaces'}</h2><p className="mt-1 text-body-sm text-muted-foreground">{language === 'vi' ? 'Đi thẳng vào phạm vi công việc của bạn.' : 'Go directly to the part of the business you work with.'}</p></div><Link to="/articles" className="text-body-sm font-bold text-primary">{language === 'vi' ? `Xem ${summary.departments} phòng ban` : `View ${summary.departments} departments`} →</Link></div>
-        <div className="grid overflow-hidden rounded-panel border border-border bg-surface sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-3 flex items-end justify-between gap-4"><div><h2 className="font-display text-h3 font-bold text-foreground">{language === 'vi' ? 'Không gian tri thức' : 'Knowledge spaces'}</h2><p className="mt-1 text-body-sm text-muted-foreground">{language === 'vi' ? 'Đi thẳng vào phạm vi công việc của bạn.' : 'Go directly to the part of the business you work with.'}</p></div><Link to="/articles" className="text-body-sm font-bold text-primary">{language === 'vi' ? `Xem ${departmentCount} phòng ban` : `View ${departmentCount} departments`} →</Link></div>
+        {!catalog && !catalogError ? <div aria-label={language === 'vi' ? 'Đang tải phòng ban' : 'Loading departments'} className="grid overflow-hidden rounded-panel border border-border bg-surface sm:grid-cols-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map((index) => <div key={index} className="min-h-36 animate-pulse border-b border-border p-5 sm:border-r xl:border-b-0 last:border-r-0"><div className="h-3 w-16 rounded bg-surface-muted" /><div className="mt-9 h-5 w-2/3 rounded bg-surface-muted" /><div className="mt-3 h-3 w-4/5 rounded bg-surface-muted" /></div>)}
+        </div> : catalogError ? <div role="alert" className="rounded-panel border border-warning/30 bg-warning/10 px-5 py-6"><h3 className="font-display text-body font-bold text-foreground">{language === 'vi' ? 'Chưa tải được phòng ban' : 'Departments could not be loaded'}</h3><p className="mt-1 text-body-sm text-muted-foreground">{language === 'vi' ? 'Các phần khác của trang vẫn hoạt động bình thường.' : 'The rest of this page is still available.'}</p><button type="button" onClick={() => { void reloadCatalog().catch(() => undefined) }} className="mt-4 min-h-10 rounded-control border border-border bg-surface px-4 text-body-sm font-bold text-primary hover:bg-surface-elevated">{language === 'vi' ? 'Thử lại' : 'Retry'}</button></div> : spaces.length ? <div className="grid overflow-hidden rounded-panel border border-border bg-surface sm:grid-cols-2 xl:grid-cols-4">
           {spaces.map((space, index) => <Link key={space.name} to={`/articles?dept=${encodeURIComponent(space.name)}`} className="group relative min-h-36 border-b border-border p-5 text-foreground no-underline transition hover:bg-surface-elevated sm:border-r xl:border-b-0 last:border-r-0">
             <span className="font-mono text-caption text-muted">{String(index + 1).padStart(2, '0')} / SPACE</span><span className="absolute right-4 top-4 font-mono text-h4 text-muted/50">{space.count}</span>
             <h3 className="mt-7 font-display text-body-lg font-bold group-hover:text-primary">{space.name}</h3><p className="mt-1 text-body-sm leading-5 text-muted-foreground">{space.detail}</p>
           </Link>)}
-        </div>
+        </div> : <div className="rounded-panel border border-dashed border-border bg-surface px-5 py-9 text-center"><FolderTree size={22} className="mx-auto text-muted" /><h3 className="mt-3 font-display text-body font-bold text-foreground">{language === 'vi' ? 'Chưa có không gian phòng ban' : 'No department spaces yet'}</h3><p className="mx-auto mt-1 max-w-xl text-body-sm text-muted-foreground">{language === 'vi' ? 'Các phòng ban sẽ xuất hiện tại đây khi tài liệu đã xuất bản được gắn đúng phạm vi.' : 'Departments will appear here when published documents are assigned to them.'}</p></div>}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(19rem,.55fr)]">
