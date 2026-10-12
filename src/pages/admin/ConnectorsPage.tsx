@@ -57,6 +57,14 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { formatDateTime } from '../../lib/formatters'
+import {
+  getConnectorManagementState,
+  getConnectorNextAction,
+  matchesConnectorFilter,
+  sortConnectorsForManagement,
+  type ConnectorManagementFilter,
+  type ConnectorManagementState,
+} from '../../lib/connector-management'
 
 type Connector = {
   id: string
@@ -90,8 +98,7 @@ type Scope = {
   }
 }
 
-type ConnectorState = 'healthy' | 'attention' | 'needs_action'
-type Filter = 'all' | ConnectorState
+type ConnectorState = ConnectorManagementState
 type SyncItem = { name: string; action: string; scope?: string; web_url?: string }
 type SyncSummary = { scope_count?: number; changes_seen?: number; files_seen?: number; imported?: number; updated?: number; deleted?: number; unchanged?: number; permissions_updated?: number; items?: SyncItem[] }
 type ConnectorJob = { id: string; status: string; attempts: number; last_error?: string; created_at?: string; completed_at?: string; summary?: SyncSummary }
@@ -142,11 +149,7 @@ const providerInfo: Record<string, ProviderInfo> = {
 const getProvider = (system: string): ProviderInfo =>
   providerInfo[system] || { label: system, description: 'Cloud source', icon: <HardDrive size={18} />, accentClassName: 'bg-info/10 text-info' }
 
-const getConnectorState = (item: Connector): ConnectorState => {
-  if (!item.authorized) return 'needs_action'
-  if (item.status === 'error' || item.last_error) return 'attention'
-  return 'healthy'
-}
+const getConnectorState = (item: Connector): ConnectorState => getConnectorManagementState(item)
 
 const stateInfo: Record<ConnectorState, { label: string; description: string; className: string; icon: React.ReactNode }> = {
   healthy: {
@@ -204,7 +207,9 @@ export default function ConnectorsPage() {
   const [aclOpenId, setAclOpenId] = useState<string | null>(null)
   const [aclLoadingId, setAclLoadingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useState<ConnectorManagementFilter>('action')
+  const [setupOpen, setSetupOpen] = useState(false)
+  const initialViewSetRef = useRef(false)
   // Long-running loops here outlive a fast navigation: the sync poller runs up to 90s in
   // 2s steps, so it needs an explicit signal that the page is gone rather than continuing
   // to fetch and write state into an unmounted component.
@@ -353,11 +358,20 @@ export default function ConnectorsPage() {
     }
   }
 
+  const closeDetailPanels = (keep: 'locations' | 'activity' | 'source_map' | 'routing' | 'access') => {
+    if (keep !== 'locations') setOpenId(null)
+    if (keep !== 'activity') setActivityOpenId(null)
+    if (keep !== 'source_map') setSourceMapOpenId(null)
+    if (keep !== 'routing') setDepartmentOpenId(null)
+    if (keep !== 'access') setAclOpenId(null)
+  }
+
   const loadScopes = async (item: Connector, force = false) => {
     if (!force && openId === item.id) {
       setOpenId(null)
       return
     }
+    closeDetailPanels('locations')
     setOpenId(item.id)
     if (!force && scopes[item.id]) return
     setScopeLoadingId(item.id)
@@ -389,6 +403,7 @@ export default function ConnectorsPage() {
       setSourceMapOpenId(null)
       return
     }
+    closeDetailPanels('source_map')
     setSourceMapOpenId(item.id)
     if (!force && sourceTrees[item.id] && readmes[item.id]) return
     setBusy(`source-map:${item.id}`)
@@ -407,6 +422,7 @@ export default function ConnectorsPage() {
       setActivityOpenId(null)
       return
     }
+    closeDetailPanels('activity')
     setActivityOpenId(item.id)
     if (!force && jobs[item.id]) return
     setJobLoadingId(item.id)
@@ -426,6 +442,7 @@ export default function ConnectorsPage() {
       setAclOpenId(null)
       return
     }
+    closeDetailPanels('access')
     setAclOpenId(item.id)
     if (!force && aclPrincipals[item.id]) return
     setAclLoadingId(item.id)
@@ -445,6 +462,7 @@ export default function ConnectorsPage() {
       setDepartmentOpenId(null)
       return
     }
+    closeDetailPanels('routing')
     setDepartmentDrafts(current => ({ ...current, [item.id]: current[item.id] || item.department_ids || [] }))
     setDepartmentOpenId(item.id)
   }
@@ -565,6 +583,7 @@ export default function ConnectorsPage() {
     setBusy(`sync:${item.id}`)
     setError('')
     setMessage(`Syncing ${item.name}…`)
+    closeDetailPanels('activity')
     setActivityOpenId(item.id)
     try {
       const result = await syncConnector(item.id)
@@ -595,15 +614,23 @@ export default function ConnectorsPage() {
   const counts = useMemo(() => items.reduce((result, item) => {
     result.total += 1
     result[getConnectorState(item)] += 1
+    if (item.authorized) result.connected += 1
     return result
-  }, { total: 0, healthy: 0, attention: 0, needs_action: 0 }), [items])
+  }, { total: 0, connected: 0, healthy: 0, attention: 0, needs_action: 0 }), [items])
+  const actionCount = counts.attention + counts.needs_action
+
+  useEffect(() => {
+    if (loading || initialViewSetRef.current) return
+    initialViewSetRef.current = true
+    setFilter(actionCount > 0 ? 'action' : 'all')
+    setSetupOpen(items.length === 0)
+  }, [actionCount, items.length, loading])
 
   const visibleItems = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase()
-    return items
-      .filter(item => filter === 'all' || getConnectorState(item) === filter)
-      .filter(item => !normalizedSearch || [item.name, item.system, item.company_domain, item.path].filter(Boolean).join(' ').toLowerCase().includes(normalizedSearch))
-      .sort((left, right) => left.name.localeCompare(right.name))
+    return sortConnectorsForManagement(items
+      .filter(item => matchesConnectorFilter(item, filter))
+      .filter(item => !normalizedSearch || [item.name, item.system, item.company_domain, item.path].filter(Boolean).join(' ').toLowerCase().includes(normalizedSearch)))
   }, [filter, items, search])
 
   return (
@@ -627,17 +654,18 @@ export default function ConnectorsPage() {
 
       {(message || error) && <div role={error ? 'alert' : 'status'} className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-sm ${error ? 'border-rose-400/25 bg-rose-500/10 text-destructive-text' : 'border-emerald-400/25 bg-emerald-500/10 text-success-text'}`}><span className="mt-0.5">{error ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}</span><span className="min-w-0 flex-1">{error || message}</span><Button variant="ghost" size="sm" aria-label="Dismiss message" onClick={() => { setMessage(''); setError('') }} icon={<X size={15} />} className="rounded-md p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100" /></div>}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Connector overview">
-        <MetricCard icon={<Link2 size={17} />} label="Connected sources" value={counts.total} detail={counts.total === 1 ? '1 integration in this workspace' : `${counts.total} integrations in this workspace`} tone="info" />
-        <MetricCard icon={<CheckCircle2 size={17} />} label="Healthy" value={counts.healthy} detail="Ready for the next sync" tone="success" />
-        <MetricCard icon={<ShieldCheck size={17} />} label="Needs authorization" value={counts.needs_action} detail="One secure sign-in away" tone="warning" />
-        <MetricCard icon={<AlertCircle size={17} />} label="Needs attention" value={counts.attention} detail="Review the latest operation" tone="danger" />
+      <section className="grid gap-3 sm:grid-cols-3" aria-label="Connector overview">
+        <MetricCard icon={<Link2 size={17} />} label="Sources" value={counts.total} detail={`${counts.connected} authorized`} tone="info" />
+        <MetricCard icon={<CheckCircle2 size={17} />} label="Healthy" value={counts.healthy} detail="Ready to synchronize" tone="success" />
+        <MetricCard icon={<AlertCircle size={17} />} label="Needs action" value={actionCount} detail={actionCount ? 'Resolve these first' : 'Nothing is blocking sync'} tone={actionCount ? 'warning' : 'success'} />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
-          <form onSubmit={create} className="rounded-[24px] border border-border bg-surface p-5 shadow-[0_14px_36px_rgb(var(--shadow)/.06)] sm:p-6">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-ink text-primary-foreground"><Plus size={16} /></span><h2 className="text-base font-bold text-foreground">Add a source</h2></div><p className="mt-2 max-w-xl text-xs leading-5 text-muted-foreground">Create the connection first, then authorize it in the provider's own secure sign-in window.</p></div><div className="hidden items-center gap-1.5 text-body-sm font-semibold text-success-text sm:flex"><ShieldCheck size={14} />Encrypted credentials</div></div>
+          <section className="rounded-[24px] border border-border bg-surface shadow-[0_14px_36px_rgb(var(--shadow)/.06)]">
+            <button type="button" aria-expanded={setupOpen} onClick={() => setSetupOpen(current => !current)} className="flex w-full items-center justify-between gap-4 p-5 text-left sm:p-6"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-ink text-primary-foreground"><Plus size={16} /></span><div><h2 className="text-base font-bold text-foreground">Add a source</h2><p className="mt-1 text-xs text-muted-foreground">Connect another workspace only when you need one.</p></div></div><ChevronDown size={17} className={`shrink-0 text-muted-foreground transition ${setupOpen ? 'rotate-180' : ''}`} /></button>
+            {setupOpen && <form onSubmit={create} className="border-t border-border-soft px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+            <div className="flex items-start justify-between gap-4"><p className="max-w-xl text-xs leading-5 text-muted-foreground">Choose a provider, name the connection, then authorize it in the provider's own secure sign-in window.</p><div className="hidden items-center gap-1.5 text-body-sm font-semibold text-success-text sm:flex"><ShieldCheck size={14} />Encrypted credentials</div></div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {providers.map(({ system }) => { const provider = getProvider(system); return <button key={system} type="button" onClick={() => setForm(current => ({ ...current, system }))} className={`group rounded-2xl border p-4 text-left transition ${form.system === system ? 'border-info/50 bg-info/8 shadow-[0_8px_24px_rgb(var(--info)/.1)]' : 'border-border bg-canvas hover:border-info/30 hover:bg-surface-soft'}`}><span className="flex items-start justify-between gap-3"><span className={`grid h-10 w-10 place-items-center rounded-xl ${form.system === system ? 'bg-info text-primary-foreground' : 'bg-info/10 text-info'}`}>{provider.icon}</span><span className={`grid h-5 w-5 place-items-center rounded-full border ${form.system === system ? 'border-info bg-info text-primary-foreground' : 'border-border text-transparent'}`}><Check size={12} /></span></span><span className="mt-3 block text-sm font-bold text-foreground">{provider.label}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{provider.description}</span></button> })}
             </div>
@@ -646,12 +674,13 @@ export default function ConnectorsPage() {
               <Input required className="min-w-0 flex-1" placeholder="Connection name, e.g. Engineering Drive" value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} />
               <Button type="submit" variant="primary" size="lg" disabled={!form.name.trim() || !form.system} loading={busy === 'create'} icon={<Plus size={16} />}>{busy === 'create' ? 'Creating source…' : 'Create source'}</Button>
             </div>
-          </form>
+            </form>}
+          </section>
 
           <section className="rounded-[24px] border border-border bg-surface shadow-[0_14px_36px_rgb(var(--shadow)/.06)]">
             <div className="border-b border-border-soft p-5 sm:p-6">
               <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center"><div><div className="flex items-center gap-2"><Settings2 size={17} className="text-info" /><h2 className="text-base font-bold text-foreground">Your sources</h2><Badge variant="default" size="sm">{items.length}</Badge></div><p className="mt-1 text-xs text-muted-foreground">Operate each connection without leaving this view.</p></div><div className="flex flex-col gap-2 sm:flex-row"><label className="relative min-w-0 sm:w-64"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input aria-label="Search connectors" className="field h-10 w-full pl-9 pr-9 text-xs" placeholder="Search sources…" value={search} onChange={event => setSearch(event.target.value)} />{search && <Button type="button" variant="ghost" size="sm" aria-label="Clear search" onClick={() => setSearch('')} icon={<X size={14} />} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-surface-soft" />}</label><Button type="button" variant="secondary" size="md" onClick={() => void refreshConnectors(true)} disabled={refreshing || loading} loading={refreshing} icon={<RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />}>{refreshing ? 'Refreshing' : 'Refresh'}</Button></div></div>
-              <div className="mt-5 flex max-w-full gap-1 overflow-x-auto rounded-xl bg-canvas p-1" role="tablist" aria-label="Filter connector status">{([['all', 'All', counts.total], ['healthy', 'Healthy', counts.healthy], ['needs_action', 'Action required', counts.needs_action], ['attention', 'Attention', counts.attention]] as [Filter, string, number][]).map(([value, label, count]) => <button key={value} type="button" role="tab" aria-selected={filter === value} onClick={() => setFilter(value)} className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${filter === value ? 'bg-surface text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>{label}<Badge variant={filter === value ? 'info' : 'default'} size="sm">{count}</Badge></button>)}</div>
+              <div className="mt-5 flex max-w-full gap-1 overflow-x-auto rounded-xl bg-canvas p-1" role="tablist" aria-label="Filter connector work">{([['action', 'Needs action', actionCount], ['connected', 'Connected', counts.connected], ['all', 'All sources', counts.total]] as [ConnectorManagementFilter, string, number][]).map(([value, label, count]) => <button key={value} type="button" role="tab" aria-selected={filter === value} onClick={() => setFilter(value)} className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${filter === value ? 'bg-surface text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>{label}<Badge variant={value === 'action' && count ? 'warning' : filter === value ? 'info' : 'default'} size="sm">{count}</Badge></button>)}</div>
             </div>
             <div className="p-4 sm:p-5">{loading ? <ConnectorSkeletons /> : visibleItems.length === 0 ? <EmptyConnectors hasItems={items.length > 0} onReset={() => { setSearch(''); setFilter('all') }} /> : <div className="space-y-4">{visibleItems.map(item => <ConnectorCard key={item.id} item={item} provider={getProvider(item.system)} state={getConnectorState(item)} open={openId === item.id} scopes={scopes[item.id] || []} jobs={jobs[item.id] || []} preview={previews[item.id]} sourceTree={sourceTrees[item.id]} readme={readmes[item.id]} sourceMapOpen={sourceMapOpenId === item.id} activityOpen={activityOpenId === item.id} activityLoading={jobLoadingId === item.id} departmentOpen={departmentOpenId === item.id} departments={departments} departmentIds={departmentDrafts[item.id] || item.department_ids || []} busy={busy} scopeLoading={scopeLoadingId === item.id} aclPrincipals={aclPrincipals[item.id] || []} aclOpen={aclOpenId === item.id} aclLoading={aclLoadingId === item.id} onAuthorize={authorize} onSync={sync} onRetryFailed={retryFailed} onPreview={loadPreview} onToggleSourceMap={loadSourceMap} onToggleScopes={loadScopes} onRefreshScopes={itemToRefresh => void loadScopes(itemToRefresh, true)} onToggleActivity={loadJobs} onToggleDepartments={toggleDepartments} onSaveDepartments={saveDepartments} onSaveScopes={saveScopes} onChangeMode={changeMode} onEnableWebhooks={enableWebhooks} onToggleAcl={loadAcl} onSaveAclMapping={saveAclMapping} />)}</div>}</div>
           </section>
@@ -664,6 +693,10 @@ export default function ConnectorsPage() {
       </section>
     </div>
   )
+}
+
+function DetailButton({ active, icon, label, onClick, disabled }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void; disabled: boolean }) {
+  return <button type="button" aria-pressed={active} onClick={onClick} disabled={disabled} className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-body-sm font-semibold transition disabled:opacity-50 ${active ? 'bg-surface text-info shadow-sm' : 'text-muted-foreground hover:bg-surface-soft hover:text-foreground'}`}>{icon}{label}</button>
 }
 
 function MetricCard({ icon, label, value, detail, tone }: { icon: React.ReactNode; label: string; value: number; detail: string; tone: 'info' | 'success' | 'warning' | 'danger' }) {
@@ -732,25 +765,43 @@ function ConnectorCard({ item, provider, state, open, scopes, jobs, preview, sou
   const reconciliationPending = item.health?.scopes?.some(scope => scope.full_sync_required || scope.cursor_status !== 'ready')
   const webhookRenewalDue = item.health?.subscriptions?.some(subscription => subscription.active && subscription.seconds_to_expiry != null && subscription.seconds_to_expiry < 3600)
   const heldDocuments = item.health?.documents_needing_attention ?? 0
-  const primaryBusy = busy === `authorize:${item.id}` || busy === `sync:${item.id}` || busy === `preview:${item.id}` || busy === `source-map:${item.id}`
   const itemBusy = Boolean(busy?.endsWith(`:${item.id}`) || busy?.startsWith(`acl:${item.id}:`))
   const connectorDepartments = departments.filter(department => department.company_domain === item.company_domain)
   const selectedDepartmentNames = departmentIds.map(id => connectorDepartments.find(department => department.id === id)?.name).filter(Boolean) as string[]
+  const nextAction = getConnectorNextAction(item)
+  const runNextAction = () => {
+    if (nextAction === 'authorize') onAuthorize(item)
+    else if (nextAction === 'retry_held') onRetryFailed(item)
+    else if (nextAction === 'review_access') onToggleAcl(item)
+    else if (nextAction === 'choose_locations') onToggleScopes(item)
+    else onSync(item)
+  }
+  const nextActionLabel = nextAction === 'authorize'
+    ? 'Authorize source'
+    : nextAction === 'retry_held'
+      ? `Retry ${heldDocuments} held`
+      : nextAction === 'review_access'
+        ? 'Review access'
+        : nextAction === 'choose_locations'
+          ? 'Choose locations'
+          : 'Sync now'
+  const nextActionBusy = busy === `authorize:${item.id}` || busy === `retry:${item.id}` || busy === `sync:${item.id}` || (nextAction === 'review_access' && aclLoading) || (nextAction === 'choose_locations' && scopeLoading)
   return <article className={`overflow-hidden rounded-[22px] border bg-surface shadow-[0_10px_28px_rgb(var(--shadow)/.045)] transition ${open ? 'border-info/35 shadow-[0_16px_34px_rgb(var(--info)/.08)]' : 'border-border'}`}>
     <div className="p-5 sm:p-6">
       {item.authorized && <div className="mb-4 flex flex-wrap gap-2 text-caption font-semibold text-muted-foreground"><Badge variant="default" size="sm">Queue {item.health?.queue_depth ?? 0}</Badge><Badge variant="default" size="sm">Notifications 24h {item.health?.notifications_last_24h ?? 0}</Badge>{heldDocuments > 0 && <Badge variant="warning" size="sm">{heldDocuments} held after repeated errors</Badge>}{reconciliationPending && <Badge variant="warning" size="sm">Reconciliation pending</Badge>}{webhookRenewalDue && <Badge variant="warning" size="sm">Webhook renewal due</Badge>}</div>}
       {item.authorized && (item.health?.documents?.total ?? 0) > 0 && <DocumentBreakdown counts={item.health!.documents!} />}
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div className="flex min-w-0 items-start gap-3"><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${provider.accentClassName}`}>{provider.icon}</span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-base font-bold text-foreground">{item.name}</h3><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-bold ${status.className}`}>{status.icon}{status.label}</span></div><p className="mt-1 text-xs text-muted-foreground">{provider.label}{item.company_domain ? ` · ${item.company_domain}` : ''}</p><p className="mt-2 max-w-xl text-xs leading-5 text-muted-foreground">{status.description}. {item.authorized ? (selectedCount ? `${selectedCount} location${selectedCount === 1 ? '' : 's'} selected for sync.` : 'Choose at least one location to control what is indexed.') : 'Complete authorization to discover available locations.'}</p></div></div><div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">{!item.authorized && <Button type="button" variant="primary" size="md" onClick={() => onAuthorize(item)} disabled={primaryBusy || itemBusy} loading={busy === `authorize:${item.id}`} icon={busy === `authorize:${item.id}` ? undefined : <ExternalLink size={15} />}>{busy === `authorize:${item.id}` ? 'Opening secure sign-in…' : 'Authorize source'}</Button>}{item.authorized && <><Button type="button" variant="primary" size="md" onClick={() => onSync(item)} disabled={primaryBusy || itemBusy} loading={busy === `sync:${item.id}`} icon={busy === `sync:${item.id}` ? undefined : <RefreshCw size={15} />}>{busy === `sync:${item.id}` ? 'Queueing sync…' : 'Sync now'}</Button>{heldDocuments > 0 && <Button type="button" variant="secondary" size="md" onClick={() => onRetryFailed(item)} disabled={primaryBusy || itemBusy} loading={busy === `retry:${item.id}`} icon={busy === `retry:${item.id}` ? undefined : <RotateCcw size={15} />} className="border-warning/35 text-warning hover:bg-warning/10">{busy === `retry:${item.id}` ? 'Releasing…' : `Retry ${heldDocuments} held`}</Button>}<Button type="button" variant="secondary" size="md" onClick={() => onToggleSourceMap(item)} disabled={primaryBusy || itemBusy} loading={busy === `source-map:${item.id}`} icon={busy === `source-map:${item.id}` ? undefined : <FolderTree size={15} />} className={sourceMapOpen ? 'border-info/35 bg-info/10 text-info' : ''}>{sourceMapOpen ? 'Close source map' : 'Source map'}</Button>{item.system === 'sharepoint' && <Button type="button" variant="secondary" size="md" onClick={() => onPreview(item)} disabled={primaryBusy || itemBusy || selectedCount === 0} loading={busy === `preview:${item.id}`} icon={busy === `preview:${item.id}` ? undefined : <Search size={15} />} className="border-info/30 text-info hover:bg-info/10">{busy === `preview:${item.id}` ? 'Previewing…' : 'Preview files'}</Button>}<Button type="button" variant="secondary" size="md" onClick={() => onToggleScopes(item)} disabled={scopeLoading || itemBusy} loading={scopeLoading} icon={scopeLoading ? undefined : <FolderOpen size={15} />} className={open ? 'border-info/35 bg-info/10 text-info' : ''}>{open ? 'Close locations' : 'Manage locations'}<ChevronDown size={14} className={`transition ${open ? 'rotate-180' : ''}`} /></Button>{item.system === 'sharepoint' && <Button type="button" variant="secondary" size="md" onClick={() => onToggleAcl(item)} disabled={aclLoading || itemBusy} loading={aclLoading} icon={aclLoading ? undefined : <ShieldCheck size={15} />} className={aclOpen ? 'border-cyan/35 bg-cyan/10 text-info-text' : ''}>{aclOpen ? 'Close ACL' : 'Review ACL'}</Button>}</>}</div></div>
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div className="flex min-w-0 items-start gap-3"><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${provider.accentClassName}`}>{provider.icon}</span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-base font-bold text-foreground">{item.name}</h3><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-bold ${status.className}`}>{status.icon}{status.label}</span></div><p className="mt-1 text-xs text-muted-foreground">{provider.label}{item.company_domain ? ` · ${item.company_domain}` : ''}</p><p className="mt-2 max-w-xl text-xs leading-5 text-muted-foreground">{status.description}. {item.authorized ? (selectedCount ? `${selectedCount} location${selectedCount === 1 ? '' : 's'} selected for sync.` : 'Choose at least one location to control what is indexed.') : 'Complete authorization to discover available locations.'}</p></div></div><Button type="button" variant="primary" size="md" onClick={runNextAction} disabled={itemBusy} loading={nextActionBusy} icon={nextAction === 'authorize' ? <ExternalLink size={15} /> : nextAction === 'retry_held' ? <RotateCcw size={15} /> : nextAction === 'review_access' ? <ShieldCheck size={15} /> : nextAction === 'choose_locations' ? <FolderOpen size={15} /> : <RefreshCw size={15} />}>{nextActionLabel}</Button></div>
       {item.last_error && <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-amber-400/25 bg-amber-500/8 px-3.5 py-3 text-xs text-warning-text"><AlertCircle size={15} className="mt-0.5 shrink-0" /><span><span className="font-bold">Latest sync notice:</span> {item.last_error}</span></div>}
       <div className="mt-5 grid gap-3 border-t border-border-soft pt-5 sm:grid-cols-2"><div className="rounded-xl bg-canvas px-3.5 py-3"><p className="text-caption font-bold uppercase tracking-[.12em] text-muted">Last activity</p><p className="mt-1.5 text-xs font-semibold text-foreground">{formatDate(item.last_sync)}</p></div>{item.authorized ? <div className="rounded-xl bg-canvas px-3.5 py-3"><p className="text-caption font-bold uppercase tracking-[.12em] text-muted">Automation</p><div className="mt-1.5 flex items-center gap-2"><Select aria-label={`Sync schedule for ${item.name}`} className="h-7 min-w-0 rounded-lg border border-border bg-surface px-2 text-xs font-semibold text-foreground outline-none" value={item.sync_mode} onChange={event => onChangeMode(item, event.target.value)} disabled={itemBusy}><option value="daily">Daily sync</option><option value="on_update">On update</option><option value="manual">Manual only</option></Select>{item.sync_mode === 'on_update' && <span className="inline-flex shrink-0 items-center gap-1 text-caption font-semibold text-info">{item.webhook_enabled ? <><Check size={12} />Live</> : <Button type="button" variant="ghost" size="sm" onClick={() => onEnableWebhooks(item)} disabled={itemBusy} className="font-semibold underline decoration-dotted underline-offset-2 hover:no-underline">Enable alerts</Button>}</span>}</div></div> : <div className="rounded-xl bg-canvas px-3.5 py-3"><p className="text-caption font-bold uppercase tracking-[.12em] text-muted">Next step</p><p className="mt-1.5 text-xs font-semibold text-foreground">Authorize to unlock sync controls</p></div>}</div>
-      {item.authorized && <Button type="button" variant="ghost" size="sm" onClick={() => onToggleActivity(item)} disabled={activityLoading || itemBusy} icon={<History size={14} />} className="mt-4 text-xs font-bold text-info hover:text-info/75">{activityLoading ? 'Loading sync activity…' : activityOpen ? 'Hide sync activity' : 'View sync activity'}{jobs.length > 0 && <Badge variant="info" size="sm">{jobs.length}</Badge>}</Button>}
-      <div className="mt-3 flex flex-col justify-between gap-2 rounded-xl border border-info/15 bg-info/5 px-3.5 py-3 sm:flex-row sm:items-center"><div><p className="text-caption font-bold uppercase tracking-[.12em] text-muted">Default draft routing</p><p className="mt-1 text-xs font-semibold text-foreground">{selectedDepartmentNames.length ? selectedDepartmentNames.join(' · ') : item.department_names?.length ? item.department_names.join(' · ') : 'Not configured — reviewers may not see this draft'}</p></div><Button type="button" variant="secondary" size="sm" onClick={() => onToggleDepartments(item)} disabled={itemBusy} icon={<Settings2 size={13} />} className="shrink-0 border-info/25 text-info hover:bg-info/10">{departmentOpen ? 'Close routing' : 'Set departments'}</Button></div>
+      {item.authorized && <div className="mt-4 flex max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-canvas p-1" aria-label={`Manage ${item.name}`}><DetailButton active={open} icon={<FolderOpen size={13} />} label="Locations" onClick={() => onToggleScopes(item)} disabled={scopeLoading || itemBusy} /><DetailButton active={departmentOpen} icon={<Settings2 size={13} />} label="Routing" onClick={() => onToggleDepartments(item)} disabled={itemBusy} />{item.system === 'sharepoint' && <DetailButton active={aclOpen} icon={<ShieldCheck size={13} />} label="Access" onClick={() => onToggleAcl(item)} disabled={aclLoading || itemBusy} />}<DetailButton active={activityOpen} icon={<History size={13} />} label="Activity" onClick={() => onToggleActivity(item)} disabled={activityLoading || itemBusy} /><DetailButton active={sourceMapOpen} icon={<FolderTree size={13} />} label="Source map" onClick={() => onToggleSourceMap(item)} disabled={itemBusy} /></div>}
+      {departmentOpen && <p className="mt-3 text-body-sm text-muted-foreground">Current routing: {selectedDepartmentNames.length ? selectedDepartmentNames.join(' · ') : item.department_names?.length ? item.department_names.join(' · ') : 'not configured'}</p>}
+      {open && item.system === 'sharepoint' && <div className="mt-3 flex justify-end"><Button type="button" variant="secondary" size="sm" onClick={() => onPreview(item)} disabled={itemBusy || selectedCount === 0} loading={busy === `preview:${item.id}`} icon={<Search size={13} />}>Preview selected files</Button></div>}
     </div>
     {departmentOpen && <DepartmentPicker departments={connectorDepartments} selectedIds={departmentIds} busy={busy === `departments:${item.id}`} onSave={selected => void onSaveDepartments(item, selected)} />}
     {activityOpen && <SyncActivity jobs={jobs} loading={activityLoading} />}
     {open && <ScopePicker item={item} scopes={scopes} busy={busy === `scopes:${item.id}`} loading={scopeLoading} onRefresh={() => onRefreshScopes(item)} onSave={selected => onSaveScopes(item, selected)} />}
     {sourceMapOpen && <SourceMapPanel tree={sourceTree} readme={readme} loading={busy === `source-map:${item.id}`} />}
-    {preview && <PreviewPanel preview={preview} />}
+    {open && preview && <PreviewPanel preview={preview} />}
     {aclOpen && <AclMappingPanel item={item} principals={aclPrincipals} departments={departments} loading={aclLoading} busy={busy} onSave={(principal, departmentId) => void onSaveAclMapping(item, principal, departmentId)} />}
   </article>
 }

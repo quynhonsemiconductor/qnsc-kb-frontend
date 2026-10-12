@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   Activity, AlertTriangle, Bell, BookOpen, Bookmark, Bot, Building2, ChevronDown,
-  ClipboardList, Compass, FileArchive, FileCheck2, FileText, FolderTree, Globe,
-  Home, Menu, Monitor, Network, Plus, Search, Settings2, Shield, Sparkles, Tag, Users,
+  ClipboardList, Compass, FileCheck2, FileText, FolderTree, Globe,
+  Home, Menu, Monitor, Plus, Search, Settings2, Shield, Sparkles, Tag, Users,
   type LucideIcon,
 } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageProvider'
@@ -131,7 +131,6 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const metadataItems: NavEntry[] = [
     { to: '/meta/tags', label: t('nav.tags'), icon: Tag },
     { to: '/meta/glossary', label: t('nav.glossary'), icon: Compass },
-    { to: '/meta/graph', label: t('nav.graph'), icon: Network },
   ]
   const adminItems: NavEntry[] = [
     ...(has('user.manage') ? [
@@ -144,14 +143,13 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
       { to: '/admin/llm', label: t('nav.aiProvider'), icon: Sparkles },
     ] : []),
     ...(has('connector.manage') ? [{ to: '/admin/connectors', label: t('nav.sourceConnectors'), icon: FolderTree }] : []),
-    ...(has('article.create') ? [{ to: '/sources', label: t('nav.sourcesFiles'), icon: FileArchive }] : []),
   ]
 
   const path = location.pathname
   const knowledgeActive = path === '/browse' || path.startsWith('/articles') || path.startsWith('/search') || path.startsWith('/ai') || path.startsWith('/bookmarks')
   const governanceActive = path.startsWith('/governance')
   const metadataActive = path.startsWith('/meta')
-  const adminActive = path.startsWith('/admin') || path === '/sources'
+  const adminActive = path.startsWith('/admin')
 
   return <>
     <header className="knowledge-header relative z-sticky shrink-0 border-b border-border bg-surface/95 backdrop-blur">

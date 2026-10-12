@@ -18,6 +18,18 @@ describe('draft management status', () => {
     })
   })
 
+  it('turns a stalled preparation into an actionable retry', () => {
+    expect(getDraftManagementStatus(draft({ restructure_status: 'stalled' }), context)).toMatchObject({
+      state: 'stalled', action: 'retry', bulkEligible: false,
+    })
+  })
+
+  it('preserves a layout decision from lightweight list metadata', () => {
+    expect(getDraftManagementStatus(draft({ has_restructure_candidate: true, restructure_decision: 'pending_review' }), context)).toMatchObject({
+      state: 'decision', reason: 'layout_choice', bulkEligible: false,
+    })
+  })
+
   it('prioritizes section review over an update decision', () => {
     expect(getDraftManagementStatus(draft({ candidate_count: 2, requires_update_confirmation: true }), context)).toMatchObject({
       state: 'split_review', action: 'review_sections', bulkEligible: false,

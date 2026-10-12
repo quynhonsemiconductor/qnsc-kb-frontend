@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity, AlertTriangle, BookOpen, Bookmark, Bot, ClipboardList, Compass,
-  FileArchive, FileText, FolderTree, KeyRound, LogOut, Network, Search,
+  FileText, FolderTree, KeyRound, LogOut, Search,
   Settings2, Tag, Users, Shield, Sparkles, X, Building2, Home, Globe, Monitor,
   type LucideIcon,
 } from 'lucide-react'
@@ -75,17 +75,15 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
         <DrawerSection title={t('nav.metadata')}>
           <DrawerLink to="/meta/tags" icon={Tag}>{t('nav.tags')}</DrawerLink>
           <DrawerLink to="/meta/glossary" icon={Compass}>{t('nav.glossary')}</DrawerLink>
-          <DrawerLink to="/meta/graph" icon={Network}>{t('nav.graph')}</DrawerLink>
         </DrawerSection>
 
-        {(has('user.manage') || has('role.manage') || has('connector.manage') || has('article.create')) && <DrawerSection title={t('nav.administration')}>
+        {(has('user.manage') || has('role.manage') || has('connector.manage')) && <DrawerSection title={t('nav.administration')}>
           {has('user.manage') && <DrawerLink to="/admin/users" icon={Users}>{t('nav.usersRoles')}</DrawerLink>}
           {has('user.manage') && <DrawerLink to="/admin/departments" icon={Building2}>{t('nav.departments')}</DrawerLink>}
           {has('role.manage') && <DrawerLink to="/admin/roles" icon={Shield}>{t('nav.rolesPermissions')}</DrawerLink>}
           {has('connector.manage') && <DrawerLink to="/admin/connectors" icon={FolderTree}>{t('nav.sourceConnectors')}</DrawerLink>}
           {has('role.manage') && <DrawerLink to="/admin/features" icon={Settings2}>{t('nav.featureControls')}</DrawerLink>}
           {has('role.manage') && <DrawerLink to="/admin/llm" icon={Sparkles}>{t('nav.aiProvider')}</DrawerLink>}
-          {has('article.create') && <DrawerLink to="/sources" icon={FileArchive}>{t('nav.sourcesFiles')}</DrawerLink>}
         </DrawerSection>}
       </nav>
 

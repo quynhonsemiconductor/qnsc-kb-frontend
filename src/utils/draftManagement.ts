@@ -1,5 +1,5 @@
-export type DraftQueueState = 'processing' | 'split_review' | 'decision' | 'ready'
-export type DraftPrimaryAction = 'wait' | 'review_sections' | 'review_decision' | 'review'
+export type DraftQueueState = 'processing' | 'stalled' | 'split_review' | 'decision' | 'ready'
+export type DraftPrimaryAction = 'wait' | 'retry' | 'review_sections' | 'review_decision' | 'review'
 export type DraftDecisionReason = 'possible_update' | 'layout_choice' | 'missing_department' | 'needs_approver' | 'assigned_elsewhere' | null
 
 export type ManageableDraft = {
@@ -9,6 +9,7 @@ export type ManageableDraft = {
   candidate_count?: number
   restructure_status?: string
   restructure_candidate_md?: string | null
+  has_restructure_candidate?: boolean
   restructure_decision?: string
   requires_update_confirmation?: boolean
   assigned_approver_id?: string | null
@@ -33,7 +34,10 @@ export function getDraftManagementStatus(
   context: DraftManagementContext,
 ): DraftManagementStatus {
   if (['queued', 'processing'].includes(draft.restructure_status || '')) {
-    return { state: 'processing', action: 'wait', reason: null, bulkEligible: false, priority: 3 }
+    return { state: 'processing', action: 'wait', reason: null, bulkEligible: false, priority: 4 }
+  }
+  if (draft.restructure_status === 'stalled') {
+    return { state: 'stalled', action: 'retry', reason: null, bulkEligible: false, priority: 0 }
   }
 
   if ((draft.candidate_count || 0) > 1) {
@@ -47,7 +51,7 @@ export function getDraftManagementStatus(
     && !context.canSelfApprove,
   )
   const needsLayoutChoice = Boolean(
-    draft.restructure_candidate_md
+    (draft.has_restructure_candidate || draft.restructure_candidate_md)
     && draft.restructure_decision === 'pending_review',
   )
   const hasDepartment = Boolean(
