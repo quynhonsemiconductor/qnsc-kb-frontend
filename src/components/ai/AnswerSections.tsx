@@ -3,16 +3,19 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { BookOpen, Sparkles } from 'lucide-react'
-import AnswerText, { AnswerCitation } from './AnswerText'
+import AnswerText, { AnswerCitation, AnswerEvidenceLabels } from './AnswerText'
 
 interface AnswerSectionsProps {
   grounded: string
   extended?: string
   citations?: AnswerCitation[]
   onCitationClick: (citation: AnswerCitation) => void
+  /* Only the grounded half may show evidence. The extended section is general knowledge
+     by definition — it cites nothing, so it has nothing to anchor. */
+  evidence?: { labels: AnswerEvidenceLabels }
 }
 
-function AnswerSections({ grounded, extended = '', citations = [], onCitationClick }: AnswerSectionsProps) {
+function AnswerSections({ grounded, extended = '', citations = [], onCitationClick, evidence }: AnswerSectionsProps) {
   // An empty `grounded` string used to render the full "Answer from your Knowledge Base"
   // shell — heading, GROUNDED badge, border — wrapped around nothing. On a retrieval
   // product that is the most damaging state possible: the badge asserts provenance for
@@ -28,7 +31,7 @@ function AnswerSections({ grounded, extended = '', citations = [], onCitationCli
            its own tint (2.61:1 measured), so it now uses the on-tint text tokens. */
         <section className="rounded-surface border border-info/25 bg-info/[0.045] p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-info/15 pb-3"><p className="flex items-center gap-2 text-caption font-bold uppercase tracking-widest text-info-text"><span className="grid h-6 w-6 place-items-center rounded-control bg-info/10"><BookOpen size={13} /></span> Answer from your Knowledge Base</p><span className="rounded-full border border-info/25 bg-info/10 px-2 py-1 text-caption font-bold uppercase tracking-[.12em] text-info-text">Grounded</span></div>
-          <AnswerText content={grounded} citations={citations} onCitationClick={onCitationClick} />
+          <AnswerText content={grounded} citations={citations} onCitationClick={onCitationClick} evidence={evidence} />
         </section>
       ) : (
         <section role="status" className="rounded-surface border border-warning/25 bg-warning/[0.06] p-4">
