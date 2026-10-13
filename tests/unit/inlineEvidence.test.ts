@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  anchorInlineEvidence,
+  citationMarkers,
+  findCitationByMarker,
   INLINE_IMAGE_CAP,
   INLINE_TABLE_CAP,
   selectInlineEvidence,
@@ -146,5 +149,118 @@ describe('selecting inline evidence for one answer', () => {
     )
 
     expect(selection.items.map(item => item.evidenceId)).toEqual(['t1'])
+  })
+})
+
+describe('anchoring inline evidence to the citing block', () => {
+  it('anchors each figure at the marker that cites it', () => {
+    const answer = 'Login works [C1]. Export differs [C2].'
+    const result = anchorInlineEvidence(answer, [
+      figure('img-1', { source_index: 1 }),
+      figure('img-2', { source_index: 2 }),
+    ])
+
+    expect(result.anchors.map(anchor => anchor.offset)).toEqual([
+      answer.indexOf('[C1]'),
+      answer.indexOf('[C2]'),
+    ])
+    expect(result.anchors.map(anchor => anchor.items.map(item => item.evidenceId))).toEqual([
+      ['img-1'], ['img-2'],
+    ])
+    expect(result.trailing).toEqual([])
+  })
+
+  it('anchors at the FIRST marker when one figure is cited repeatedly', () => {
+    const answer = 'Intro [C1]. Restated later [C1]. Also here [C1].'
+    const result = anchorInlineEvidence(answer, [figure('img-1', { source_index: 1 })])
+
+    expect(result.anchors).toHaveLength(1)
+    expect(result.anchors[0].offset).toBe(answer.indexOf('[C1]'))
+  })
+
+  it('keeps two figures cited side by side in citation order', () => {
+    const result = anchorInlineEvidence('Both shown [C1][C2].', [
+      figure('img-1', { source_index: 1 }),
+      figure('img-2', { source_index: 2 }),
+    ])
+
+    expect(result.anchors.flatMap(anchor => anchor.items.map(item => item.evidenceId)))
+      .toEqual(['img-1', 'img-2'])
+  })
+
+  it('anchors tables and figures each at their own marker', () => {
+    const result = anchorInlineEvidence('Totals [C1] and the screen [C2].', [
+      citation({ source_index: 1, evidence_id: 'tbl-1', evidence_kind: 'table', evidence_table: table() }),
+      figure('img-1', { source_index: 2 }),
+    ])
+
+    expect(result.anchors.map(anchor => anchor.items[0].type)).toEqual(['table', 'image'])
+  })
+
+  it('trails evidence when the answer carries no markers at all', () => {
+    const result = anchorInlineEvidence('No markers here.', [figure('img-1', { source_index: 1 })])
+
+    expect(result.anchors).toEqual([])
+    expect(result.trailing.map(item => item.evidenceId)).toEqual(['img-1'])
+  })
+
+  it('trails only the evidence no marker claimed', () => {
+    const result = anchorInlineEvidence('Only the first is cited [C1].', [
+      figure('img-1', { source_index: 1 }),
+      figure('img-2', { source_index: 2 }),
+    ])
+
+    expect(result.anchors.flatMap(anchor => anchor.items.map(item => item.evidenceId))).toEqual(['img-1'])
+    expect(result.trailing.map(item => item.evidenceId)).toEqual(['img-2'])
+  })
+
+  it('never anchors evidence a cap withheld', () => {
+    const result = anchorInlineEvidence(
+      'One [C1]. Two [C2]. Three [C3].',
+      [
+        figure('img-1', { source_index: 1 }),
+        figure('img-2', { source_index: 2 }),
+        figure('img-3', { source_index: 3 }),
+      ],
+      { imageCap: 1 },
+    )
+
+    const shown = [
+      ...result.anchors.flatMap(anchor => anchor.items.map(item => item.evidenceId)),
+      ...result.trailing.map(item => item.evidenceId),
+    ]
+    expect(shown).toEqual(['img-1'])
+    expect(result.hiddenImages).toBe(2)
+  })
+
+  it('ignores a marker whose citation carries no evidence', () => {
+    const result = anchorInlineEvidence('Plain source [C1]. Figure [C2].', [
+      citation({ source_index: 1 }),
+      figure('img-1', { source_index: 2 }),
+    ])
+
+    expect(result.anchors).toHaveLength(1)
+    expect(result.anchors[0].items.map(item => item.evidenceId)).toEqual(['img-1'])
+  })
+
+  it('reads older numeric and Source ID marker spellings', () => {
+    expect(citationMarkers('a [1] b [Source ID: C2] c [C3]').map(marker => marker.number))
+      .toEqual([1, 2, 3])
+  })
+
+  it('resolves markers positionally only when no citation carries an index', () => {
+    const indexed = [figure('img-1', { source_index: 2 })]
+    // An indexed set must not fall back: [1] names no citation here, and guessing would
+    // put a figure beside a claim that cites something else.
+    expect(findCitationByMarker(indexed, 1)).toBeUndefined()
+    expect(findCitationByMarker(indexed, 2)?.evidence_id).toBe('img-1')
+
+    const legacy = [figure('img-a'), figure('img-b')]
+    expect(findCitationByMarker(legacy, 2)?.evidence_id).toBe('img-b')
+  })
+
+  it('has nothing to anchor when the answer cited no evidence', () => {
+    expect(anchorInlineEvidence('Text [C1].', [citation({ source_index: 1 })]))
+      .toMatchObject({ anchors: [], trailing: [], hiddenImages: 0, hiddenTables: 0 })
   })
 })
