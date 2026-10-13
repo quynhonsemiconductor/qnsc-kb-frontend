@@ -18,6 +18,18 @@ describe('draft management status', () => {
     })
   })
 
+  it('treats a rate-limit-deferred AI formatting as still preparing, with its own reason', () => {
+    expect(getDraftManagementStatus(draft({ restructure_status: 'deferred' }), context)).toMatchObject({
+      state: 'processing', action: 'wait', reason: 'ai_deferred', bulkEligible: false,
+    })
+  })
+
+  it('reports completion when a deferred draft finishes preparing', () => {
+    const before = [draft({ restructure_status: 'deferred' })]
+    const after = [draft({ restructure_status: 'llm' })]
+    expect(getPreparationCompletion(before, after, context)).not.toBeNull()
+  })
+
   it('turns a stalled preparation into an actionable retry', () => {
     expect(getDraftManagementStatus(draft({ restructure_status: 'stalled' }), context)).toMatchObject({
       state: 'stalled', action: 'retry', bulkEligible: false,
