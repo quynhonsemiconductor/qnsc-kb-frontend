@@ -17,6 +17,7 @@ import AnswerText, { type AnswerCitation } from '../../components/ai/AnswerText'
 import AnswerSections from '../../components/ai/AnswerSections'
 import AnalysisResults from '../../components/ai/AnalysisResults'
 import EvidenceTable from '../../components/ai/EvidenceTable'
+import InlineEvidence from '../../components/ai/InlineEvidence'
 import type { AnalyticsResult, Citation, EvidenceStatus } from '../../types/ai'
 import { collapseDuplicateFailedRetries, resetFailedMessageForRetry } from '../../lib/ai-retry'
 import { useDialog } from '../../components/ui/DialogProvider'
@@ -1027,6 +1028,20 @@ export default function AskPage() {
                             },
                           }}
                         />
+                        {!isStreamingThis && (
+                          <InlineEvidence
+                            citations={message.citations}
+                            onSelect={setSelectedSource}
+                            labels={{
+                              heading: t('chat.inlineEvidenceHeading'),
+                              moreImages: t('chat.inlineEvidenceMoreImages'),
+                              moreTables: t('chat.inlineEvidenceMoreTables'),
+                              tableRowSummary: t('chat.tableRowSummary'),
+                              unavailable: t('chat.inlineEvidenceUnavailable'),
+                              open: t('chat.inlineEvidenceOpen'),
+                            }}
+                          />
+                        )}
                         {message.citations && message.citations.length > 0 && (
                           <div className="mt-4 border-t border-hairline pt-4 pl-10">
                             <button
