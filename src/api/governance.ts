@@ -1,4 +1,9 @@
 import client from './client'
+import { invalidateAsyncResource } from '../hooks/useAsyncResource'
+
+function invalidatePublishedKnowledge() {
+  invalidateAsyncResource('home-')
+}
 
 export async function uploadSource(file: File, tags: string[] = [], dept?: string, departmentIds: string[] = []) {
   // Upload through the authenticated API rather than PUTing directly from the
@@ -72,6 +77,7 @@ export async function approveDraft(id: string, dept: string, departmentIds: stri
     update_article_id: updateArticleId || null,
     treat_as_new: treatAsNew,
   })
+  invalidatePublishedKnowledge()
   return response.data
 }
 
@@ -123,7 +129,9 @@ export async function bulkDecideDrafts(payload: {
   review_note?: string
 }): Promise<BulkDecideResult> {
   const response = await client.post('/governance/pending-drafts/bulk-decide', payload)
-  return response.data
+  const result = response.data as BulkDecideResult
+  if (payload.decision === 'approve' && result.decided_count > 0) invalidatePublishedKnowledge()
+  return result
 }
 
 export async function restructureDraft(id: string) {
