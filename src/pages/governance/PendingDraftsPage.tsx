@@ -222,7 +222,7 @@ export default function PendingDraftsPage() {
   }, [])
 
   const hasRestructureInFlight = useMemo(
-    () => drafts.some(draft => ['queued', 'processing'].includes(draft.restructure_status || '')),
+    () => drafts.some(draft => ['queued', 'processing', 'deferred'].includes(draft.restructure_status || '')),
     [drafts],
   )
 
@@ -304,7 +304,7 @@ export default function PendingDraftsPage() {
   const selectedDepartments = visibleDepartments.filter(item => docDepartmentIds.includes(item.id))
   const primaryDepartmentId = visibleDepartments.find(item => item.name === docDept)?.id
   const hasReadingView = (draft: Draft | null | undefined) => Boolean(draft?.restructured_body_md)
-  const isAiBusy = (draft: Draft | null | undefined) => ['queued', 'processing'].includes(draft?.restructure_status || '')
+  const isAiBusy = (draft: Draft | null | undefined) => ['queued', 'processing', 'deferred'].includes(draft?.restructure_status || '')
 
   // `restructure_status !== 'llm'` used to gate the retry button, which offered a retry
   // on every terminal state — including the `lossless_ready` that `commit_candidates`
@@ -768,7 +768,7 @@ export default function PendingDraftsPage() {
         const status = statusById.get(draft.id)!
         const selected = selectedIds.includes(draft.id)
         const statusLabel = status.state === 'processing' ? t('drafts.statusProcessing') : status.state === 'stalled' ? t('drafts.statusStalled') : status.state === 'split_review' ? t('drafts.statusSections') : status.state === 'ready' ? t('drafts.statusReady') : t('drafts.statusDecision')
-        const reason = status.reason === 'possible_update' ? t('drafts.reasonUpdate') : status.reason === 'layout_choice' ? t('drafts.reasonLayout') : status.reason === 'missing_department' ? t('drafts.reasonDepartment') : status.reason === 'needs_approver' ? t('drafts.reasonApprover') : status.reason === 'assigned_elsewhere' ? t('drafts.reasonAssigned') : status.state === 'split_review' ? t('drafts.reasonSections', { count: draft.candidate_count || 0 }) : status.state === 'processing' ? t('drafts.reasonProcessing') : status.state === 'stalled' ? t('drafts.reasonStalled') : t('drafts.reasonReady')
+        const reason = status.reason === 'possible_update' ? t('drafts.reasonUpdate') : status.reason === 'layout_choice' ? t('drafts.reasonLayout') : status.reason === 'missing_department' ? t('drafts.reasonDepartment') : status.reason === 'needs_approver' ? t('drafts.reasonApprover') : status.reason === 'assigned_elsewhere' ? t('drafts.reasonAssigned') : status.state === 'split_review' ? t('drafts.reasonSections', { count: draft.candidate_count || 0 }) : status.reason === 'ai_deferred' ? t('drafts.reasonDeferred') : status.state === 'processing' ? t('drafts.reasonProcessing') : status.state === 'stalled' ? t('drafts.reasonStalled') : t('drafts.reasonReady')
         const tone = status.state === 'ready' ? 'success' : status.state === 'processing' ? 'default' : 'warning'
         const actionLabel = status.action === 'retry' ? t('drafts.retryPreparation') : status.action === 'review_sections' ? t('drafts.reviewSections') : status.action === 'review_decision' ? t('drafts.reviewDecision') : status.action === 'wait' ? t('drafts.preparing') : t('drafts.review')
         return <article key={draft.id} tabIndex={0} onFocus={() => setFocusedDraftId(draft.id)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedDraftId(current => current === draft.id ? null : current) }} className={`grid gap-4 border-b border-border p-4 outline-none transition last:border-b-0 hover:bg-surface-muted/60 lg:grid-cols-[auto_minmax(0,1.4fr)_minmax(15rem,.8fr)_auto] lg:items-center ${selected ? 'bg-primary/5' : ''} ${focusedDraftId === draft.id ? 'ring-1 ring-inset ring-primary/30' : ''}`}>

@@ -1,6 +1,6 @@
 export type DraftQueueState = 'processing' | 'stalled' | 'split_review' | 'decision' | 'ready'
 export type DraftPrimaryAction = 'wait' | 'retry' | 'review_sections' | 'review_decision' | 'review'
-export type DraftDecisionReason = 'possible_update' | 'layout_choice' | 'missing_department' | 'needs_approver' | 'assigned_elsewhere' | null
+export type DraftDecisionReason = 'possible_update' | 'layout_choice' | 'missing_department' | 'needs_approver' | 'assigned_elsewhere' | 'ai_deferred' | null
 
 export type ManageableDraft = {
   id: string
@@ -33,6 +33,11 @@ export function getDraftManagementStatus(
   draft: ManageableDraft,
   context: DraftManagementContext,
 ): DraftManagementStatus {
+  // `deferred`: the AI provider is rate limiting and the backend has scheduled its own retry. Still
+  // preparing (so polled, not actionable), but with a reason that says why it is taking longer.
+  if (draft.restructure_status === 'deferred') {
+    return { state: 'processing', action: 'wait', reason: 'ai_deferred', bulkEligible: false, priority: 4 }
+  }
   if (['queued', 'processing'].includes(draft.restructure_status || '')) {
     return { state: 'processing', action: 'wait', reason: null, bulkEligible: false, priority: 4 }
   }
@@ -118,7 +123,7 @@ export function getPreparationCompletion(
   const previousById = new Map(previous.map(draft => [draft.id, draft]))
   const destinations = current.flatMap((draft) => {
     const before = previousById.get(draft.id)
-    if (!before || !['queued', 'processing'].includes(before.restructure_status || '')) return []
+    if (!before || !['queued', 'processing', 'deferred'].includes(before.restructure_status || '')) return []
     const state = getDraftManagementStatus(draft, context).state
     return state === 'ready' || state === 'decision' || state === 'split_review' ? [state] : []
   })
