@@ -44,6 +44,7 @@ jobs:
     uses: quynhonsemiconductor/ci/.github/workflows/actions-security.yml@v1
     with:
       blocking: true
+      combine: true # actionlint + zizmor as ONE job; the required check is `actions-security / Workflow security (actionlint, zizmor)`
 
   security:
     # A CEILING, not a grant this workflow uses: the reusable's Trivy job declares
@@ -58,6 +59,9 @@ jobs:
     uses: quynhonsemiconductor/ci/.github/workflows/security.yml@v1
     with:
       product: qnsc-kb-frontend
+      # Gitleaks + osv-scanner + Semgrep as ONE job; the required check is
+      # `security / Security scans (Gitleaks, osv-scanner, Semgrep)`.
+      combine: true
       scan_container: false
       node_version: '20'
 
