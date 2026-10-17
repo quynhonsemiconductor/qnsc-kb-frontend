@@ -118,6 +118,89 @@ jobs:
       - name: Audit critical production vulnerabilities
         run: npm audit --omit=dev --audit-level=critical
 
+  # ── Local quickstart ────────────────────────────────────────────────────────
+  # The README's commands from the example env, against a REAL backend: starts qnsc-kb-backend's compose stack
+  # from its `main` (its own example env, no model bake, zero-vector embeddings), starts `npm run dev`, then
+  # proves the dev server serves the app, that `/api` is proxied to the backend, and that one authenticated call
+  # works through that proxy. Catches a broken proxy target, a base URL the dev server cannot reach, and drift
+  # in the backend's published sign-in.
+  #
+  # Depends on the backend repository's `main`: if its local quickstart is broken this job fails, which is the
+  # point (a frontend that cannot sign in locally is broken), but it is a cross-repository coupling and is named
+  # as one here.
+  quickstart:
+    name: Local quickstart
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: quynhonsemiconductor/qnsc-kb-backend
+          ref: main
+          path: backend
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Start the backend (its example env, with no model bake for CI)
+        working-directory: backend
+        run: |
+          cp .env.example .env
+          sed -i 's/^EMBEDDING_MODEL=.*/EMBEDDING_MODEL="mock"/' .env
+          echo 'KB_BAKE_EMBEDDING_MODEL=false' >> .env
+          docker compose up -d --build --wait db redis
+          docker compose --profile migrate run --rm migrator
+          docker compose up -d --build api
+
+      - name: Backend is ready
+        run: |
+          for _ in $(seq 1 60); do
+            if body="$(curl -fsS http://localhost:8000/health/ready 2>/dev/null)"; then echo "$body"; exit 0; fi
+            sleep 3
+          done
+          echo "::error::the backend never became ready"
+          exit 1
+
+      - name: Install and start the dev server (from the example env)
+        run: |
+          cp .env.example .env
+          npm ci
+          nohup npm run dev -- --host 127.0.0.1 --port 5173 --strictPort > dev.log 2>&1 &
+          for _ in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:5173/ -o index.html 2>/dev/null; then break; fi
+            sleep 1
+          done
+          grep -q 'id="root"' index.html
+
+      - name: Authenticated call through the dev server's proxy
+        run: |
+          set -euo pipefail
+          token="$(curl -fsS -X POST http://127.0.0.1:5173/api/v1/auth/login \
+            --data-urlencode 'username=admin@qnsc.vn' --data-urlencode 'password=Admin123@' \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
+          curl -fsS -H "Authorization: Bearer $token" http://127.0.0.1:5173/api/v1/auth/me \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); print("signed in through the proxy as", d["email"], d["role"]); assert d["role"] == "Admin"'
+
+      - name: Logs (on failure)
+        if: failure()
+        run: |
+          cat dev.log || true
+          cd backend && docker compose ps -a && docker compose logs --no-color --tail=120
+
+      - name: Tear down
+        if: always()
+        working-directory: backend
+        run: docker compose down -v
+
   # ── The aggregate gate ──────────────────────────────────────────────────────
   # `Web CI required` is THE required check for this workflow. It exists because GitHub counts a
   # SKIPPED or CANCELLED required check as PASSING, so naming each job in the ruleset
@@ -135,7 +218,7 @@ jobs:
   ci-required:
     name: Web CI required
     if: always()
-    needs: [quality, test, build]
+    needs: [quality, test, build, quickstart]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
