@@ -125,9 +125,10 @@ jobs:
   # works through that proxy. Catches a broken proxy target, a base URL the dev server cannot reach, and drift
   # in the backend's published sign-in.
   #
-  # Depends on the backend repository's `main`: if its local quickstart is broken this job fails, which is the
-  # point (a frontend that cannot sign in locally is broken), but it is a cross-repository coupling and is named
-  # as one here.
+  # Depends on the backend repository's `main`, so it is deliberately NOT in `Web CI required`'s `needs`: a
+  # backend break must not block every frontend pull request. It still runs on every PR and shows red when the
+  # local run is broken (a frontend that cannot sign in locally IS broken), it just does not gate merging.
+  # Do not add it to the gate's `needs` without removing that cross-repository dependency first.
   quickstart:
     name: Local quickstart
     runs-on: ubuntu-latest
@@ -219,7 +220,7 @@ jobs:
   ci-required:
     name: Web CI required
     if: always()
-    needs: [quality, test, build, quickstart]
+    needs: [quality, test, build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
