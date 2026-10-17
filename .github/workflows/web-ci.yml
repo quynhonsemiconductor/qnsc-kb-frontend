@@ -184,11 +184,12 @@ jobs:
       - name: Authenticated call through the dev server's proxy
         run: |
           set -euo pipefail
-          token="$(curl -fsS -X POST http://127.0.0.1:5173/api/v1/auth/login \
-            --data-urlencode 'username=admin@qnsc.vn' --data-urlencode 'password=Admin123@' \
-            | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
-          curl -fsS -H "Authorization: Bearer $token" http://127.0.0.1:5173/api/v1/auth/me \
-            | python3 -c 'import json,sys; d=json.load(sys.stdin); print("signed in through the proxy as", d["email"], d["role"]); assert d["role"] == "Admin"'
+          # Responses go to files and are parsed from there (no `curl | interpreter` pipe, which Semgrep flags).
+          curl -fsS -X POST http://127.0.0.1:5173/api/v1/auth/login \
+            --data-urlencode 'username=admin@qnsc.vn' --data-urlencode 'password=Admin123@' -o login.json
+          token="$(python3 -c 'import json; print(json.load(open("login.json"))["access_token"])')"
+          curl -fsS -H "Authorization: Bearer $token" http://127.0.0.1:5173/api/v1/auth/me -o me.json
+          python3 -c 'import json; d=json.load(open("me.json")); print("signed in through the proxy as", d["email"], d["role"]); assert d["role"] == "Admin"'
 
       - name: Logs (on failure)
         if: failure()
