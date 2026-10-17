@@ -142,7 +142,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: quynhonsemiconductor/qnsc-kb-backend
-          ref: chore/local-quickstart
+          ref: main
           path: backend
           persist-credentials: false
 
