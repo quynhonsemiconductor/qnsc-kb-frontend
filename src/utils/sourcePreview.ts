@@ -12,6 +12,8 @@
  * browser's own viewer in its own process. The check is repeated client-side because these
  * viewers receive a `blob:` URL, and a blob URL carries no headers to enforce anything with.
  */
+import { isRenderableOffice, type OfficeKind } from './officePreview'
+
 export const INLINE_SOURCE_TYPES = [
   'application/pdf',
   'image/png',
@@ -31,7 +33,7 @@ export function canInlineSourceType(mimeType?: string | null): boolean {
   return !type || INLINE_SOURCE_TYPES.includes(type)
 }
 
-export type SourcePreviewMode = 'loading' | 'unavailable' | 'download' | 'image' | 'embed'
+export type SourcePreviewMode = 'loading' | 'unavailable' | 'download' | 'image' | 'embed' | 'office'
 
 /**
  * Resolve what the review pane should show, as one value instead of nested ternaries.
@@ -45,15 +47,22 @@ export function sourcePreviewMode({
   unavailable,
   url,
   mimeType,
+  officeKind,
 }: {
   loading?: boolean
   unavailable?: boolean
   url?: string | null
   mimeType?: string | null
+  /** What the file turned out to be, for formats the API does not serve inline. */
+  officeKind?: OfficeKind | null
 }): SourcePreviewMode {
   if (unavailable) return 'unavailable'
   if (loading || !url) return 'loading'
-  if (!canInlineSourceType(mimeType)) return 'download'
+  if (!canInlineSourceType(mimeType)) {
+    // A Word or Excel file is not shown by the browser itself, but the page can render it
+    // into a sandboxed frame. Anything else (including PowerPoint) is offered as a download.
+    return isRenderableOffice(officeKind) ? 'office' : 'download'
+  }
   return (mimeType || '').toLowerCase().startsWith('image/') ? 'image' : 'embed'
 }
 

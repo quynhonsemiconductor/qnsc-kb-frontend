@@ -27,7 +27,9 @@ import { Badge } from '../../components/ui/Badge'
 import { formatDay } from '../../lib/formatters'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 import { compareDraftManagementOrder, getDraftManagementStatus, getPreparationCompletion, getPublishBlockers, isPreparationQueueState } from '../../utils/draftManagement'
-import { sourceFileNameFromRef, sourcePreviewMode } from '../../utils/sourcePreview'
+import { canInlineSourceType, sourceFileNameFromRef, sourcePreviewMode } from '../../utils/sourcePreview'
+import { detectOfficeKind, isRenderableOffice, type OfficeKind } from '../../utils/officePreview'
+import OfficePreview from '../../components/review/OfficePreview'
 import PdfViewer from '../../components/ai/PdfViewer'
 
 
@@ -154,7 +156,7 @@ export default function PendingDraftsPage() {
   // available because a human still has to confirm the text that gets indexed and later
   // cited by RAG — the original is what the document IS, the Markdown is what search knows.
   const [reviewTab, setReviewTab] = useState<'file' | 'structured' | 'candidate' | 'extracted'>('file')
-  const [sourceFile, setSourceFile] = useState<{ url: string; type: string } | null>(null)
+  const [sourceFile, setSourceFile] = useState<{ url: string; type: string; blob?: Blob; officeKind?: OfficeKind | null } | null>(null)
   const [sourceLoading, setSourceLoading] = useState(false)
   const [sourceUnavailable, setSourceUnavailable] = useState(false)
   const [sourceMaximised, setSourceMaximised] = useState(false)
@@ -361,7 +363,7 @@ export default function PendingDraftsPage() {
       setReviewOpen(true)
       setDepartmentMenuOpen(false)
       setReviewTab('file')
-      void loadSourceFile(detail.id)
+      void loadSourceFile(detail.id, detail.source_ref)
       setShowComparison(opensAsUpdate)
       setShowTechnicalDetails(false)
       setUpdateArticleId(detail.content_metadata?.suggested_update_article_id || '')
@@ -402,14 +404,18 @@ export default function PendingDraftsPage() {
     setSourceFile(null)
   }
 
-  const loadSourceFile = async (draftId: string) => {
+  const loadSourceFile = async (draftId: string, sourceRef?: string | null) => {
     releaseSourceFile()
     setSourceUnavailable(false)
     setSourceLoading(true)
     try {
-      const { url, type } = await downloadPendingDraftSource(draftId)
+      const { url, type, blob } = await downloadPendingDraftSource(draftId)
       sourceUrlRef.current = url
-      setSourceFile({ url, type })
+      // Only a format the browser will not show itself needs to be identified. Word and
+      // Excel are then rendered by the page; anything else (PowerPoint included) is offered
+      // as a download.
+      const officeKind = canInlineSourceType(type) ? null : await detectOfficeKind(blob, sourceFileNameFromRef(sourceRef))
+      setSourceFile({ url, type, blob, officeKind })
     } catch {
       setSourceUnavailable(true)
     } finally {
@@ -691,6 +697,7 @@ export default function PendingDraftsPage() {
       unavailable: sourceUnavailable,
       url: sourceFile?.url,
       mimeType: sourceFile?.type,
+      officeKind: sourceFile?.officeKind,
     })
 
     if (mode === 'unavailable') {
@@ -699,7 +706,10 @@ export default function PendingDraftsPage() {
     if (mode === 'loading') {
       return <div role="status" className="grid h-full place-items-center text-body-sm text-muted-foreground"><span className="flex items-center gap-2"><RefreshCw size={15} className="animate-spin" />{t('drafts.loadingSourceFile')}</span></div>
     }
-    if (mode === 'download') {
+    if (mode === 'office' && sourceFile?.blob && isRenderableOffice(sourceFile.officeKind)) {
+      return <OfficePreview blob={sourceFile.blob} kind={sourceFile.officeKind} fileName={fileName} />
+    }
+    if (mode === 'download' || mode === 'office') {
       return <div className="grid h-full place-items-center px-6 text-center"><div className="max-w-sm space-y-3"><FileWarning size={22} className="mx-auto text-muted" /><p className="text-body font-semibold text-foreground">{t('drafts.sourceFileNotPreviewable')}</p><p className="text-body-sm leading-5 text-muted-foreground">{t('drafts.sourceFileNotPreviewableHelp')}</p><a href={sourceFile!.url} download={fileName} className="inline-flex min-h-10 items-center gap-2 rounded-control bg-primary px-4 text-body-sm font-bold text-primary-foreground no-underline"><Download size={14} />{t('drafts.downloadSourceFile')}</a></div></div>
     }
     if (mode === 'image') {
@@ -798,7 +808,7 @@ export default function PendingDraftsPage() {
             <div className="flex shrink-0 flex-col gap-2 border-b border-border px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <p className="text-caption font-semibold uppercase tracking-widest text-primary-text">{t('drafts.incomingDocument')}</p>
               <div className="flex items-center gap-2">
-                {reviewTab === 'file' && sourceFile && <Button variant="ghost" size="sm" onClick={() => setSourceMaximised(true)} icon={<Maximize2 size={13} />}>{t('drafts.expandFile')}</Button>}
+                {reviewTab === 'file' && sourceFile && !isRenderableOffice(sourceFile.officeKind) && <Button variant="ghost" size="sm" onClick={() => setSourceMaximised(true)} icon={<Maximize2 size={13} />}>{t('drafts.expandFile')}</Button>}
                 <div className="flex overflow-x-auto rounded-lg border border-border bg-surface p-0.5"><button type="button" onClick={() => setReviewTab('file')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'file' ? 'bg-primary/10 text-primary-text' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.originalFile')}</button><button type="button" onClick={() => setReviewTab('structured')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'structured' ? 'bg-primary/10 text-primary-text' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.readingView')}</button>{selectedDraft.restructure_candidate_md && <button type="button" onClick={() => setReviewTab('candidate')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'candidate' ? 'bg-warning/10 text-warning-text' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.preparedVersion')}</button>}<button type="button" onClick={() => setReviewTab('extracted')} className={`shrink-0 rounded-md px-2.5 py-1 text-body-sm font-semibold ${reviewTab === 'extracted' ? 'bg-surface-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{t('drafts.extractedText')}</button></div>
               </div>
             </div>
