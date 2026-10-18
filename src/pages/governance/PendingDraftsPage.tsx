@@ -8,7 +8,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useNavigate } from 'react-router-dom'
 import {
-  approveDraft, assignDraftApprover, bulkDecideDrafts, decideRestructure, downloadPendingDraftSource, getDraftComparison, getEligibleApprovers, getPendingDraft, getPendingDrafts, rejectDraft, restructureDraft,
+  approveDraft, assignDraftApprover, bulkDecideDrafts, decideRestructure, downloadPendingDraftSource, getDraftComparison, getEligibleApprovers, getPendingDraft, getPendingDraftsPage, rejectDraft, restructureDraft,
   type BulkDecideResult,
 } from '../../api/governance'
 import { listDepartments } from '../../api/auth'
@@ -28,6 +28,7 @@ import { formatDay } from '../../lib/formatters'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 import { compareDraftManagementOrder, getDraftManagementStatus, getPreparationCompletion, getPublishBlockers, isPreparationQueueState } from '../../utils/draftManagement'
 import { sourceFileNameFromRef, sourcePreviewMode } from '../../utils/sourcePreview'
+import { QUEUE_PAGE_SIZE, appendPage, formatQueueCount, hasMore, refreshFirstPage } from '../../utils/draftQueue'
 import PdfViewer from '../../components/ai/PdfViewer'
 
 
@@ -138,6 +139,12 @@ export default function PendingDraftsPage() {
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
+  // What the server is actually asked to match: `query` after the reviewer stops typing.
+  const [searchTerm, setSearchTerm] = useState('')
+  // The server's total for the current search, or null when it did not report one (an API
+  // that predates paging). With null the page behaves as it always did.
+  const [total, setTotal] = useState<number | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [actingDraftId, setActingDraftId] = useState<string | null>(null)
   const [restructuringDraftId, setRestructuringDraftId] = useState<string | null>(null)
   const [reviewLoadingId, setReviewLoadingId] = useState<string | null>(null)
@@ -178,6 +185,12 @@ export default function PendingDraftsPage() {
   const [bulkResult, setBulkResult] = useState<(BulkDecideResult & { titles: Record<string, string> }) | null>(null)
   const [focusedDraftId, setFocusedDraftId] = useState<string | null>(null)
   const previousDrafts = useRef<Draft[] | null>(null)
+  // The list as currently shown, for merging pages into. NOT `previousDrafts`: that is only
+  // refreshed by a fetch, while approving, rejecting, assigning and restructuring change
+  // `drafts` directly. Merging into the stale copy would bring a draft that was just
+  // approved back onto the screen.
+  const draftsRef = useRef<Draft[]>([])
+  useEffect(() => { draftsRef.current = drafts }, [drafts])
   const { t } = useLanguage()
   const dialog = useDialog()
   const navigate = useNavigate()
@@ -189,10 +202,31 @@ export default function PendingDraftsPage() {
     [departments, user?.company_domain],
   )
 
-  const fetchDrafts = async (showLoading = true) => {
+  // Responses can arrive out of order (typing quickly, or a poll overtaking a reload). Only
+  // the most recent request may update the screen; an older one would put back a list the
+  // reviewer has already searched away from.
+  const fetchSeq = useRef(0)
+
+  /**
+   * `reload` replaces the list with the first page (initial load, a new search, Refresh,
+   * after a bulk decision: anything where rows may have LEFT the queue). `poll` is the
+   * background refresh while documents are being prepared: it re-reads only the first page,
+   * where those documents are, and keeps whatever the reviewer loaded further down.
+   */
+  const fetchDrafts = async (showLoading = true, mode: 'reload' | 'poll' = 'reload') => {
+    const seq = ++fetchSeq.current
     if (showLoading) setLoading(true)
     try {
-      const nextDrafts: Draft[] = await getPendingDrafts('pending')
+      const page = await getPendingDraftsPage<Draft>({
+        status: 'pending',
+        limit: QUEUE_PAGE_SIZE,
+        search: searchTerm || undefined,
+      })
+      if (seq !== fetchSeq.current) return
+      const nextDrafts: Draft[] = mode === 'poll'
+        ? refreshFirstPage(draftsRef.current, page.items)
+        : page.items
+      setTotal(page.total)
       const completion = previousDrafts.current
         ? getPreparationCompletion(previousDrafts.current, nextDrafts, managementContext)
         : null
@@ -211,13 +245,49 @@ export default function PendingDraftsPage() {
         return metadata ? { ...current, ...metadata } : current
       })
       setError('')
-    } catch { setError('Could not load the review queue.') } finally {
-      if (showLoading) setLoading(false)
+    } catch {
+      if (seq === fetchSeq.current) setError('Could not load the review queue.')
+    } finally {
+      if (showLoading && seq === fetchSeq.current) setLoading(false)
     }
   }
 
+  /** Fetch the next page of the same search and add it below what is shown. */
+  const loadMore = async () => {
+    if (loadingMore || !hasMore(drafts.length, total)) return
+    const seq = fetchSeq.current
+    setLoadingMore(true)
+    try {
+      const page = await getPendingDraftsPage<Draft>({
+        status: 'pending',
+        limit: QUEUE_PAGE_SIZE,
+        offset: drafts.length,
+        search: searchTerm || undefined,
+      })
+      // A reload or a new search started meanwhile: this page belongs to a list that is gone.
+      if (seq !== fetchSeq.current) return
+      const merged = appendPage(draftsRef.current, page.items)
+      previousDrafts.current = merged
+      setDrafts(merged)
+      setTotal(page.total)
+      setError('')
+    } catch { setError(t('drafts.loadMoreFailed')) } finally { setLoadingMore(false) }
+  }
+
   useEffect(() => {
+    const timer = window.setTimeout(() => setSearchTerm(query.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
+
+  // Loads the queue on mount and again whenever the (debounced) search changes. A different
+  // search is a different list, so the old one is not compared with it when looking for
+  // documents that have finished preparing.
+  useEffect(() => {
+    previousDrafts.current = null
     void fetchDrafts()
+  }, [searchTerm])
+
+  useEffect(() => {
     void listDepartments().then(setDepartments).catch(() => setDepartments([]))
   }, [])
 
@@ -226,7 +296,7 @@ export default function PendingDraftsPage() {
     [drafts],
   )
 
-  usePolling(() => fetchDrafts(false), 4000, hasRestructureInFlight)
+  usePolling(() => fetchDrafts(false, 'poll'), 4000, hasRestructureInFlight)
 
   useEffect(() => {
     if (reviewOpen && selectedDraft && !docDepartmentIds.length && visibleDepartments.length) {
@@ -241,8 +311,11 @@ export default function PendingDraftsPage() {
   const statusById = useMemo(() => new Map(
     drafts.map(draft => [draft.id, getDraftManagementStatus(draft, managementContext)]),
   ), [drafts, managementContext])
+  // More drafts on the server than are loaded. The first tab can then state the real total,
+  // but the others are counted from loaded rows only, so they are shown as lower bounds.
+  const partial = hasMore(drafts.length, total)
   const queueCounts = useMemo(() => {
-    const counts = { all: drafts.length, ready: 0, decision: 0, processing: 0 }
+    const counts = { all: total ?? drafts.length, ready: 0, decision: 0, processing: 0 }
     for (const draft of drafts) {
       const state = statusById.get(draft.id)?.state
       if (state === 'ready') counts.ready += 1
@@ -250,17 +323,21 @@ export default function PendingDraftsPage() {
       else counts.decision += 1
     }
     return counts
-  }, [drafts, statusById])
+  }, [drafts, statusById, total])
   const filteredDrafts = useMemo(() => drafts.filter((draft) => {
     const haystack = `${draft.title} ${draft.source_ref} ${draft.dept || ''} ${draft.summary || ''}`.toLowerCase()
-    const matchesSearch = !query.trim() || haystack.includes(query.trim().toLowerCase())
+    // When the server reported a total it has already searched, ignoring case AND accents.
+    // Searching again here would hide rows it matched ("quy trinh" finds "Quy trình" there
+    // but not in a plain `includes`). Only an API that predates paging leaves this to the
+    // browser, as it always was.
+    const matchesSearch = total !== null || !query.trim() || haystack.includes(query.trim().toLowerCase())
     const state = statusById.get(draft.id)?.state
     const matchesFilter = queueFilter === 'all'
       || (queueFilter === 'ready' && state === 'ready')
       || (queueFilter === 'processing' && isPreparationQueueState(state))
       || (queueFilter === 'decision' && state !== 'ready' && !isPreparationQueueState(state))
     return matchesSearch && matchesFilter
-  }).sort(compareDraftManagementOrder), [drafts, query, queueFilter, statusById])
+  }).sort(compareDraftManagementOrder), [drafts, query, queueFilter, statusById, total])
   const eligibleVisibleDrafts = useMemo(
     () => filteredDrafts.filter(draft => statusById.get(draft.id)?.bulkEligible),
     [filteredDrafts, statusById],
@@ -457,6 +534,8 @@ export default function PendingDraftsPage() {
     try {
       await approveDraft(selectedDraft.id, docDept, docDepartmentIds, updateArticleId || undefined, treatAsNew)
       setDrafts(current => current.filter(draft => draft.id !== selectedDraft.id))
+      // The server's total still counts it until the next fetch; keep the first tab honest.
+      setTotal(current => current === null ? current : Math.max(0, current - 1))
       setMessage(`Published ${selectedDraft.title}.`)
       closeReview()
     } catch (requestError: any) {
@@ -516,6 +595,7 @@ export default function PendingDraftsPage() {
     try {
       await rejectDraft(draftId, reviewNote)
       setDrafts(current => current.filter(draft => draft.id !== draftId))
+      setTotal(current => current === null ? current : Math.max(0, current - 1))
       setMessage('Draft rejected. The original source remains stored.')
       closeReview()
     } catch { await dialog.alert(t('drafts.rejectionFailed'), { title: t('drafts.rejectionFailedTitle') }) } finally { setActingDraftId(null) }
@@ -731,7 +811,7 @@ export default function PendingDraftsPage() {
               ['ready', 'drafts.filterReady'],
               ['decision', 'drafts.filterDecision'],
               ['processing', 'drafts.filterProcessing'],
-            ] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={queueFilter === key} onClick={() => { setQueueFilter(key); clearSelection() }} className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-body-sm font-semibold transition ${queueFilter === key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-surface-muted hover:text-foreground'}`}><span>{t(label)}</span><span className={`rounded-md px-1.5 py-0.5 font-mono text-caption ${queueFilter === key ? 'bg-primary-foreground/15' : 'bg-surface-muted'}`}>{queueCounts[key]}</span></button>)}
+            ] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={queueFilter === key} onClick={() => { setQueueFilter(key); clearSelection() }} className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-body-sm font-semibold transition ${queueFilter === key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-surface-muted hover:text-foreground'}`}><span>{t(label)}</span><span className={`rounded-md px-1.5 py-0.5 font-mono text-caption ${queueFilter === key ? 'bg-primary-foreground/15' : 'bg-surface-muted'}`}>{formatQueueCount(queueCounts[key], partial && key !== 'all')}</span></button>)}
           </div>
           <div className="min-w-0 flex-1 xl:max-w-md"><Input value={query} onChange={event => { setQuery(event.target.value); clearSelection() }} placeholder={t('drafts.searchPlaceholder')} leftIcon={<Search size={15} />} /></div>
         </div>
@@ -752,7 +832,7 @@ export default function PendingDraftsPage() {
       </section>}
 
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <div><h2 className="text-body font-bold text-foreground">{t('drafts.queueHeading', { count: filteredDrafts.length })}</h2><p className="mt-0.5 text-body-sm text-muted-foreground">{t('drafts.queueHelp')}</p></div>
+        <div><h2 className="text-body font-bold text-foreground">{t('drafts.queueHeading', { count: filteredDrafts.length })}</h2><p className="mt-0.5 text-body-sm text-muted-foreground">{t('drafts.queueHelp')}</p>{partial && total !== null && <p className="mt-0.5 text-body-sm font-semibold text-warning-text" role="status">{t('drafts.showingOf', { shown: drafts.length, total })}</p>}</div>
         {eligibleVisibleDrafts.length > 0 && <label className="inline-flex cursor-pointer items-center gap-2 text-body-sm font-semibold text-muted-foreground"><input type="checkbox" className="sr-only" checked={allVisibleSelected} onChange={toggleAllVisible} /><span className={`grid h-4 w-4 place-items-center rounded border ${allVisibleSelected || someVisibleSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-input'}`}>{allVisibleSelected ? <Check size={11} strokeWidth={3} /> : someVisibleSelected ? <Minus size={11} strokeWidth={3} /> : null}</span>{t('drafts.selectReady', { count: eligibleVisibleDrafts.length })}</label>}
       </div>
 
@@ -778,6 +858,12 @@ export default function PendingDraftsPage() {
           <div className="flex flex-wrap items-center gap-2 lg:justify-end"><Button variant="primary" size="sm" onClick={() => status.action === 'retry' ? void handleRestructure(draft) : void openReview(draft)} disabled={status.action === 'wait' || reviewLoadingId === draft.id || restructuringDraftId === draft.id} loading={reviewLoadingId === draft.id || restructuringDraftId === draft.id} icon={status.action === 'retry' ? <RefreshCw size={14} /> : status.action === 'review_sections' ? <Layers3 size={14} /> : status.action === 'wait' ? <RefreshCw size={14} className="animate-spin" /> : <Eye size={14} />}>{actionLabel}</Button>{status.action !== 'wait' && status.action !== 'retry' && <Button variant="ghost" size="sm" onClick={() => void handleReject(draft.id)} disabled={actingDraftId === draft.id}>{t('drafts.reject')}</Button>}{status.action !== 'retry' && canRetryAiFormat(draft) && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(draft)} disabled={restructuringDraftId === draft.id} aria-label={t('drafts.retryPreparation')} icon={<RefreshCw size={13} />} />}</div>
         </article>
       })}</div>}
+
+      {!loading && partial && total !== null && <div className="flex justify-center px-1 pb-2">
+        <Button variant="secondary" size="sm" onClick={() => void loadMore()} disabled={loadingMore} icon={<RefreshCw size={14} className={loadingMore ? 'animate-spin' : undefined} />}>
+          {loadingMore ? t('drafts.loadingMore') : t('drafts.loadMore', { count: Math.min(QUEUE_PAGE_SIZE, total - drafts.length) })}
+        </Button>
+      </div>}
 
       {reviewOpen && selectedDraft &&<div className="fixed inset-0 z-modal bg-scrim/30 p-0 backdrop-blur-[2px] sm:p-3" role="dialog" aria-modal="true" aria-labelledby={reviewTitleId}><FocusTrap className="contents"><section className="mx-auto flex h-full max-w-[100rem] flex-col overflow-hidden border border-border bg-canvas shadow-modal sm:rounded-panel">
         <header className="shrink-0 border-b border-border bg-surface px-4 py-3 sm:px-6">

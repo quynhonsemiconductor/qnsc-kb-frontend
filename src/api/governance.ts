@@ -1,5 +1,6 @@
 import client from './client'
 import { invalidateAsyncResource } from '../hooks/useAsyncResource'
+import { parseTotalCount } from '../utils/draftQueue'
 
 function invalidatePublishedKnowledge() {
   invalidateAsyncResource('home-')
@@ -43,6 +44,30 @@ export async function uploadSources(files: File[], tagsByFile: string[][] = [], 
 export async function getPendingDrafts(status?: string) {
   const response = await client.get('/governance/pending-drafts', { params: { status } })
   return response.data
+}
+
+/**
+ * One page of the review queue, with the server's real total.
+ *
+ * The body is still a bare array; the total travels in `X-Total-Count` (axios lower-cases
+ * header names). `total` is null when the header is absent, which is how an API that
+ * predates paging looks: it ignores `limit`, `offset` and `search` and returns up to 500
+ * rows, and callers then fall back to filtering what they have, as they always did.
+ *
+ * `search` is matched by the server (title, source reference, department; case and accent
+ * insensitive) against the WHOLE queue, not just the rows already loaded.
+ */
+export async function getPendingDraftsPage<T = unknown>(params: {
+  status?: string
+  limit?: number
+  offset?: number
+  search?: string
+}): Promise<{ items: T[]; total: number | null }> {
+  const response = await client.get('/governance/pending-drafts', { params })
+  return {
+    items: response.data as T[],
+    total: parseTotalCount(response.headers?.['x-total-count']),
+  }
 }
 
 export async function getPendingDraft(id: string, includeContent = true) {
