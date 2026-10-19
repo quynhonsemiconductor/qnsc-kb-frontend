@@ -49,6 +49,29 @@ describe('source preview mode', () => {
     expect(sourcePreviewMode({ url: 'blob:x', mimeType: 'image/svg+xml' })).toBe('download')
   })
 
+  it('renders a Word or Excel file in the page, because the browser will not show it itself', () => {
+    const octet = 'application/octet-stream'
+    expect(sourcePreviewMode({ url: 'blob:x', mimeType: octet, officeKind: 'docx' })).toBe('office')
+    expect(sourcePreviewMode({ url: 'blob:x', mimeType: octet, officeKind: 'xlsx' })).toBe('office')
+  })
+
+  it('renders PowerPoint, TIFF and BMP in the page too', () => {
+    const octet = 'application/octet-stream'
+    for (const officeKind of ['pptx', 'tiff', 'bmp'] as const) {
+      expect(sourcePreviewMode({ url: 'blob:x', mimeType: octet, officeKind })).toBe('office')
+    }
+  })
+
+  it('still offers anything unidentified as a download', () => {
+    const octet = 'application/octet-stream'
+    expect(sourcePreviewMode({ url: 'blob:x', mimeType: octet, officeKind: null })).toBe('download')
+    expect(sourcePreviewMode({ url: 'blob:x', mimeType: octet })).toBe('download')
+  })
+
+  it('lets the API-approved inline types win over a detected Office kind', () => {
+    expect(sourcePreviewMode({ url: 'blob:x', mimeType: 'application/pdf', officeKind: 'docx' })).toBe('embed')
+  })
+
   it('renders images as images and everything else inline-safe as an embed', () => {
     expect(sourcePreviewMode({ url: 'blob:x', mimeType: 'image/png' })).toBe('image')
     expect(sourcePreviewMode({ url: 'blob:x', mimeType: 'image/jpeg' })).toBe('image')
