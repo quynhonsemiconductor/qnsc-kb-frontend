@@ -55,10 +55,15 @@ describe('source preview mode', () => {
     expect(sourcePreviewMode({ url: 'blob:x', mimeType: octet, officeKind: 'xlsx' })).toBe('office')
   })
 
-  it('still offers PowerPoint, and anything unidentified, as a download', () => {
+  it('renders PowerPoint, TIFF and BMP in the page too', () => {
     const octet = 'application/octet-stream'
-    // No safe renderer exists for it.
-    expect(sourcePreviewMode({ url: 'blob:x', mimeType: octet, officeKind: 'pptx' })).toBe('download')
+    for (const officeKind of ['pptx', 'tiff', 'bmp'] as const) {
+      expect(sourcePreviewMode({ url: 'blob:x', mimeType: octet, officeKind })).toBe('office')
+    }
+  })
+
+  it('still offers anything unidentified as a download', () => {
+    const octet = 'application/octet-stream'
     expect(sourcePreviewMode({ url: 'blob:x', mimeType: octet, officeKind: null })).toBe('download')
     expect(sourcePreviewMode({ url: 'blob:x', mimeType: octet })).toBe('download')
   })

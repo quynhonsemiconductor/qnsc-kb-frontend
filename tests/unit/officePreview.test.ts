@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   PREVIEW_CSP,
+  ROWS_PER_PAGE,
   detectOfficeKind,
   escapeHtml,
   formatCell,
   isRenderableOffice,
   officeKindFromName,
   previewDocument,
-  sheetsToHtml,
+  sheetPageCount,
+  sheetPageHtml,
   sniffOfficeKind,
+  toBase64,
   type SheetLabels,
 } from '../../src/utils/officePreview'
 
@@ -20,10 +23,12 @@ const zipLike = (entryName: string, filler = 64) =>
   new Uint8Array([...ZIP_MAGIC, ...new Array(filler).fill(7), ...ascii(entryName), ...new Array(22).fill(0)])
 
 const labels: SheetLabels = {
-  truncatedRows: (shown, total) => `first ${shown} of ${total} rows`,
   truncatedColumns: (shown, total) => `first ${shown} of ${total} columns`,
   emptySheet: 'empty sheet',
 }
+
+const grid = (rows: number, columns: number) =>
+  Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, column) => `r${row + 1}c${column + 1}`))
 
 describe('officeKindFromName', () => {
   it('reads the format from the extension, ignoring case and stray whitespace', () => {
@@ -38,26 +43,32 @@ describe('officeKindFromName', () => {
     expect(officeKindFromName('macros.xlsm')).toBe('xlsx')
   })
 
+  it('recognises the two picture formats a browser does not show', () => {
+    expect(officeKindFromName('scan.tif')).toBe('tiff')
+    expect(officeKindFromName('scan.TIFF')).toBe('tiff')
+    expect(officeKindFromName('logo.bmp')).toBe('bmp')
+  })
+
   it('returns null when the name says nothing usable', () => {
-    for (const name of ['guide.pdf', 'file-1', 'archive.docx.exe', '', undefined, null, 'old.doc', 'old.xls']) {
+    for (const name of ['guide.pdf', 'file-1', 'archive.docx.exe', '', undefined, null, 'old.doc', 'old.xls', 'photo.png']) {
       expect(officeKindFromName(name)).toBeNull()
     }
   })
 })
 
 describe('isRenderableOffice', () => {
-  it('renders Word and Excel, and not PowerPoint', () => {
-    expect(isRenderableOffice('docx')).toBe(true)
-    expect(isRenderableOffice('xlsx')).toBe(true)
-    // There is no safe, maintained renderer for it; it stays a download.
-    expect(isRenderableOffice('pptx')).toBe(false)
+  it('draws every kind it recognises', () => {
+    for (const kind of ['docx', 'xlsx', 'pptx', 'tiff', 'bmp'] as const) expect(isRenderableOffice(kind)).toBe(true)
+  })
+
+  it('draws nothing for an unknown file', () => {
     expect(isRenderableOffice(null)).toBe(false)
     expect(isRenderableOffice(undefined)).toBe(false)
   })
 })
 
 describe('sniffOfficeKind', () => {
-  it('tells the three formats apart by the one entry each has', () => {
+  it('tells the three Office formats apart by the one entry each has', () => {
     expect(sniffOfficeKind(zipLike('word/document.xml'))).toBe('docx')
     expect(sniffOfficeKind(zipLike('xl/workbook.xml'))).toBe('xlsx')
     expect(sniffOfficeKind(zipLike('ppt/presentation.xml'))).toBe('pptx')
@@ -86,6 +97,22 @@ describe('sniffOfficeKind', () => {
     atStartOnly.set(ascii('xl/workbook.xml'), 100)
     expect(sniffOfficeKind(atStartOnly)).toBeNull()
   })
+
+  it('recognises a TIFF by either byte order', () => {
+    expect(sniffOfficeKind(new Uint8Array([0x49, 0x49, 0x2a, 0x00, 8, 0, 0, 0]))).toBe('tiff')
+    expect(sniffOfficeKind(new Uint8Array([0x4d, 0x4d, 0x00, 0x2a, 0, 0, 0, 8]))).toBe('tiff')
+  })
+
+  it('recognises a BMP by its signature and its zeroed reserved fields', () => {
+    const header = new Uint8Array(14)
+    header.set([0x42, 0x4d], 0)
+    expect(sniffOfficeKind(header)).toBe('bmp')
+  })
+
+  it('does not take a text file that merely begins with "BM" for a BMP', () => {
+    expect(sniffOfficeKind(new Uint8Array(ascii('BM25 report: quarterly numbers')))).toBeNull()
+    expect(sniffOfficeKind(new Uint8Array(ascii('BM')))).toBeNull()
+  })
 })
 
 describe('detectOfficeKind', () => {
@@ -99,10 +126,26 @@ describe('detectOfficeKind', () => {
     const workbook = new Blob([zipLike('xl/workbook.xml')])
     expect(await detectOfficeKind(workbook, 'item-id')).toBe('xlsx')
     expect(await detectOfficeKind(workbook, null)).toBe('xlsx')
+    expect(await detectOfficeKind(new Blob([zipLike('ppt/presentation.xml')]), 'item-id')).toBe('pptx')
+    expect(await detectOfficeKind(new Blob([new Uint8Array([0x49, 0x49, 0x2a, 0x00, 1, 2, 3, 4])]), 'item-id')).toBe('tiff')
   })
 
-  it('reports nothing for content that is not an Office file', async () => {
+  it('reports nothing for content that is not one of them', async () => {
     expect(await detectOfficeKind(new Blob(['plain text']), 'item-id')).toBeNull()
+  })
+})
+
+describe('toBase64', () => {
+  it('encodes bytes the way btoa does', () => {
+    expect(toBase64(new Uint8Array(ascii('hello')))).toBe('aGVsbG8=')
+    expect(toBase64(new Uint8Array())).toBe('')
+  })
+
+  it('handles a buffer larger than one call can take', () => {
+    // 0x8000 is the chunk size; this is several chunks and a remainder.
+    const bytes = new Uint8Array(0x8000 * 3 + 17).map((_, index) => index % 251)
+    const decoded = Uint8Array.from(atob(toBase64(bytes)), char => char.charCodeAt(0))
+    expect(decoded).toEqual(bytes)
   })
 })
 
@@ -157,28 +200,61 @@ describe('formatCell', () => {
   })
 })
 
-describe('sheetsToHtml', () => {
-  it('draws a heading and a table per sheet, with row numbers', () => {
-    const html = sheetsToHtml(
-      [
-        { sheet: 'Doanh thu', data: [['Quý', 'Tiền'], ['Q1', 100]] },
-        { sheet: 'Chi phí', data: [['A']] },
-      ],
-      labels,
-    )
+describe('sheetPageCount', () => {
+  it('has a page for every started block of rows, and at least one', () => {
+    expect(sheetPageCount(0)).toBe(1)
+    expect(sheetPageCount(1)).toBe(1)
+    expect(sheetPageCount(ROWS_PER_PAGE)).toBe(1)
+    expect(sheetPageCount(ROWS_PER_PAGE + 1)).toBe(2)
+    expect(sheetPageCount(1500)).toBe(3)
+    expect(sheetPageCount(1500, 100)).toBe(15)
+  })
+})
 
-    expect(html).toContain('<h2>Doanh thu</h2>')
-    expect(html).toContain('<h2>Chi phí</h2>')
+describe('sheetPageHtml', () => {
+  it('draws a table with row numbers as in the spreadsheet', () => {
+    const html = sheetPageHtml({ sheet: 'S', data: [['Quý', 'Tiền'], ['Q1', 100]] }, 0, labels)
+
     expect(html).toContain('<th scope="row">1</th><td>Quý</td><td>Tiền</td>')
     expect(html).toContain('<th scope="row">2</th><td>Q1</td><td>100</td>')
   })
 
-  it('never lets cell text or a sheet name become markup', () => {
+  it('reaches EVERY row, page by page, with no row lost or repeated', () => {
+    // The reason this is paged and not capped: a reviewer must be able to read all of it.
+    const data = grid(1203, 2)
+    const seen: string[] = []
+    for (let page = 0; page < sheetPageCount(data.length); page += 1) {
+      const html = sheetPageHtml({ sheet: 'Big', data }, page, labels)
+      for (const match of html.matchAll(/<th scope="row">(\d+)<\/th>/g)) seen.push(match[1])
+    }
+    expect(seen).toHaveLength(1203)
+    expect(new Set(seen).size).toBe(1203)
+    expect(seen[0]).toBe('1')
+    expect(seen[seen.length - 1]).toBe('1203')
+  })
+
+  it('numbers the rows of a later page from where the previous one stopped', () => {
+    const data = grid(12, 1)
+    const html = sheetPageHtml({ sheet: 'S', data }, 1, labels, { rows: 5 })
+
+    expect(html).toContain('<th scope="row">6</th><td>r6c1</td>')
+    expect(html).toContain('<th scope="row">10</th><td>r10c1</td>')
+    expect(html).not.toContain('r5c1')
+    expect(html).not.toContain('r11c1')
+  })
+
+  it('treats a page past the end as the last page', () => {
+    const html = sheetPageHtml({ sheet: 'S', data: grid(7, 1) }, 99, labels, { rows: 5 })
+    expect(html).toContain('r7c1')
+    expect(html).not.toContain('r1c1')
+  })
+
+  it('never lets cell text become markup', () => {
     // The document is an untrusted upload, so this is the point of the whole function.
     const payload = '<img src=x onerror=alert(1)><script>alert(2)</script>'
-    const html = sheetsToHtml([{ sheet: `<b>${payload}</b>`, data: [[payload, '" onmouseover="alert(3)']] }], labels)
+    const html = sheetPageHtml({ sheet: 'S', data: [[payload, '" onmouseover="alert(3)']] }, 0, labels)
 
-    expect(html).not.toMatch(/<(?!\/?(section|h2|p|div|table|tbody|tr|th|td)[\s>])/i)
+    expect(html).not.toMatch(/<(?!\/?(p|div|table|tbody|tr|th|td)[\s>])/i)
     expect(html).not.toContain('<img')
     expect(html).not.toContain('<script')
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
@@ -186,30 +262,28 @@ describe('sheetsToHtml', () => {
   })
 
   it('pads a short row so every row has the same number of cells', () => {
-    const html = sheetsToHtml([{ sheet: 'S', data: [['a', 'b', 'c'], ['x']] }], labels)
+    const html = sheetPageHtml({ sheet: 'S', data: [['a', 'b', 'c'], ['x']] }, 0, labels)
     expect(html).toContain('<th scope="row">2</th><td>x</td><td></td><td></td>')
   })
 
-  it('says so when it shows only part of a sheet, rather than truncating silently', () => {
-    const data = Array.from({ length: 12 }, (_, row) => Array.from({ length: 8 }, (_, col) => `r${row}c${col}`))
-    const html = sheetsToHtml([{ sheet: 'Big', data }], labels, { rows: 5, columns: 3 })
+  it('says so when it shows only some of the columns', () => {
+    const html = sheetPageHtml({ sheet: 'Wide', data: grid(2, 8) }, 0, labels, { columns: 3 })
 
-    expect(html).toContain('first 5 of 12 rows')
     expect(html).toContain('first 3 of 8 columns')
-    expect(html.match(/<tr>/g)).toHaveLength(5)
-    expect(html).not.toContain('r5c0')
-    expect(html).not.toContain('r0c3')
+    expect(html).toContain('r1c3')
+    expect(html).not.toContain('r1c4')
   })
 
   it('adds no note when everything fits', () => {
-    const html = sheetsToHtml([{ sheet: 'Small', data: [['a', 'b']] }], labels)
-    expect(html).not.toContain('class="note"')
+    expect(sheetPageHtml({ sheet: 'Small', data: [['a', 'b']] }, 0, labels)).not.toContain('class="note"')
   })
 
   it('marks an empty sheet instead of drawing an empty table', () => {
-    const html = sheetsToHtml([{ sheet: 'Nothing', data: [] }, { sheet: 'Blank', data: [[]] }], labels)
-    expect(html.match(/empty sheet/g)).toHaveLength(2)
-    expect(html).not.toContain('<table>')
+    for (const data of [[], [[]]]) {
+      const html = sheetPageHtml({ sheet: 'Nothing', data }, 0, labels)
+      expect(html).toContain('empty sheet')
+      expect(html).not.toContain('<table>')
+    }
   })
 })
 
