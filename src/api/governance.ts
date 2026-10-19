@@ -92,7 +92,7 @@ export async function downloadPendingDraftSource(id: string, page?: number) {
     ...(page ? { params: { page } } : {}),
   })
   const type = String(response.data?.type || response.headers?.['content-type'] || '').split(';')[0].trim()
-  return { url: URL.createObjectURL(response.data), type }
+  return { url: URL.createObjectURL(response.data), type, blob: response.data as Blob }
 }
 
 export async function approveDraft(id: string, dept: string, departmentIds: string[] = [], updateArticleId?: string, treatAsNew = false) {
