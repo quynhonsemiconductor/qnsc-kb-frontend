@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -6,6 +6,11 @@ import { readFile, writeFile } from 'node:fs/promises'
 // Captured in `configResolved` so the CSP plugin below can read them in `closeBundle`.
 let apiBaseUrl: string | undefined
 let outDir = 'dist'
+
+// The dev server's own settings come from `.env` too. Vite puts `.env` into `import.meta.env` only for VITE_-prefixed
+// keys, and these must stay unprefixed (a VITE_ value ships in the browser bundle), so they are read here, with the
+// process environment winning as usual.
+const dotenv = { ...loadEnv('', process.cwd(), ''), ...process.env }
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -70,9 +75,13 @@ export default defineConfig({
     setupFiles: ['./tests/setup-timezone.ts'],
   },
   server: {
+    // Pinned, and a taken port fails the start instead of moving: the backend's CORS_ORIGINS and the sign-in cookie
+    // are set for this origin. A second copy of the stack sets FRONTEND_DEV_PORT (see README "Run a second copy").
+    port: Number(dotenv.FRONTEND_DEV_PORT) || 5173,
+    strictPort: true,
     proxy: {
       '/api': {
-        target: process.env.VITE_DEV_API_TARGET || 'http://localhost:8000',
+        target: dotenv.VITE_DEV_API_TARGET || 'http://localhost:8000',
         changeOrigin: true,
       },
     },

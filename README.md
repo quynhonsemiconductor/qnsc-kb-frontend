@@ -37,8 +37,14 @@ An absolute `VITE_API_BASE_URL` skips the proxy and calls the backend cross-orig
 from an origin its `CORS_ORIGINS` lists, which is `http://localhost:5173` by default. A production
 build (`npm run build`) refuses to compile without `VITE_API_BASE_URL`.
 
-If port 5173 is taken, Vite moves to the next free one and prints it; the proxy still works, but a
-direct (absolute) API URL would then fail CORS, which is one more reason to keep the relative path.
+The dev port is pinned to 5173 (`FRONTEND_DEV_PORT` in `.env` to change it). If it is taken, `npm run dev` fails with
+`Port 5173 is already in use` rather than moving: the backend's CORS and the sign-in cookie are set for this origin.
+
+### Run a second copy
+
+Beside a second copy of the backend (its own `COMPOSE_PROJECT_NAME` and `KB_API_PORT`, see its README), this copy needs
+its own dev port and proxy target. In `.env`: `FRONTEND_DEV_PORT=5174` and `VITE_DEV_API_TARGET=http://localhost:<that backend's KB_API_PORT>`.
+Then `npm run dev` and sign in as before.
 
 ### Checks
 
