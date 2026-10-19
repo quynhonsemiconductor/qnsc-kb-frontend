@@ -46,6 +46,12 @@ Beside a second copy of the backend (its own `COMPOSE_PROJECT_NAME` and `KB_API_
 its own dev port and proxy target. In `.env`: `FRONTEND_DEV_PORT=5174` and `VITE_DEV_API_TARGET=http://localhost:<that backend's KB_API_PORT>`.
 Then `npm run dev` and sign in as before.
 
+Cookies are scoped to a host, not a port (RFC 6265). `localhost:5173` and `localhost:5174` share one cookie jar, so signing in to
+one copy also signs you into the other, and signing out of one signs out the other. Open the second copy as
+`http://127.0.0.1:5174` instead: that is a different host, with its own cookies. Or use a separate browser profile.
+The test login and the proxy need nothing else; real Microsoft sign-in needs that origin registered in the backend's
+`CORS_ORIGINS` and `APP_URL`, and in the Entra redirect URI.
+
 ### Checks
 
 ```bash
