@@ -38,19 +38,20 @@ from an origin its `CORS_ORIGINS` lists, which is `http://localhost:5173` by def
 build (`npm run build`) refuses to compile without `VITE_API_BASE_URL`.
 
 The dev port is pinned to 5173 (`FRONTEND_DEV_PORT` in `.env` to change it). If it is taken, `npm run dev` fails with
-`Port 5173 is already in use` rather than moving: the backend's CORS and the sign-in cookie are set for this origin.
+`Port 5173 is already in use` rather than moving: the backend's `CORS_ORIGINS` are set for this origin.
 
 ### Run a second copy
 
-Beside a second copy of the backend (its own `COMPOSE_PROJECT_NAME` and `KB_API_PORT`, see its README), this copy needs
-its own dev port and proxy target. In `.env`: `FRONTEND_DEV_PORT=5174` and `VITE_DEV_API_TARGET=http://localhost:<that backend's KB_API_PORT>`.
-Then `npm run dev` and sign in as before.
+A second copy of the frontend runs beside this one when it has its own port, host and backend. In the second frontend's `.env`:
 
-Cookies are scoped to a host, not a port (RFC 6265). `localhost:5173` and `localhost:5174` share one cookie jar, so signing in to
-one copy also signs you into the other, and signing out of one signs out the other. Open the second copy as
-`http://127.0.0.1:5174` instead: that is a different host, with its own cookies. Or use a separate browser profile.
-The test login and the proxy need nothing else; real Microsoft sign-in needs that origin registered in the backend's
-`CORS_ORIGINS` and `APP_URL`, and in the Entra redirect URI.
+- `FRONTEND_DEV_PORT=5174` and `FRONTEND_DEV_HOST=127.0.0.1` (Vite binds `localhost`, which is IPv6 `::1` on macOS, so `127.0.0.1` needs this).
+- `VITE_DEV_API_TARGET=http://localhost:<that backend's KB_API_PORT>`.
+
+Open the second copy as **`http://127.0.0.1:5174`**, not `localhost`. Cookies are scoped to a host, not a port (RFC 6265): `localhost:5173` and
+`localhost:5174` share one cookie jar, so signing in to one signs you into the other. `127.0.0.1` is a different host with its own cookies.
+
+On the **second backend**, set `CORS_ORIGINS` and `FRONTEND_URL` to `http://127.0.0.1:5174`. Without that, login and token refresh return 403.
+For Microsoft sign-in, set `MICROSOFT_LOGIN_REDIRECT_URI` to that origin's callback on the backend, and register the same redirect URI on your Entra app.
 
 ### Checks
 

@@ -75,9 +75,12 @@ export default defineConfig({
     setupFiles: ['./tests/setup-timezone.ts'],
   },
   server: {
-    // Pinned, and a taken port fails the start instead of moving: the backend's CORS_ORIGINS and the sign-in cookie
+    // Pinned, and a taken port fails the start instead of moving: the backend's CORS_ORIGINS are set for this origin
     // are set for this origin. A second copy of the stack sets FRONTEND_DEV_PORT (see README "Run a second copy").
     port: Number(dotenv.FRONTEND_DEV_PORT) || 5173,
+    // Vite binds localhost (IPv6 ::1 on macOS), so 127.0.0.1 is refused. A second copy sets FRONTEND_DEV_HOST=127.0.0.1
+    // to serve on the origin it opens; the default stays localhost.
+    host: dotenv.FRONTEND_DEV_HOST || 'localhost',
     strictPort: true,
     proxy: {
       '/api': {
