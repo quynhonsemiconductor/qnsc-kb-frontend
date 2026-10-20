@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import { registerPreloadErrorReload } from './lib/preload-error'
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -44,6 +45,8 @@ class ErrorBoundary extends React.Component<
 window.addEventListener('unhandledrejection', (event) => {
   console.error('Unhandled promise rejection', event.reason)
 })
+
+registerPreloadErrorReload()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
