@@ -32,8 +32,12 @@ on:
     types: [opened, synchronize, reopened]
 
 concurrency:
-  group: ci-web-${{ github.ref }}
-  cancel-in-progress: true
+  # A PUSH TO MAIN IS NEVER CANCELLED, and that takes a group of its own per commit — the old
+  # `ci-web-${{ github.ref }}` shared one group across main pushes, so the second push CANCELLED the
+  # first's run and the deploy's "wait for Web · CI" gate failed on a green commit (rova's incident,
+  # copied here before it happens). pull_request keeps one group per PR, cancelled in progress.
+  group: ci-web-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.event_name == 'push' && format('main-{0}', github.sha) || format('{0}-{1}', github.event_name, github.run_id)) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -42,8 +46,32 @@ env:
   NODE_VERSION: '20' # matches the Dockerfile's node:20-alpine build stage
 
 jobs:
+  # ── Which parts changed ─────────────────────────────────────────────────────
+  # A change that touches only files on the ignore list cannot affect what this workflow builds,
+  # so the heavy jobs are skipped and the gate reports a clean "nothing to test" instead of
+  # counting skipped-as-passing. Every doubt runs everything (API error, empty list, a file not
+  # on the list) — see actions/changed-paths in the ci repo, which handles pull_request AND
+  # merge_group (queue runs compare against the queue base).
+  changes:
+    name: Which parts changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - id: paths
+        uses: quynhonsemiconductor/ci/actions/changed-paths@5a57261635f88c46fa1e6e553f9b930a138b4b2e # v1.22.0
+        with:
+          ignore: |
+            **/*.md
+            docs/**
+    outputs:
+      run: ${{ steps.paths.outputs.run }}
   quality:
     name: Lint & typecheck
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -74,6 +102,8 @@ jobs:
   # from this fast deterministic gate.
   test:
     name: Unit tests
+    needs: [changes, quality]
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -94,7 +124,8 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [quality, test]
+    needs: [changes, quality, test]
+    if: needs.changes.outputs.run == 'true'
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -132,6 +163,8 @@ jobs:
   # Do not add it to the gate's `needs` without removing that cross-repository dependency first.
   quickstart:
     name: Local quickstart
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -221,10 +254,23 @@ jobs:
   ci-required:
     name: Web CI required
     if: always()
-    needs: [quality, test, build]
+    needs: [changes, quality, test, build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: quynhonsemiconductor/ci/actions/assert-jobs-succeeded@5a57261635f88c46fa1e6e553f9b930a138b4b2e # v1.22.0
+      # The two branches are exclusive, exactly rova's gate: when `changes` said run, every job
+      # must be `success` (no allow-skipped — a renamed or removed job fails loudly); otherwise
+      # only `changes` itself must have succeeded (the rest are skipped by design). If `changes`
+      # FAILED, its output is empty, the second branch runs on `changes.result=failure`, and the
+      # gate fails: "could not decide" never becomes a pass.
+      - name: Every job must have succeeded
+        if: ${{ needs.changes.outputs.run == 'true' }}
+        uses: quynhonsemiconductor/ci/actions/assert-jobs-succeeded@5a57261635f88c46fa1e6e553f9b930a138b4b2e # v1.22.0
         with:
           results: ${{ join(needs.*.result, ',') }}
+
+      - name: Nothing here to test (every changed file is ignorable)
+        if: ${{ needs.changes.outputs.run != 'true' }}
+        uses: quynhonsemiconductor/ci/actions/assert-jobs-succeeded@5a57261635f88c46fa1e6e553f9b930a138b4b2e # v1.22.0
+        with:
+          results: ${{ needs.changes.result }}
