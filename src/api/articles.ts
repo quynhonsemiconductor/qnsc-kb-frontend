@@ -1,4 +1,5 @@
 import client from './client'
+import { fileNameFromContentDisposition } from '../utils/sourcePreview'
 
 export async function getArticles(params: any = {}) {
   const response = await client.get('/articles', { params })
@@ -14,6 +15,35 @@ export async function downloadArticleSource(id: string) {
   const response = await client.get(`/articles/${id}/source`, { responseType: 'blob' })
   const type = String(response.data?.type || response.headers?.['content-type'] || '').split(';')[0].trim()
   return { url: URL.createObjectURL(response.data), type }
+}
+
+export interface ArticleIndexSummary {
+  pending: number
+  processing: number
+  ready: number
+  failed: number
+  total: number
+  not_ready: number
+}
+
+/** How many published articles the AI can answer from, and how many are still being indexed. */
+export async function getArticleIndexSummary(): Promise<ArticleIndexSummary> {
+  const response = await client.get('/articles/index-summary')
+  return response.data
+}
+
+/**
+ * The stored original of an article, as a blob the page can render.
+ *
+ * Unlike `downloadArticleSource` this also returns the bytes and the file name the API sent,
+ * because a Word or Excel file is identified by name (or, failing that, by its content) and
+ * only then drawn by the page. The caller owns `url` and MUST revoke it.
+ */
+export async function downloadArticleSourceFile(id: string) {
+  const response = await client.get(`/articles/${id}/source`, { responseType: 'blob' })
+  const type = String(response.data?.type || response.headers?.['content-type'] || '').split(';')[0].trim()
+  const name = fileNameFromContentDisposition(response.headers?.['content-disposition'])
+  return { url: URL.createObjectURL(response.data), type, blob: response.data as Blob, name }
 }
 
 export async function downloadEvidencePreview(articleId: string, evidenceId: string) {

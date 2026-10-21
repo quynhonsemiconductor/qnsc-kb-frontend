@@ -35,6 +35,8 @@ import {
   ,updateStructuredMetadata, type StructuredMetadata
 } from '../../api/articles'
 import { downloadArticleSource } from '../../api/articles'
+import OriginalFilePane from '../../components/articles/OriginalFilePane'
+import { indexNeedsAttention } from '../../utils/sourcePreview'
 import { getArticles } from '../../api/articles'
 import PdfViewer from '../../components/ai/PdfViewer'
 import { useAuth } from '../../auth/useAuth'
@@ -142,6 +144,9 @@ export default function ArticleDetailPage() {
   const [metadataDraft, setMetadataDraft] = useState<StructuredMetadata>({ document_number: '', issue_date: '', expiry_date: '', signed_by: '' })
   const [savingMetadata, setSavingMetadata] = useState(false)
   const [sourceViewer, setSourceViewer] = useState<{ url: string; name: string; type: string } | null>(null)
+  // 'original' is the default whenever the file was stored: what readers see after approval
+  // should be the document that was uploaded, with the extracted text one click away.
+  const [viewMode, setViewMode] = useState<'original' | 'text'>('original')
   const [sourceLoading, setSourceLoading] = useState(false)
   const sourceUrlRef = useRef<string | null>(null)
 
@@ -541,10 +546,32 @@ export default function ArticleDetailPage() {
               )}
             </div>
 
-            {/* Render Markdown text (simple fallback renderer for preview logic) */}
-            <div ref={readingRef} onMouseUp={captureExcerpt} onKeyUp={captureExcerpt} className="markdown-surface max-w-none border-t border-border pt-xl">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: MarkdownLink }}>{renderedBody || article.body_md}</ReactMarkdown>
-            </div>
+            {indexNeedsAttention(article.index_status, article.status) && (
+              <div role="status" className={`rounded-lg border px-3 py-2 text-sm font-semibold ${article.index_status === 'failed' ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>
+                {article.index_status === 'failed'
+                  ? t('index.detailFailed')
+                  : t('index.detailBanner', { state: t(article.index_status === 'processing' ? 'index.processing' : 'index.waiting') })}
+              </div>
+            )}
+
+            {article.source_available && (
+              <div role="tablist" aria-label={t('original.tabOriginal')} className="flex gap-1 border-t border-border pt-4">
+                {(['original', 'text'] as const).map(mode => (
+                  <button key={mode} type="button" role="tab" aria-selected={viewMode === mode} onClick={() => setViewMode(mode)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${viewMode === mode ? 'bg-primary/10 text-primary-text' : 'text-muted-foreground hover:bg-surface-soft hover:text-foreground'}`}>
+                    {t(mode === 'original' ? 'original.tabOriginal' : 'original.tabText')}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {article.source_available && viewMode === 'original'
+              ? <OriginalFilePane articleId={article.id} title={article.title} />
+              : (
+                /* Render Markdown text (simple fallback renderer for preview logic) */
+                <div ref={readingRef} onMouseUp={captureExcerpt} onKeyUp={captureExcerpt} className="markdown-surface max-w-none border-t border-border pt-xl">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: MarkdownLink }}>{renderedBody || article.body_md}</ReactMarkdown>
+                </div>
+              )}
 
             {/* Voting Bar */}
             <div className="flex items-center gap-4 border-t border-slate-800/40 pt-5">

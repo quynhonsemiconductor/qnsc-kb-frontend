@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   INLINE_SOURCE_TYPES,
   canInlineSourceType,
+  fileNameFromContentDisposition,
+  indexNeedsAttention,
   sourceFileNameFromRef,
   sourcePreviewMode,
 } from '../../src/utils/sourcePreview'
@@ -102,5 +104,47 @@ describe('source file name', () => {
     expect(sourceFileNameFromRef('')).toBe('Original file')
     expect(sourceFileNameFromRef(null)).toBe('Original file')
     expect(sourceFileNameFromRef('upload://')).toBe('Original file')
+  })
+})
+
+describe('file name from Content-Disposition', () => {
+  it('reads the quoted form the API sends', () => {
+    expect(fileNameFromContentDisposition('attachment; filename="quy_trinh.docx"')).toBe('quy_trinh.docx')
+    expect(fileNameFromContentDisposition('inline; filename="a b.pdf"')).toBe('a b.pdf')
+  })
+
+  it('prefers the encoded form and decodes it', () => {
+    expect(fileNameFromContentDisposition("attachment; filename=\"x.docx\"; filename*=UTF-8''quy%20tr%C3%ACnh.docx")).toBe('quy trình.docx')
+  })
+
+  it('reads an unquoted name and survives a malformed encoding', () => {
+    expect(fileNameFromContentDisposition('attachment; filename=report.xlsx')).toBe('report.xlsx')
+    expect(fileNameFromContentDisposition("attachment; filename*=UTF-8''%E0%A4%A; filename=\"ok.pdf\"")).toBe('ok.pdf')
+  })
+
+  it('returns null when there is no name', () => {
+    expect(fileNameFromContentDisposition(undefined)).toBeNull()
+    expect(fileNameFromContentDisposition('')).toBeNull()
+    expect(fileNameFromContentDisposition('attachment')).toBeNull()
+    expect(fileNameFromContentDisposition('attachment; filename=""')).toBeNull()
+  })
+})
+
+describe('index state needing attention', () => {
+  it('flags a published article that is queued, indexing or failed', () => {
+    for (const state of ['pending', 'processing', 'failed']) expect(indexNeedsAttention(state, 'published')).toBe(true)
+  })
+
+  it('says nothing about a ready article', () => {
+    expect(indexNeedsAttention('ready', 'published')).toBe(false)
+  })
+
+  it('never flags a draft, which is not indexed at all', () => {
+    for (const status of ['draft', 'pending_review', 'archived', undefined, null]) expect(indexNeedsAttention('pending', status)).toBe(false)
+  })
+
+  it('ignores an unknown or missing state', () => {
+    expect(indexNeedsAttention('legacy', 'published')).toBe(false)
+    expect(indexNeedsAttention(undefined, 'published')).toBe(false)
   })
 })
