@@ -46,6 +46,31 @@ export async function downloadArticleSourceFile(id: string) {
   return { url: URL.createObjectURL(response.data), type, blob: response.data as Blob, name }
 }
 
+export interface SourceEditResult {
+  id: string
+  title: string
+  status: string
+  /** 'published' when the editor may approve their own change, else 'pending_approval'. */
+  workflow: string
+  message: string
+  counts: number[]
+  notes: string[]
+  /** The article text could not be edited in place and was re-read from the corrected file. */
+  text_regenerated: boolean
+}
+
+/** Where each find/replace would land in the stored original, without changing anything. */
+export async function previewSourceEdit(id: string, replacements: Array<{ find: string; replace: string }>, version?: number) {
+  const response = await client.post(`/articles/${id}/source-edits/preview`, { replacements, version })
+  return response.data as { counts: number[]; notes: string[] }
+}
+
+/** Apply the changes to the original and submit the corrected file as a new version. */
+export async function submitSourceEdit(id: string, replacements: Array<{ find: string; replace: string }>, version?: number) {
+  const response = await client.post(`/articles/${id}/source-edits`, { replacements, version })
+  return response.data as SourceEditResult
+}
+
 export async function downloadEvidencePreview(articleId: string, evidenceId: string) {
   const response = await client.get(`/articles/${articleId}/evidence/${evidenceId}/preview`, { responseType: 'blob' })
   const type = String(response.data?.type || response.headers?.['content-type'] || '').split(';')[0].trim()
