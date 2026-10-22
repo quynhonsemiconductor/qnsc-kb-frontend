@@ -80,3 +80,30 @@ export function sourceFileNameFromRef(sourceRef?: string | null): string {
   const segments = withoutQuery.split('/').filter(Boolean)
   return decodeURIComponent(segments[segments.length - 1] || '') || 'Original file'
 }
+
+/**
+ * The file name in a `Content-Disposition` header, or null when there is none.
+ *
+ * The article source endpoint always sends `filename="..."` (already reduced to safe
+ * characters by the API); this only needs to read it back so the original can be identified
+ * by its extension.
+ */
+export function fileNameFromContentDisposition(header?: string | null): string | null {
+  const value = String(header || '')
+  const encoded = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(value)
+  if (encoded) {
+    try { return decodeURIComponent(encoded[1].trim()) || null } catch { /* fall through to the plain form */ }
+  }
+  const quoted = /filename\s*=\s*"([^"]*)"/i.exec(value)
+  if (quoted) return quoted[1] || null
+  const bare = /filename\s*=\s*([^;]+)/i.exec(value)
+  return bare ? bare[1].trim() || null : null
+}
+
+/**
+ * Whether a published article is not yet searchable by the AI: still queued, being indexed, or
+ * failed. Only published articles are indexed at all, so a draft is never "waiting".
+ */
+export function indexNeedsAttention(status?: string | null, articleStatus?: string | null): status is 'pending' | 'processing' | 'failed' {
+  return articleStatus === 'published' && (status === 'pending' || status === 'processing' || status === 'failed')
+}
