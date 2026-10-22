@@ -1,6 +1,8 @@
 # Default owner for everything in this repo.
 # Enforced via the main-protection ruleset (require_code_owner_review).
-* @quynhonsemiconductor/kb-maintainers
+# Org docs: quynhonsemiconductor/.github → docs/ORG-GOVERNANCE.md (the area-team model).
 
-/.github/         @quynhonsemiconductor/kb-maintainers
-/src/api/         @quynhonsemiconductor/kb-maintainers
+*                 @quynhonsemiconductor/kb-leads
+
+/.github/         @quynhonsemiconductor/kb-leads
+/src/api/         @quynhonsemiconductor/kb-leads
