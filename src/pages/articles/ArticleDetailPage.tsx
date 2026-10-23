@@ -36,7 +36,6 @@ import {
 } from '../../api/articles'
 import { downloadArticleSource } from '../../api/articles'
 import OriginalFilePane from '../../components/articles/OriginalFilePane'
-import SourceEditPanel from '../../components/articles/SourceEditPanel'
 import { indexNeedsAttention } from '../../utils/sourcePreview'
 import { getArticles } from '../../api/articles'
 import PdfViewer from '../../components/ai/PdfViewer'
@@ -568,32 +567,35 @@ export default function ArticleDetailPage() {
               </div>
             )}
 
-            {article.source_available && viewMode === 'original' && canEdit && !editingSource && (
+            {article.source_available && viewMode === 'original' && canEdit && (
               <div className="flex justify-end">
-                <Button variant="secondary" size="sm" onClick={() => setEditingSource(true)}>{t('sourceEdit.open')}</Button>
+                <Button variant={editingSource ? 'primary' : 'secondary'} size="sm" onClick={() => setEditingSource(value => !value)} aria-pressed={editingSource}>
+                  {editingSource ? t('select.done') : t('sourceEdit.open')}
+                </Button>
               </div>
             )}
 
-            {article.source_available && viewMode === 'original' && editingSource && (
-              <SourceEditPanel
-                articleId={article.id}
-                version={article.version}
-                onClose={() => setEditingSource(false)}
-                onSubmitted={result => {
-                  setEditingSource(false)
-                  const published = result.workflow === 'published'
-                  const message = [t(published ? 'sourceEdit.published' : 'sourceEdit.pending'), result.text_regenerated ? t('sourceEdit.regenerated') : ''].filter(Boolean).join('\n\n')
-                  void dialog.alert(message, { title: t('sourceEdit.title'), tone: 'success' })
-                  if (published) {
-                    setOriginalRevision(value => value + 1)
-                    void loadArticleDetails()
-                  }
-                }}
-              />
-            )}
-
             {article.source_available && viewMode === 'original'
-              ? <OriginalFilePane key={originalRevision} articleId={article.id} title={article.title} />
+              ? (
+                <OriginalFilePane
+                  key={originalRevision}
+                  articleId={article.id}
+                  title={article.title}
+                  editing={editingSource ? {
+                    version: article.version,
+                    onSubmitted: result => {
+                      setEditingSource(false)
+                      const published = result.workflow === 'published'
+                      const message = [t(published ? 'sourceEdit.published' : 'sourceEdit.pending'), result.text_regenerated ? t('sourceEdit.regenerated') : ''].filter(Boolean).join('\n\n')
+                      void dialog.alert(message, { title: t('sourceEdit.title'), tone: 'success' })
+                      if (published) {
+                        setOriginalRevision(value => value + 1)
+                        void loadArticleDetails()
+                      }
+                    },
+                  } : undefined}
+                />
+              )
               : (
                 /* Render Markdown text (simple fallback renderer for preview logic) */
                 <div ref={readingRef} onMouseUp={captureExcerpt} onKeyUp={captureExcerpt} className="markdown-surface max-w-none border-t border-border pt-xl">
