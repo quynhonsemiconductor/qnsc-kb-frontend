@@ -5,7 +5,19 @@ export type ConnectorAclPrincipal = {
   principal_id: string
   principal_name?: string | null
   roles: string[]
-  mapping_status: 'mapped' | 'unmapped'
+  /**
+   * `mapped`: an administrator's decision or a signed-in identity. `auto`: resolved by the system
+   * (see `auto_via`). `ignored`: not a person (an application, a device, a limited sharing link),
+   * grants nothing. `no_account`: a provider person with no KB account, grants nothing until one
+   * exists. `unmapped`: still needs an administrator, and blocks approval.
+   */
+  mapping_status: 'mapped' | 'auto' | 'ignored' | 'no_account' | 'unmapped'
+  /** How an `auto` principal was resolved. */
+  auto_via?: 'email' | 'name' | 'company' | null
+  auto_department_name?: string | null
+  /** For an unmapped group: the closest department by name, offered but never applied. */
+  suggested_department_id?: string | null
+  suggested_department_name?: string | null
   /** Server-owned: whether this principal may be mapped to a department. */
   mappable?: boolean
   department_id?: string | null
