@@ -1,4 +1,4 @@
-import type { AIStreamEvent, AnalyticsResult, Citation, EvidenceStatus } from '../types/ai'
+import type { AIStreamEvent, AgentStep, AnalyticsResult, Citation, EvidenceStatus } from '../types/ai'
 
 export interface AIStreamHandlers {
   onToken: (content: string) => void
@@ -6,6 +6,7 @@ export interface AIStreamHandlers {
   onDone: (data: Record<string, any>) => void
   onAnalytics?: (results: AnalyticsResult[]) => void
   onEvidenceStatus?: (status: EvidenceStatus) => void
+  onStep?: (step: AgentStep) => void
 }
 
 /** Dispatch one additive SSE payload without making an unknown event fatal. */
@@ -13,6 +14,7 @@ export function dispatchAIStreamPayload(payload: AIStreamEvent, handlers: AIStre
   if (payload.type === 'token') handlers.onToken(payload.content || '')
   if (payload.type === 'replace') handlers.onToken(`\u0000REPLACE\u0000${payload.content || ''}`)
   if (payload.type === 'sources') handlers.onSources(payload.sources || [])
+  if (payload.type === 'step') handlers.onStep?.({ step: payload.step, status: payload.status, detail: payload.detail, data: payload.data })
   if (payload.type === 'analytics') handlers.onAnalytics?.(payload.analytics_results || [])
   if (payload.type === 'evidence_status') handlers.onEvidenceStatus?.(payload.status || {
     stage: payload.stage,

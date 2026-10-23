@@ -1,5 +1,5 @@
 import client, { clearExpiredSession, getAccessToken, refreshSession } from './client'
-import type { AIStreamEvent, AnalyticsResult, EvidenceStatus } from '../types/ai'
+import type { AIStreamEvent, AgentStep, AnalyticsResult, EvidenceStatus } from '../types/ai'
 import { dispatchAIStreamPayload } from '../lib/ai-stream'
 import { buildAIAskPayload } from '../lib/ai-retry'
 
@@ -37,6 +37,7 @@ export async function askAIStream(
   onAnalytics?: (results: AnalyticsResult[]) => void,
   onEvidenceStatus?: (status: EvidenceStatus) => void,
   retryFailed = false,
+  onStep?: (step: AgentStep) => void,
 ) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
   const token = getAccessToken()
@@ -59,7 +60,7 @@ export async function askAIStream(
     signal,
   })
   if (response.status === 401 && retry && await refreshSession()) {
-    return askAIStream(question, conversationId, language, onToken, onSources, onDone, articleId, signal, false, confirmEdit, editInstruction, onAnalytics, onEvidenceStatus, retryFailed)
+    return askAIStream(question, conversationId, language, onToken, onSources, onDone, articleId, signal, false, confirmEdit, editInstruction, onAnalytics, onEvidenceStatus, retryFailed, onStep)
   }
   if (response.status === 401) clearExpiredSession()
   if (!response.ok || !response.body) throw new Error(`AI stream failed (${response.status})`)
@@ -78,7 +79,7 @@ export async function askAIStream(
       return
     }
     dispatchAIStreamPayload(payload as AIStreamEvent, {
-      onToken, onSources, onDone, onAnalytics, onEvidenceStatus,
+      onToken, onSources, onDone, onAnalytics, onEvidenceStatus, onStep,
     })
   }
   try {
