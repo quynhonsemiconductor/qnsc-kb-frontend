@@ -16,8 +16,12 @@ import PdfViewer from '../../components/ai/PdfViewer'
 import AnswerText, { type AnswerCitation } from '../../components/ai/AnswerText'
 import AnswerSections from '../../components/ai/AnswerSections'
 import AnalysisResults from '../../components/ai/AnalysisResults'
+import AgentProgress from '../../components/ai/AgentProgress'
+import ChartArtifactView from '../../components/ai/ChartArtifactView'
+import FigureArtifactView from '../../components/ai/FigureArtifactView'
+import { parseArtifacts, parseSteps, parseUnverifiedNumbers, upsertStep } from '../../lib/agent'
 import EvidenceTable from '../../components/ai/EvidenceTable'
-import type { AnalyticsResult, Citation, EvidenceStatus } from '../../types/ai'
+import type { AgentArtifact, AgentStep, AnalyticsResult, Citation, EvidenceStatus } from '../../types/ai'
 import { collapseDuplicateFailedRetries, resetFailedMessageForRetry } from '../../lib/ai-retry'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
@@ -47,6 +51,11 @@ interface Message {
   confidence?: 'low' | 'normal'
   analyticsResults?: AnalyticsResult[]
   evidenceStatus?: EvidenceStatus
+  // What the agent did for this answer, the charts / marked figures it attached, and
+  // numbers in the answer that no cited source contains.
+  agentSteps?: AgentStep[]
+  artifacts?: AgentArtifact[]
+  unverifiedNumbers?: string[]
   // Populated only when the backend's CLAIM_VERIFICATION_ENABLED flag is on (off by
   // default). Absent, not an empty array, on any answer the flag did not run for --
   // treat that as "not checked", not "every claim confirmed".
@@ -244,7 +253,6 @@ export default function AskPage() {
   const [editTitle, setEditTitle] = useState('')
   const [historyQuery, setHistoryQuery] = useState('')
   const [showAllHistory, setShowAllHistory] = useState(false)
-  const [agentWorkOpen, setAgentWorkOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sourceUrlRef = useRef<string | null>(null)
@@ -317,6 +325,9 @@ export default function AskPage() {
         editInstruction: actionData.edit_instruction,
         analyticsResults: item.analytics_results || actionData.analytics_results || [],
         evidenceStatus: item.evidence_status || actionData.evidence_status,
+        agentSteps: parseSteps(actionData.agent_trace),
+        artifacts: parseArtifacts(actionData.artifacts),
+        unverifiedNumbers: parseUnverifiedNumbers(actionData.unverified_numbers),
       }
       })
       setMessages(mappedMessages)
@@ -517,15 +528,17 @@ export default function AskPage() {
       setMessages((previous) => [...previous, { sender: 'user', text: query }])
     }
     try {
+      // The assistant's message exists before anything is awaited, so its progress is shown
+      // inside it from the first moment instead of in a block of its own.
+      if (!retryFailed) {
+        assistantMessageId = `ai-${Date.now()}`
+        setMessages((previous) => [...previous, { id: assistantMessageId, sender: 'ai', text: '', citations: [] }])
+      }
       let activeId = conversationId
       if (!activeId) {
         const conversation = await createConversation(query.slice(0, 80))
         activeId = conversation.id
         setConversationId(activeId)
-      }
-      if (!retryFailed) {
-        assistantMessageId = `ai-${Date.now()}`
-        setMessages((previous) => [...previous, { id: assistantMessageId, sender: 'ai', text: '', citations: [] }])
       }
       await askAIStream(
         query,
@@ -575,6 +588,10 @@ export default function AskPage() {
             analyticsResults: data.analytics_results || actionData.analytics_results || message.analyticsResults || [],
             evidenceStatus: data.evidence_status || actionData.evidence_status || message.evidenceStatus,
             unverifiedClaims: data.unverified_claims,
+            // The server's record of the steps is authoritative once the answer is complete.
+            agentSteps: parseSteps(data.agent_trace).length ? parseSteps(data.agent_trace) : message.agentSteps,
+            artifacts: parseArtifacts(data.artifacts),
+            unverifiedNumbers: parseUnverifiedNumbers(data.unverified_numbers),
           } : message))
         },
         confirmedArticleId || requestArticleId,
@@ -585,6 +602,7 @@ export default function AskPage() {
         (results) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, analyticsResults: results } : message)),
         (status) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, evidenceStatus: status } : message)),
         retryFailed,
+        (step) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, agentSteps: upsertStep(message.agentSteps || [], step) } : message)),
       )
       await refreshConversations()
     } catch (requestError: any) {
@@ -674,7 +692,6 @@ export default function AskPage() {
   }
 
   const isEmpty = messages.length === 0
-  const activeEvidenceStatus = [...messages].reverse().find((message) => message.sender === 'ai')?.evidenceStatus
 
   return (
     <>
@@ -933,6 +950,15 @@ export default function AskPage() {
                             {isFailure || isNoAnswer ? <AlertCircle size={14} /> : <Bot size={14} />}
                           </div>
                           <div className="min-w-0 flex-1">
+                            {message.sender === 'ai' && !isFailure && (message.agentSteps?.length ?? 0) > 0 && (
+                              <AgentProgress steps={message.agentSteps || []} live={isStreamingThis} />
+                            )}
+                            {isStreamingThis && !message.text && !(message.agentSteps?.length) && (
+                              <div role="status" className="mb-3 flex items-center gap-2 text-body-sm text-muted-foreground">
+                                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-info/25 border-t-info" />
+                                {t('chat.agentSearching')}…
+                              </div>
+                            )}
                             {!isStreamingThis && message.confidence === 'low' && (
                               <div className="mb-3 flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning-text">
                                 <AlertCircle size={14} className="mt-0.5 shrink-0" />
@@ -948,6 +974,12 @@ export default function AskPage() {
                                     : `${message.unverifiedClaims.length} cited claims in this answer could not be confirmed against their sources — please verify: `}
                                   {message.unverifiedClaims.map(claim => `"${claim.sentence}"`).join('; ')}
                                 </span>
+                              </div>
+                            )}
+                            {!isStreamingThis && !!message.unverifiedNumbers?.length && (
+                              <div className="mb-3 flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning-text">
+                                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                                <span>{t('agent.numbers.notice', { numbers: message.unverifiedNumbers.join(', ') })}</span>
                               </div>
                             )}
                             {message.failed ? (
@@ -1044,6 +1076,13 @@ export default function AskPage() {
                             },
                           }}
                         />
+                        {!isStreamingThis && (message.artifacts?.length ?? 0) > 0 && (
+                          <div className="mt-3 space-y-3 pl-10">
+                            {message.artifacts!.map(artifact => artifact.type === 'chart'
+                              ? <ChartArtifactView key={artifact.id} chart={artifact} />
+                              : <FigureArtifactView key={artifact.id} figure={artifact} />)}
+                          </div>
+                        )}
                         {message.citations && message.citations.length > 0 && (
                           <div className="mt-4 border-t border-hairline pt-4 pl-10">
                             <button
@@ -1136,21 +1175,6 @@ export default function AskPage() {
                       </div>
                     )
                   })}
-                  {loading && (
-                    <section className="ask-fade-in ml-10 max-w-2xl overflow-hidden rounded-xl border border-border bg-surface-elevated">
-                      <button type="button" onClick={() => setAgentWorkOpen(value => !value)} aria-expanded={agentWorkOpen} className="flex min-h-10 w-full items-center gap-2 bg-surface-muted px-3 text-left text-body-sm font-semibold text-foreground">
-                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-info/25 border-t-info" />
-                        {t('chat.agentSearching')}…
-                        <ChevronDown size={14} className={`ml-auto text-muted transition ${agentWorkOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      {agentWorkOpen && <div className="space-y-2 border-t border-border px-3 py-3 font-mono text-caption text-muted-foreground">
-                        <p>✓ {t('chat.agentSearching')}</p>
-                        {activeEvidenceStatus?.stage && ['reading_evidence', 'calculating', 'answering'].includes(activeEvidenceStatus.stage) && <p>✓ {t('chat.agentReadingEvidence')}</p>}
-                        {activeEvidenceStatus?.stage && ['calculating', 'answering'].includes(activeEvidenceStatus.stage) && <p>✓ {t('chat.agentCalculating')}</p>}
-                        <p className="text-info-text">→ {t('chat.agentAnswering')}</p>
-                      </div>}
-                    </section>
-                  )}
                   <div ref={bottomRef} />
                 </div>
               )}

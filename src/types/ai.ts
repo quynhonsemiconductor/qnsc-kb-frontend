@@ -53,6 +53,45 @@ export interface EvidenceStatus {
   fallback_reason?: string
 }
 
+/** One step of the agent's work on a question, as streamed (and stored) by the backend. */
+export interface AgentStep {
+  step: string
+  status: 'running' | 'done' | 'skipped' | 'failed'
+  detail?: string
+  data?: Record<string, unknown>
+  ms?: number
+}
+
+export interface ChartArtifact {
+  type: 'chart'
+  id: string
+  chart_type: 'bar' | 'line' | 'pie'
+  title: string
+  x_label: string
+  categories: string[]
+  series: Array<{ name: string; values: Array<number | null> }>
+  evidence_id: string
+  source_id: string
+  truncated?: boolean
+  total_rows?: number
+}
+
+/** Rectangles are fractions (0-1) of the figure's width and height, from its top left. */
+export interface FigureRegion { x: number; y: number; w: number; h: number; label: string }
+
+export interface FigureArtifact {
+  type: 'figure_annotation'
+  id: string
+  evidence_id: string
+  article_id: string
+  source_id: string
+  title: string
+  caption: string
+  regions: FigureRegion[]
+}
+
+export type AgentArtifact = ChartArtifact | FigureArtifact
+
 // Populated only when the backend's CLAIM_VERIFICATION_ENABLED flag is on.
 export interface UnverifiedClaim { sentence: string; source_id: string }
 
@@ -68,6 +107,7 @@ export interface AIAnswer {
 export type AIStreamEvent =
   | { type: 'token' | 'replace'; content?: string }
   | { type: 'sources'; sources?: Citation[] }
+  | { type: 'step'; step: string; status: AgentStep['status']; detail?: string; data?: Record<string, unknown> }
   | { type: 'evidence_status'; status?: EvidenceStatus; stage?: EvidenceStatus['stage']; vision_used?: boolean; fallback_reason?: string }
   | ({ type: 'done' | 'analytics'; analytics_results?: AnalyticsResult[]; evidence_status?: EvidenceStatus } & Record<string, unknown>)
   | { type: 'error'; detail?: string }
