@@ -76,7 +76,11 @@ export default function OriginalFilePane({ articleId, title }: { articleId: stri
       return notice(true, t('original.notPreviewable'), t('original.notPreviewableHelp'), <a href={file.url} download={file.name} className="inline-flex min-h-10 items-center gap-2 rounded-control bg-primary px-4 text-body-sm font-bold text-primary-foreground no-underline"><Download size={14} />{t('original.download')}</a>)
     }
     if (mode === 'image') return <div className="h-full overflow-auto bg-white p-4"><img src={file.url} alt={file.name} className="mx-auto max-w-full object-contain" /></div>
-    return <embed src={file.url} type={file.type || 'application/pdf'} title={file.name} className="size-full bg-white" />
+    // A frame, not an embed element: the app's CSP says `object-src 'none'`, which blocks embed and
+    // object elements (the pane rendered blank), while `frame-src blob:` allows a frame. No `sandbox`,
+    // for the reason given in PdfViewer: the blob is minted by this origin and a sandboxed frame
+    // has an opaque origin that cannot load it.
+    return <iframe src={file.url} title={file.name} className="size-full border-0 bg-white" />
   }
 
   return <div className="h-[75vh] min-h-[24rem] overflow-hidden rounded-xl border border-border bg-surface-muted">{render()}</div>

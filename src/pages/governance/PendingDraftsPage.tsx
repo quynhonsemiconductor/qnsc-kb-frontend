@@ -795,7 +795,8 @@ export default function PendingDraftsPage() {
     if (mode === 'image') {
       return <div className="h-full overflow-auto bg-white p-4"><img src={sourceFile!.url} alt={fileName} className="mx-auto max-w-full object-contain" /></div>
     }
-    return <embed src={sourceFile!.url} type={sourceFile!.type || 'application/pdf'} title={fileName} className="size-full bg-white" />
+    // A frame, not an embed element: `object-src 'none'` in the CSP blocks embed and object elements (blank pane).
+    return <iframe src={sourceFile!.url} title={fileName} className="size-full border-0 bg-white" />
   }
 
   return (
