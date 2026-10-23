@@ -1,5 +1,6 @@
 import client from './client'
 import { fileNameFromContentDisposition } from '../utils/sourcePreview'
+import type { EditPayloadRow } from '../lib/selectionEdit'
 
 export async function getArticles(params: any = {}) {
   const response = await client.get('/articles', { params })
@@ -60,13 +61,13 @@ export interface SourceEditResult {
 }
 
 /** Where each find/replace would land in the stored original, without changing anything. */
-export async function previewSourceEdit(id: string, replacements: Array<{ find: string; replace: string }>, version?: number) {
+export async function previewSourceEdit(id: string, replacements: EditPayloadRow[], version?: number) {
   const response = await client.post(`/articles/${id}/source-edits/preview`, { replacements, version })
   return response.data as { counts: number[]; notes: string[] }
 }
 
 /** Apply the changes to the original and submit the corrected file as a new version. */
-export async function submitSourceEdit(id: string, replacements: Array<{ find: string; replace: string }>, version?: number) {
+export async function submitSourceEdit(id: string, replacements: EditPayloadRow[], version?: number) {
   const response = await client.post(`/articles/${id}/source-edits`, { replacements, version })
   return response.data as SourceEditResult
 }
