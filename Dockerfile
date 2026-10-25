@@ -7,7 +7,7 @@ ARG VITE_API_BASE_URL=/api/v1
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine@sha256:a3554c0d0b48177b1413c26e01f695334428020d9df01243fbae3e11cfd17417
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
