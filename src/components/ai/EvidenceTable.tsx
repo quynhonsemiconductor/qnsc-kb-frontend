@@ -30,6 +30,8 @@ interface EvidenceTableProps {
   articleId?: string
   evidenceId?: string
   onAsk?: () => void
+  /** Draws one cell. The row is the same object the table was given, however it is sorted or filtered. */
+  renderCell?: (row: Array<string | number | null>, columnIndex: number, value: string | number | null) => React.ReactNode
 }
 
 /**
@@ -40,7 +42,7 @@ interface EvidenceTableProps {
  * Sorting and filtering are views over the rows; copy and CSV export what the reader is
  * looking at, so a filtered or sorted table is taken away as it is seen.
  */
-export default function EvidenceTable({ table, label, labels, articleId, evidenceId, onAsk }: EvidenceTableProps) {
+export default function EvidenceTable({ table, label, labels, articleId, evidenceId, onAsk, renderCell }: EvidenceTableProps) {
   const [full, setFull] = useState<EvidenceTableData | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -105,7 +107,7 @@ export default function EvidenceTable({ table, label, labels, articleId, evidenc
 
   return (
     <div className="overflow-hidden rounded-xl border border-hairline">
-      <Grid table={shown} label={label} labels={labels} maxHeight="max-h-80" toolbar={view => toolbar(view, false)} />
+      <Grid table={shown} label={label} labels={labels} maxHeight="max-h-80" toolbar={view => toolbar(view, false)} renderCell={renderCell} />
       {(cut || shown.truncated) && (
         <div className="flex flex-wrap items-center gap-2 border-t border-hairline bg-surface-muted px-3 py-2">
           <p className="text-caption text-stone">{formatEvidenceRowSummary(labels.rowSummary, shown.rows.length, total)}</p>
@@ -118,7 +120,7 @@ export default function EvidenceTable({ table, label, labels, articleId, evidenc
       {expanded && (
         <EvidenceDialog title={label} closeLabel={labels.close} onClose={() => setExpanded(false)}>
           <div className="p-4">
-            <Grid table={shown} label={label} labels={labels} maxHeight="max-h-[65dvh]" toolbar={view => toolbar(view, true)} />
+            <Grid table={shown} label={label} labels={labels} maxHeight="max-h-[65dvh]" toolbar={view => toolbar(view, true)} renderCell={renderCell} />
           </div>
         </EvidenceDialog>
       )}
@@ -126,12 +128,13 @@ export default function EvidenceTable({ table, label, labels, articleId, evidenc
   )
 }
 
-function Grid({ table, label, labels, maxHeight, toolbar }: {
+function Grid({ table, label, labels, maxHeight, toolbar, renderCell }: {
   table: EvidenceTableData
   label: string
   labels: EvidenceTableLabels
   maxHeight: string
   toolbar: (view: EvidenceTableData) => React.ReactNode
+  renderCell?: EvidenceTableProps['renderCell']
 }) {
   const [sort, setSort] = useState<{ column: number; direction: SortDirection } | null>(null)
   const [query, setQuery] = useState('')
@@ -184,7 +187,7 @@ function Grid({ table, label, labels, maxHeight, toolbar }: {
           <tbody>
             {rows.map((row, rowIndex) => (
               <tr key={rowIndex} className="odd:bg-canvas">
-                {table.columns.map((_, columnIndex) => <td key={columnIndex} className="max-w-64 border-b border-hairline/70 px-3 py-2 align-top text-steel">{String(row[columnIndex] ?? '—')}</td>)}
+                {table.columns.map((_, columnIndex) => <td key={columnIndex} className="max-w-64 border-b border-hairline/70 px-3 py-2 align-top text-steel">{renderCell ? renderCell(row, columnIndex, row[columnIndex] ?? null) : String(row[columnIndex] ?? '—')}</td>)}
               </tr>
             ))}
           </tbody>

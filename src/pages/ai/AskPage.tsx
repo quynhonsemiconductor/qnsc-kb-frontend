@@ -21,9 +21,10 @@ import RefusalCard from '../../components/ai/RefusalCard'
 import { isRefusal, parseRelatedSources, refusalSentence } from '../../lib/refusal'
 import ChartArtifactView from '../../components/ai/ChartArtifactView'
 import FigureArtifactView from '../../components/ai/FigureArtifactView'
-import { parseArtifacts, parseSteps, parseUnverifiedNumbers, upsertStep } from '../../lib/agent'
+import TableArtifactView from '../../components/ai/TableArtifactView'
+import { coverageText, parseArtifacts, parseCoverage, parseSteps, parseUnverifiedNumbers, upsertStep } from '../../lib/agent'
 import EvidenceTable from '../../components/ai/EvidenceTable'
-import type { AgentArtifact, AgentStep, AnalyticsResult, Citation, EvidenceStatus } from '../../types/ai'
+import type { AgentArtifact, AgentStep, AnalyticsResult, AnswerCoverage, Citation, EvidenceStatus } from '../../types/ai'
 import { collapseDuplicateFailedRetries, resetFailedMessageForRetry } from '../../lib/ai-retry'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
@@ -63,6 +64,8 @@ interface Message {
   agentSteps?: AgentStep[]
   artifacts?: AgentArtifact[]
   unverifiedNumbers?: string[]
+  // What a question spanning many documents was answered from; absent for every other answer.
+  coverage?: AnswerCoverage
   // Populated only when the backend's CLAIM_VERIFICATION_ENABLED flag is on (off by
   // default). Absent, not an empty array, on any answer the flag did not run for --
   // treat that as "not checked", not "every claim confirmed".
@@ -363,6 +366,7 @@ export default function AskPage() {
         agentSteps: parseSteps(actionData.agent_trace),
         artifacts: parseArtifacts(actionData.artifacts),
         unverifiedNumbers: parseUnverifiedNumbers(actionData.unverified_numbers),
+        coverage: parseCoverage(actionData.coverage),
       }
       })
       setMessages(mappedMessages)
@@ -630,6 +634,7 @@ export default function AskPage() {
             relatedSources: parseRelatedSources(data.related_sources),
             artifacts: parseArtifacts(data.artifacts),
             unverifiedNumbers: parseUnverifiedNumbers(data.unverified_numbers),
+            coverage: parseCoverage(data.coverage),
           } : message))
         },
         confirmedArticleId || requestArticleId,
@@ -1013,6 +1018,16 @@ export default function AskPage() {
                                 </span>
                               </div>
                             )}
+                            {!isStreamingThis && message.coverage && (() => {
+                              const text = coverageText(t, message.coverage)
+                              return (
+                                <p data-testid="answer-coverage" className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-hairline bg-surface-muted px-3 py-2 text-xs text-steel">
+                                  <Layers size={13} className="shrink-0 text-info" />
+                                  <span className="font-medium">{text.summary}</span>
+                                  {text.note && <span className="text-stone">{text.note}</span>}
+                                </p>
+                              )
+                            })()}
                             {!isStreamingThis && !!message.unverifiedNumbers?.length && (
                               <div className="mb-3 flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning-text">
                                 <AlertCircle size={14} className="mt-0.5 shrink-0" />
@@ -1117,7 +1132,9 @@ export default function AskPage() {
                           <div className="mt-3 space-y-3 pl-10">
                             {message.artifacts!.map(artifact => artifact.type === 'chart'
                               ? <ChartArtifactView key={artifact.id} chart={artifact} />
-                              : <FigureArtifactView key={artifact.id} figure={artifact} />)}
+                              : artifact.type === 'table'
+                                ? <TableArtifactView key={artifact.id} artifact={artifact} labels={answerEvidence.labels} />
+                                : <FigureArtifactView key={artifact.id} figure={artifact} />)}
                           </div>
                         )}
                         {message.citations && message.citations.length > 0 && (
