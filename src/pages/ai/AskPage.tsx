@@ -17,6 +17,8 @@ import AnswerText, { type AnswerCitation } from '../../components/ai/AnswerText'
 import AnswerSections from '../../components/ai/AnswerSections'
 import AnalysisResults from '../../components/ai/AnalysisResults'
 import AgentProgress from '../../components/ai/AgentProgress'
+import RefusalCard from '../../components/ai/RefusalCard'
+import { isRefusal, parseRelatedSources, refusalSentence } from '../../lib/refusal'
 import ChartArtifactView from '../../components/ai/ChartArtifactView'
 import FigureArtifactView from '../../components/ai/FigureArtifactView'
 import { parseArtifacts, parseSteps, parseUnverifiedNumbers, upsertStep } from '../../lib/agent'
@@ -53,6 +55,11 @@ interface Message {
   evidenceStatus?: EvidenceStatus
   // What the agent did for this answer, the charts / marked figures it attached, and
   // numbers in the answer that no cited source contains.
+  // The server says when an answer is a refusal, keeps the sentence apart from the passage offered
+  // under it, and lists the nearest documents (not citations).
+  refused?: boolean
+  refusalText?: string
+  relatedSources?: Citation[]
   agentSteps?: AgentStep[]
   artifacts?: AgentArtifact[]
   unverifiedNumbers?: string[]
@@ -325,6 +332,9 @@ export default function AskPage() {
         editInstruction: actionData.edit_instruction,
         analyticsResults: item.analytics_results || actionData.analytics_results || [],
         evidenceStatus: item.evidence_status || actionData.evidence_status,
+        refused: Boolean(actionData.refused),
+        refusalText: typeof actionData.refusal_text === 'string' ? actionData.refusal_text : undefined,
+        relatedSources: parseRelatedSources(actionData.related_sources),
         agentSteps: parseSteps(actionData.agent_trace),
         artifacts: parseArtifacts(actionData.artifacts),
         unverifiedNumbers: parseUnverifiedNumbers(actionData.unverified_numbers),
@@ -590,6 +600,9 @@ export default function AskPage() {
             unverifiedClaims: data.unverified_claims,
             // The server's record of the steps is authoritative once the answer is complete.
             agentSteps: parseSteps(data.agent_trace).length ? parseSteps(data.agent_trace) : message.agentSteps,
+            refused: Boolean(data.refused),
+            refusalText: typeof data.refusal_text === 'string' ? data.refusal_text : undefined,
+            relatedSources: parseRelatedSources(data.related_sources),
             artifacts: parseArtifacts(data.artifacts),
             unverifiedNumbers: parseUnverifiedNumbers(data.unverified_numbers),
           } : message))
@@ -931,8 +944,7 @@ export default function AskPage() {
                         </div>
                       </div>
                     )
-                    const isNoAnswer = !message.failed && !isStreamingThis &&
-                      /not found in the knowledge base/i.test(message.text.trim()) && !(message.citations && message.citations.length > 0)
+                    const isNoAnswer = !isStreamingThis && isRefusal(message)
                     const isFailure = Boolean(message.failed)
                     const pendingForMessage = pendingEditConfirmation && pendingEditConfirmation.articleId === message.articleId
                       ? pendingEditConfirmation
@@ -1015,7 +1027,7 @@ export default function AskPage() {
                                 )}
                               </div>
                             ) : isNoAnswer ? (
-                              <p className="text-body italic leading-6 text-stone">{message.text}</p>
+                              <RefusalCard sentence={refusalSentence(message)} related={message.relatedSources || []} onOpen={setSelectedSource} />
                             ) : (
                               message.action === 'edit_confirmation_required' ? (
                                 <div className="rounded-xl border border-warning/25 bg-warning/10 px-3 py-3 text-warning">
