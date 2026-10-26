@@ -2,12 +2,12 @@
  * Pure helpers for the agent's progress and artifacts, kept apart from the components so the
  * rules can be tested without rendering anything.
  */
-import type { AgentArtifact, AgentStep, ChartArtifact, FigureArtifact, FigureRegion } from '../types/ai'
+import type { AgentArtifact, AgentStep, AnswerCoverage, ChartArtifact, FigureArtifact, FigureRegion, TableArtifact } from '../types/ai'
 
 // ── steps ──────────────────────────────────────────────────────────────────────────────────
 
 /** The order the agent works in; a step it did not report is simply absent. */
-export const STEP_ORDER = ['understand', 'search', 'review', 'chart', 'figure', 'answer', 'verify'] as const
+export const STEP_ORDER = ['understand', 'catalog', 'digests', 'synthesize', 'search', 'review', 'chart', 'figure', 'answer', 'verify'] as const
 
 /**
  * Fold one streamed step into the list: a step reported again (running, then done) replaces
@@ -65,6 +65,12 @@ export function stepText(t: Translate, step: AgentStep): string {
   if (step.step === 'verify') {
     const unverified = Number(data.unverified ?? 0)
     return unverified > 0 ? t(key('flagged'), { count: unverified }) : t(key('done'))
+  }
+  if (step.step === 'catalog') return t(key('done'), { total: Number(data.total ?? 0) })
+  if (step.step === 'digests') return t(key('done'), { with_digest: Number(data.with_digest ?? 0), total: Number(data.total ?? 0) })
+  if (step.step === 'synthesize') {
+    const used = Number(data.used ?? 0)
+    return data.cache_hit ? t(key('cached'), { used }) : t(key('done'), { used, calls: Number(data.calls ?? 0) })
   }
   return t(key('done'))
 }
@@ -124,6 +130,83 @@ function parseFigure(item: Record<string, unknown>): FigureArtifact | null {
   }
 }
 
+/** The most rows and columns a table artifact is allowed to carry; the server cuts at the same bounds. */
+export const MAX_TABLE_ROWS = 200
+export const MAX_TABLE_COLUMNS = 12
+const MAX_CELL_CHARS = 500
+
+function parseCell(value: unknown): string | number | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  return String(value).slice(0, MAX_CELL_CHARS)
+}
+
+/**
+ * A table the assistant built. Rows and their document links are read together so that a row
+ * dropped for being malformed takes its link with it; reading them apart would shift every
+ * link after it onto the wrong row.
+ */
+export function parseTable(item: Record<string, unknown>): TableArtifact | null {
+  if (!Array.isArray(item.columns) || !Array.isArray(item.rows)) return null
+  const columns = item.columns.slice(0, MAX_TABLE_COLUMNS).map(value => String(value ?? ''))
+  if (columns.length === 0) return null
+  const linkColumn = finite(item.link_column) && Number.isInteger(item.link_column) && item.link_column >= 0 && item.link_column < columns.length ? item.link_column : null
+  const rawLinks = linkColumn !== null && Array.isArray(item.row_links) ? item.row_links : null
+  const rows: Array<Array<string | number | null>> = []
+  const links: Array<{ article_id: string }> = []
+  item.rows.slice(0, MAX_TABLE_ROWS).forEach((raw, index) => {
+    if (!Array.isArray(raw)) return
+    rows.push(columns.map((_, column) => parseCell(raw[column])))
+    const link = rawLinks?.[index] as Record<string, unknown> | null | undefined
+    links.push({ article_id: typeof link?.article_id === 'string' ? link.article_id : '' })
+  })
+  if (rows.length === 0) return null
+  const title = String(item.title ?? '')
+  return {
+    type: 'table',
+    id: String(item.id ?? title),
+    title,
+    columns,
+    rows,
+    link_column: rawLinks ? linkColumn : null,
+    row_links: rawLinks ? links : null,
+    total_rows: finite(item.total_rows) && item.total_rows >= rows.length ? item.total_rows : undefined,
+    truncated: Boolean(item.truncated),
+  }
+}
+
+/** The coverage of a corpus answer, from the stream or a stored message; undefined when absent or malformed. */
+export function parseCoverage(raw: unknown): AnswerCoverage | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const item = raw as Record<string, unknown>
+  const count = (value: unknown) => (finite(value) && value >= 0 ? Math.floor(value) : null)
+  const total = count(item.total)
+  const used = count(item.used)
+  if (total === null || used === null) return undefined
+  return {
+    total,
+    with_digest: count(item.with_digest) ?? 0,
+    considered: count(item.considered) ?? used,
+    used,
+    partial: Boolean(item.partial),
+    reason: typeof item.reason === 'string' ? item.reason : '',
+  }
+}
+
+/** The line under a corpus answer, and the reason it was not the whole collection (if it was not). */
+export function coverageText(t: Translate, coverage: AnswerCoverage): { summary: string; note: string | null } {
+  const summary = t('chat.coverage.summary', { used: coverage.used, total: coverage.total })
+  if (!coverage.partial) return { summary, note: null }
+  const reasons: Record<string, [string, Record<string, number>]> = {
+    missing_digests: ['chat.coverage.missingDigests', { missing: Math.max(0, coverage.total - coverage.with_digest) }],
+    ceiling: ['chat.coverage.ceiling', { considered: coverage.considered }],
+    budget: ['chat.coverage.budget', {}],
+    map_failed: ['chat.coverage.mapFailed', {}],
+  }
+  const reason = reasons[coverage.reason]
+  return { summary, note: reason ? t(reason[0], reason[1]) : null }
+}
+
 /** Artifacts from the stream or from a stored message, keeping only well-formed ones. */
 export function parseArtifacts(raw: unknown): AgentArtifact[] {
   if (!Array.isArray(raw)) return []
@@ -131,7 +214,7 @@ export function parseArtifacts(raw: unknown): AgentArtifact[] {
   for (const entry of raw) {
     if (!entry || typeof entry !== 'object') continue
     const item = entry as Record<string, unknown>
-    const parsed = item.type === 'chart' ? parseChart(item) : item.type === 'figure_annotation' ? parseFigure(item) : null
+    const parsed = item.type === 'chart' ? parseChart(item) : item.type === 'figure_annotation' ? parseFigure(item) : item.type === 'table' ? parseTable(item) : null
     if (parsed) out.push(parsed)
   }
   return out

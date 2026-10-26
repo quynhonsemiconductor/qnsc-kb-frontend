@@ -104,7 +104,37 @@ export interface FigureArtifact {
   regions: FigureRegion[]
 }
 
-export type AgentArtifact = ChartArtifact | FigureArtifact
+/**
+ * A table the assistant built itself -- statistics about the collection, a list of documents --
+ * as opposed to one cut out of a document. When `link_column` is set, `row_links[i]` names the
+ * document that row `i` is about.
+ */
+export interface TableArtifact {
+  type: 'table'
+  id: string
+  title: string
+  columns: string[]
+  rows: Array<Array<string | number | null>>
+  link_column: number | null
+  row_links: Array<{ article_id: string }> | null
+  total_rows?: number
+  truncated?: boolean
+}
+
+export type AgentArtifact = ChartArtifact | FigureArtifact | TableArtifact
+
+/** What a question that spans many documents was answered from (see the backend's `Coverage`). */
+export interface AnswerCoverage {
+  /** Documents in scope that the reader may read. */
+  total: number
+  /** Of those, how many have a summary to draw on. */
+  with_digest: number
+  considered: number
+  used: number
+  partial: boolean
+  /** `missing_digests` | `ceiling` | `budget` | `map_failed` | ''. */
+  reason: string
+}
 
 // Populated only when the backend's CLAIM_VERIFICATION_ENABLED flag is on.
 export interface UnverifiedClaim { sentence: string; source_id: string }
