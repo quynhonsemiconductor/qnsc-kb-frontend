@@ -122,6 +122,49 @@ export async function changePassword(data: { current_password: string; new_passw
   return (await client.post('/auth/password/change', data)).data as { status: string }
 }
 
+export type AccountSession = {
+  id: string
+  current: boolean
+  signed_in_at?: string | null
+  last_used_at?: string | null
+  ip_address?: string | null
+  browser?: string
+  os?: string
+}
+
+export type AccountActivity = {
+  id: string
+  action: string
+  outcome: string
+  at?: string | null
+  ip_address?: string | null
+  method?: string | null
+  browser?: string
+  os?: string
+}
+
+/** The caller's own display name. Email, role and departments are managed by an administrator. */
+export async function updateMyProfile(data: { name: string }) {
+  return (await client.patch('/auth/me', data)).data
+}
+
+export async function listMySessions() {
+  return (await client.get('/auth/me/sessions')).data as AccountSession[]
+}
+
+export async function revokeMySession(sessionId: string) {
+  return (await client.delete(`/auth/me/sessions/${sessionId}`)).data as { status: string; current: boolean }
+}
+
+/** Ends every other device and re-issues this one's cookies, like a password change. */
+export async function revokeOtherSessions() {
+  return (await client.post('/auth/me/sessions/revoke-others')).data as { status: string; revoked: number }
+}
+
+export async function listMyActivity(limit = 20) {
+  return (await client.get('/auth/me/activity', { params: { limit } })).data as AccountActivity[]
+}
+
 export async function deactivateUser(userId: string) {
   const response = await client.delete(`/auth/users/${userId}`)
   return response.data

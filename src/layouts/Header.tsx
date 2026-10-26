@@ -15,6 +15,7 @@ import { Select } from '../components/ui/Select'
 import { Button } from '../components/ui/Button'
 import { FloatingPanel } from '../components/ui/FloatingPanel'
 import { BrandMarkGlyph } from '../components/ui/BrandMark'
+import UserMenu from '../components/account/UserMenu'
 import { formatDateTime } from '../lib/formatters'
 
 type NavEntry = { to: string; label: string; icon: LucideIcon }
@@ -192,6 +193,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
           </div>
           <label className="hidden h-8 shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-1.5 text-caption font-semibold text-muted-foreground lg:flex"><Globe size={12} /><Select value={language} onChange={event => setLanguage(event.target.value as 'en' | 'vi')} aria-label={t('language.switch')} size="sm" className="min-w-[4.5rem] cursor-pointer border-0 bg-transparent px-1 text-caption font-semibold text-foreground"><option value="en">EN</option><option value="vi">VI</option></Select></label>
           <label className="hidden h-8 shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-1.5 text-caption font-semibold text-muted-foreground 2xl:flex"><Monitor size={12} /><Select value={theme} onChange={event => setTheme(event.target.value as ThemePreference)} aria-label="Appearance" size="sm" className="min-w-[6.25rem] cursor-pointer border-0 bg-transparent px-1 text-caption"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></Select></label>
+          <UserMenu />
           <Button type="button" variant="secondary" size="sm" onClick={onMenuClick} aria-label="Open mobile navigation" icon={<Menu size={16} />} className="lg:hidden" />
         </div>
       </div>

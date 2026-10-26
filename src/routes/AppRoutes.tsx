@@ -10,6 +10,7 @@ const AcceptInvitePage = lazy(() => import('../auth/AcceptInvitePage'))
 const ForgotPasswordPage = lazy(() => import('../auth/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('../auth/ResetPasswordPage'))
 const HomePage = lazy(() => import('../pages/HomePage'))
+const AccountPage = lazy(() => import('../pages/account/AccountPage'))
 const BrowsePage = lazy(() => import('../pages/BrowsePage'))
 const BookmarksPage = lazy(() => import('../pages/BookmarksPage'))
 const ArticleListPage = lazy(() => import('../pages/articles/ArticleListPage'))
@@ -51,6 +52,7 @@ export const routes = createRoutesFromElements(
     <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
       <Route index element={<HomePage />} />
       <Route path="home" element={<HomePage />} />
+      <Route path="account" element={<AccountPage />} />
       <Route path="browse" element={<BrowsePage />} />
       <Route path="bookmarks" element={<BookmarksPage />} />
       <Route path="sources" element={<Navigate to="/articles" replace />} />
