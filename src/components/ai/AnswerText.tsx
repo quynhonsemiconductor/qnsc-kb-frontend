@@ -11,6 +11,7 @@ import {
   type InlineEvidenceItem,
 } from '../../lib/inline-evidence'
 import {
+  ANCHOR_ATTRIBUTE,
   ANCHOR_PROPERTY,
   anchorOffsetsFromProp,
   markEvidenceAnchors,
@@ -35,7 +36,7 @@ interface AnswerTextProps {
    * Render cited figures and tables beside the claims that cite them. Omitted while an
    * answer is still streaming, and for the action/error variants that carry no citations.
    */
-  evidence?: { labels: AnswerEvidenceLabels }
+  evidence?: { labels: AnswerEvidenceLabels; onAsk?: (question: string) => void }
 }
 
 /** Render grounded answers like DocNexus while making every citation interactive. */
@@ -119,6 +120,7 @@ function AnswerText({ content, citations = [], onCitationClick, evidence }: Answ
       previews={previews}
       onSelect={onCitationClick}
       labels={evidence!.labels}
+      onAsk={evidence!.onAsk}
     />
   ))
 
@@ -131,8 +133,13 @@ function AnswerText({ content, citations = [], onCitationClick, evidence }: Answ
    * no business in the DOM.
    */
   const withCitations = (tag: React.ElementType) => ({ children, node, ...props }: any) => {
-    const offsets = anchorOffsetsFromProp(props[ANCHOR_PROPERTY])
-    if (ANCHOR_PROPERTY in props) delete props[ANCHOR_PROPERTY]
+    // The hast node keeps the property under the name the plugin wrote; the props carry it
+    // under the DOM attribute name. Either way it is consumed here, never forwarded.
+    const offsets = anchorOffsetsFromProp(
+      node?.properties?.[ANCHOR_PROPERTY] ?? props[ANCHOR_ATTRIBUTE] ?? props[ANCHOR_PROPERTY],
+    )
+    delete props[ANCHOR_ATTRIBUTE]
+    delete props[ANCHOR_PROPERTY]
     const element = React.createElement(tag, props, processCitations(children))
     if (!offsets.length) return element
     const items = offsets.flatMap(offset => itemsByOffset.get(offset) || [])

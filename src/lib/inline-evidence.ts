@@ -24,6 +24,32 @@ export const INLINE_IMAGE_CAP = 4
 /** Tables rendered per message. Their data is already loaded; this bounds the layout. */
 export const INLINE_TABLE_CAP = 3
 
+/**
+ * Everything a citation can show: its own figure or table, then the ones on its page.
+ *
+ * Each is returned as a citation of its own (the parent's text and page, the evidence's id,
+ * kind, label and table), so the rest of this module and the side panel treat them all
+ * alike. Clicking a page figure therefore opens the source at that page.
+ */
+export function evidenceUnits(citation: Citation): Citation[] {
+  const units: Citation[] = []
+  if (citation.evidence_id) units.push(citation)
+  const { page_evidence: pageEvidence, ...base } = citation
+  for (const item of pageEvidence || []) {
+    if (!item?.evidence_id || !item.kind) continue
+    units.push({
+      ...base,
+      evidence_id: item.evidence_id,
+      evidence_kind: item.kind,
+      evidence_label: item.label,
+      evidence_preview_url: item.preview_url,
+      evidence_table: item.table ?? undefined,
+      page_number: item.page_number ?? base.page_number,
+    })
+  }
+  return units
+}
+
 export interface InlineEvidenceImage {
   type: 'image'
   evidenceId: string
@@ -145,16 +171,19 @@ export function anchorInlineEvidence(
 
   for (const marker of citationMarkers(content)) {
     const citation = findCitationByMarker(citations || [], marker.number)
-    const evidenceId = citation?.evidence_id
-    if (!evidenceId || claimed.has(evidenceId)) continue
-    const item = byEvidenceId.get(evidenceId)
-    // Absent means the caps withheld it, or it was unrenderable. Either way it is not
-    // this answer's to show, and must not become an empty anchor.
-    if (!item) continue
-    claimed.add(evidenceId)
-    const group = grouped.get(marker.offset)
-    if (group) group.push(item)
-    else grouped.set(marker.offset, [item])
+    if (!citation) continue
+    for (const unit of evidenceUnits(citation)) {
+      const evidenceId = unit.evidence_id
+      if (!evidenceId || claimed.has(evidenceId)) continue
+      const item = byEvidenceId.get(evidenceId)
+      // Absent means the caps withheld it, or it was unrenderable. Either way it is not
+      // this answer's to show, and must not become an empty anchor.
+      if (!item) continue
+      claimed.add(evidenceId)
+      const group = grouped.get(marker.offset)
+      if (group) group.push(item)
+      else grouped.set(marker.offset, [item])
+    }
   }
 
   return {
@@ -194,7 +223,7 @@ export function selectInlineEvidence(
   let hiddenImages = 0
   let hiddenTables = 0
 
-  for (const citation of citations || []) {
+  for (const citation of (citations || []).flatMap(evidenceUnits)) {
     const evidenceId = citation.evidence_id
     if (!evidenceId || !citation.evidence_kind || !citation.article_id) continue
     if (seen.has(evidenceId)) continue

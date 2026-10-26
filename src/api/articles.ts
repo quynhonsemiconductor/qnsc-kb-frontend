@@ -78,6 +78,12 @@ export async function downloadEvidencePreview(articleId: string, evidenceId: str
   return { url: URL.createObjectURL(response.data), type }
 }
 
+/** Every row of a table the answer showed only the first rows of. */
+export async function fetchEvidenceTable(articleId: string, evidenceId: string) {
+  const response = await client.get(`/articles/${articleId}/evidence/${evidenceId}/preview`)
+  return response.data as { columns?: unknown; rows?: unknown }
+}
+
 export async function getRelatedArticles(id: string, limit = 6) {
   const response = await client.get(`/articles/${id}/related`, { params: { limit } })
   return response.data
