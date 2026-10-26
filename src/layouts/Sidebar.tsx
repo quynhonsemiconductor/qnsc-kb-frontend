@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity, AlertTriangle, BookOpen, Bookmark, Bot, ClipboardList, Compass,
-  FileText, FolderTree, KeyRound, LogOut, Search,
+  FileText, FolderTree, KeyRound, LogOut, Search, UserCog,
   Settings2, Tag, Users, Shield, Sparkles, X, Building2, Home, Globe, Monitor,
   type LucideIcon,
 } from 'lucide-react'
@@ -98,10 +98,11 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
             <Select value={theme} onChange={event => setTheme(event.target.value as ThemePreference)} size="sm" className="w-full min-w-0 border-0 bg-transparent px-0 text-body-sm font-semibold text-foreground" aria-label="Appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></Select>
           </label>
         </div>
-        <div className="mb-2 flex items-center gap-2.5 rounded-xl bg-surface-muted px-3 py-3">
+        <NavLink to="/account" className="mb-2 flex items-center gap-2.5 rounded-xl bg-surface-muted px-3 py-3 no-underline transition hover:bg-surface-soft hover:no-underline" aria-label={t('account.open')}>
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary text-caption font-bold text-primary-foreground">{user?.name?.substring(0, 2).toUpperCase() || 'US'}</div>
-          <div className="min-w-0"><p className="truncate text-body-sm font-bold text-foreground">{user?.name || 'User'}</p><p className="truncate text-caption text-muted">{user?.role || 'Staff'}</p></div>
-        </div>
+          <div className="min-w-0 flex-1"><p className="truncate text-body-sm font-bold text-foreground">{user?.name || 'User'}</p><p className="truncate text-caption text-muted">{user?.role || 'Staff'}</p></div>
+          <UserCog size={15} className="shrink-0 text-muted-foreground" />
+        </NavLink>
         <div className="grid grid-cols-2 gap-2">
           <Button onClick={() => { onClose(); setPasswordOpen(true) }} variant="secondary" size="sm" icon={<KeyRound size={14} />}>{t('auth.changePassword')}</Button>
           <Button onClick={logout} variant="ghost" size="sm" icon={<LogOut size={14} />} className="text-destructive-text">{t('nav.logOut')}</Button>

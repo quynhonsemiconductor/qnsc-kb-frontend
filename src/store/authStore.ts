@@ -26,6 +26,7 @@ export type AuthUser = {
   permissions?: string[]
   permission_scopes?: Record<string, string>
   owned_departments?: Array<{ id?: string; name?: string }>
+  departments?: Array<{ id?: string; name?: string }>
 }
 
 interface AuthState {
