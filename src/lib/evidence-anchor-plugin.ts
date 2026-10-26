@@ -29,6 +29,13 @@ export const ANCHORABLE_TAGS = new Set([
 /** The property the plugin writes and the renderer reads. */
 export const ANCHOR_PROPERTY = 'dataEvidenceAnchor'
 
+/**
+ * The same property as the component sees it. react-markdown turns the hast property
+ * `dataEvidenceAnchor` into the DOM attribute name before handing props to a component, so a
+ * component reading `props.dataEvidenceAnchor` finds nothing and no figure is ever placed.
+ */
+export const ANCHOR_ATTRIBUTE = 'data-evidence-anchor'
+
 interface HastNode {
   type?: string
   tagName?: string

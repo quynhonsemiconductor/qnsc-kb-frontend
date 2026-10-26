@@ -7,6 +7,19 @@ export interface EvidenceTable {
   truncated?: boolean
 }
 
+/**
+ * A figure or table on the page a citation points at. The paragraph was what retrieval
+ * matched; this is what sits beside it in the document.
+ */
+export interface PageEvidence {
+  evidence_id: string
+  kind: EvidenceKind
+  label: string
+  page_number?: number
+  preview_url?: string
+  table?: EvidenceTable | null
+}
+
 export interface Citation {
   source_id?: string
   source_index?: number
@@ -24,6 +37,7 @@ export interface Citation {
   evidence_label?: string
   evidence_preview_url?: string
   evidence_table?: EvidenceTable
+  page_evidence?: PageEvidence[]
 }
 
 export interface AnalyticsOperand {

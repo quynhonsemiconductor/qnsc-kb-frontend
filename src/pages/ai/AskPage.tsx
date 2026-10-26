@@ -282,6 +282,31 @@ export default function AskPage() {
         tableRowSummary: t('chat.tableRowSummary'),
         unavailable: t('chat.inlineEvidenceUnavailable'),
         open: t('chat.inlineEvidenceOpen'),
+        openAtPage: t('chat.visual.openAtPage'),
+        zoom: t('chat.visual.zoom'),
+        download: t('chat.visual.download'),
+        askPrompt: t('chat.visual.askPrompt'),
+        ask: t('chat.visual.ask'),
+        zoomIn: t('chat.visual.zoomIn'),
+        zoomOut: t('chat.visual.zoomOut'),
+        fit: t('chat.visual.fit'),
+        close: t('chat.visual.close'),
+        rowSummary: t('chat.tableRowSummary'),
+        filter: t('chat.visual.filter'),
+        copy: t('chat.visual.copy'),
+        copied: t('chat.visual.copied'),
+        csv: t('chat.visual.csv'),
+        expand: t('chat.visual.expand'),
+        showAll: t('chat.visual.showAll'),
+        loadingAll: t('chat.visual.loadingAll'),
+        loadFailed: t('chat.visual.loadFailed'),
+        noMatch: t('chat.visual.noMatch'),
+        sortBy: t('chat.visual.sortBy'),
+      },
+      // Puts a question about a figure or table in the composer, ready to send or edit.
+      onAsk: (text: string) => {
+        setQuestion(text)
+        window.setTimeout(() => textareaRef.current?.focus(), 0)
       },
     }),
     [language],
@@ -1311,7 +1336,9 @@ export default function AskPage() {
                         <EvidenceTable
                           table={selectedSource.evidence_table}
                           label={selectedSource.evidence_label || t('chat.tableEvidence')}
-                          rowSummaryTemplate={t('chat.tableRowSummary')}
+                          labels={answerEvidence.labels}
+                          articleId={selectedSource.article_id}
+                          evidenceId={selectedSource.evidence_id}
                         />
                       </div>
                     )}

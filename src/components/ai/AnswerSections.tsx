@@ -12,7 +12,7 @@ interface AnswerSectionsProps {
   onCitationClick: (citation: AnswerCitation) => void
   /* Only the grounded half may show evidence. The extended section is general knowledge
      by definition — it cites nothing, so it has nothing to anchor. */
-  evidence?: { labels: AnswerEvidenceLabels }
+  evidence?: { labels: AnswerEvidenceLabels; onAsk?: (question: string) => void }
 }
 
 function AnswerSections({ grounded, extended = '', citations = [], onCitationClick, evidence }: AnswerSectionsProps) {
