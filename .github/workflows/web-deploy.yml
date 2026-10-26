@@ -125,7 +125,7 @@ jobs:
     # Cloudflare Pages answers those with index.html (405 on POST), and the deployed site
     # cannot log in while looking perfectly healthy. v1.7.1 also asserts the origin is
     # present in the built bundle, so that failure can no longer ship silently.
-    uses: quynhonsemiconductor/ci/.github/workflows/web-deploy.yml@691668f7a1bd4f4a3416f9224ae7ff7ebe831a3a # v1.23.0
+    uses: quynhonsemiconductor/ci/.github/workflows/web-deploy.yml@2a85ef7bb3c793edbc9b424ba2abeaed8080aab6 # v1.24.3
     with:
       product: qnsc-kb
       # Standalone repo, not a monorepo: wrangler runs at the repo root and the bundle
@@ -137,4 +137,3 @@ jobs:
     # Least privilege: pass only what the reusable declares (no `secrets: inherit`).
     secrets:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
