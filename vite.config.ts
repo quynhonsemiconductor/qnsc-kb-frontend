@@ -2,6 +2,8 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 import { readFile, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 
 // Captured in `configResolved` so the CSP plugin below can read them in `closeBundle`.
 let apiBaseUrl: string | undefined
@@ -12,8 +14,27 @@ let outDir = 'dist'
 // process environment winning as usual.
 const dotenv = { ...loadEnv('', process.cwd(), ''), ...process.env }
 
+// The build the bundle reports about itself (src/lib/buildInfo.ts). The commit is what tells one merge from
+// the next; `version` only moves when release-please cuts a release. CI exposes the commit as GITHUB_SHA, a local
+// build asks git, and a build with neither (a source tarball) ships '' and the UI says it does not know.
+const appVersion: string = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version
+function appCommit(): string {
+  const fromEnv = (process.env.APP_COMMIT_SHA || process.env.GITHUB_SHA || '').trim()
+  if (/^[0-9a-f]{7,40}$/i.test(fromEnv)) return fromEnv.toLowerCase()
+  try {
+    return execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().toLowerCase()
+  } catch {
+    return ''
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __APP_COMMIT__: JSON.stringify(appCommit()),
+    __APP_BUILT_AT__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     /**

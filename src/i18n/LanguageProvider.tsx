@@ -26,6 +26,9 @@ const messages: Record<Language, Record<string, string>> = {
     'nav.glossary': 'Glossary',
     'nav.graph': 'Knowledge graph',
     'nav.logOut': 'Log Out',
+    'build.title': 'Version', 'build.frontend': 'Web app', 'build.backend': 'Server',
+    'build.builtAt': 'built', 'build.startedAt': 'started', 'build.copy': 'Copy', 'build.copied': 'Copied',
+    'build.loading': 'loading…', 'build.unavailable': 'unavailable', 'build.noCommit': 'commit unknown',
     // These eight were hardcoded English in Sidebar.tsx, so the primary navigation rendered
     // half-translated in the DEFAULT locale: "TRI THỨC" and "QUẢN TRỊ" sat directly above an
     // English "ADMINISTRATION", and Home/Saved stayed English under a Vietnamese heading.
@@ -723,6 +726,9 @@ const messages: Record<Language, Record<string, string>> = {
     'nav.glossary': 'Thuật ngữ',
     'nav.graph': 'Đồ thị tri thức',
     'nav.logOut': 'Đăng xuất',
+    'build.title': 'Phiên bản', 'build.frontend': 'Giao diện', 'build.backend': 'Máy chủ',
+    'build.builtAt': 'build lúc', 'build.startedAt': 'chạy từ', 'build.copy': 'Sao chép', 'build.copied': 'Đã chép',
+    'build.loading': 'đang tải…', 'build.unavailable': 'không đọc được', 'build.noCommit': 'chưa rõ commit',
     'nav.home': 'Trang chủ',
     'nav.saved': 'Đã lưu',
     'nav.administration': 'Quản lý hệ thống',
