@@ -127,6 +127,17 @@ export function AccessTokensPanel() {
     </form>
     <p className="text-caption text-muted-foreground">{scope === 'write' ? t('tokens.scopeWriteHint') : t('tokens.scopeReadHint')}</p>
 
+    <details data-testid="token-usage" className="rounded-lg border border-border bg-surface-muted/40 p-3 text-body-sm">
+      <summary className="cursor-pointer font-semibold text-foreground">{t('tokens.usage')}</summary>
+      <div className="mt-2 space-y-2 text-muted-foreground">
+        <p>{t('tokens.usageIntro')}</p>
+        <ul className="list-disc space-y-1 pl-5 text-foreground">
+          {['tokens.example1', 'tokens.example2', 'tokens.example3'].map(key => <li key={key}>{t(key)}</li>)}
+        </ul>
+        <p className="text-caption">{t('tokens.usageTip')}</p>
+      </div>
+    </details>
+
     {failed ? <p role="alert" className="text-body-sm text-destructive">{t('account.loadFailed')}</p>
       : !data ? <div className="h-16 animate-pulse rounded-lg bg-surface-muted" />
       : data.items.length === 0 ? <p className="text-body-sm text-muted-foreground">{t('tokens.empty')}</p>
