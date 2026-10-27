@@ -8,7 +8,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useNavigate } from 'react-router-dom'
 import {
-  approveDraft, assignDraftApprover, bulkDecideDrafts, decideRestructure, downloadPendingDraftSource, getDraftComparison, getEligibleApprovers, getPendingDraft, getPendingDraftsPage, rejectDraft, restructureDraft,
+  approveDraft, assignDraftApprover, bulkDecideDraftsInBatches, decideRestructure, downloadPendingDraftSource, getDraftComparison, getEligibleApprovers, getPendingDraft, getPendingDraftsPage, rejectDraft, restructureDraft,
   type BulkDecideResult,
 } from '../../api/governance'
 import { listDepartments } from '../../api/auth'
@@ -650,12 +650,6 @@ export default function PendingDraftsPage() {
     const eligibleIds = selectedDrafts.map(draft => draft.id)
     if (!eligibleIds.length || bulkRunning) return
     const count = eligibleIds.length
-    // The endpoint caps a batch at 100 ids; refusing here explains the limit instead of
-    // letting the reviewer read a 422 they cannot act on.
-    if (count > 100) {
-      await dialog.alert(t('bulk.tooMany', { count }), { title: t('bulk.tooManyTitle') })
-      return
-    }
 
     let reviewNote: string | undefined
     if (decision === 'reject') {
@@ -694,7 +688,8 @@ export default function PendingDraftsPage() {
     setBulkRunning(true)
     setBulkResult(null)
     try {
-      const result = await bulkDecideDrafts({
+      // Any selection size is fine: the endpoint's 100-id cap is handled by sending batches.
+      const result = await bulkDecideDraftsInBatches({
         draft_ids: eligibleIds,
         decision,
         ...(decision === 'approve' ? { dept: effectiveBulkDept, department_ids: bulkDepartmentIds } : {}),
