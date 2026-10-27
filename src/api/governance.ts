@@ -159,6 +159,48 @@ export async function bulkDecideDrafts(payload: {
   return result
 }
 
+/** The endpoint rejects more than this many ids in one request. */
+export const BULK_DECIDE_BATCH_LIMIT = 100
+
+type BulkDecidePayload = Parameters<typeof bulkDecideDrafts>[0]
+
+/**
+ * Decides any number of drafts by sending them to the endpoint in batches of at most
+ * BULK_DECIDE_BATCH_LIMIT, one after the other, and returns the combined result.
+ *
+ * Select-all can legitimately pick hundreds of drafts, so the reviewer must not have to
+ * split the selection by hand. If a later batch fails outright, the earlier batches stay
+ * decided and every id that was never processed is reported as blocked, so the caller can
+ * show an accurate partial result and keep exactly those drafts selected for a retry.
+ * A failure of the first batch is thrown: nothing was decided.
+ */
+export async function bulkDecideDraftsInBatches(
+  payload: BulkDecidePayload,
+  limit: number = BULK_DECIDE_BATCH_LIMIT,
+): Promise<BulkDecideResult> {
+  const ids = Array.from(new Set(payload.draft_ids))
+  const merged: BulkDecideResult = {
+    decision: payload.decision, requested: ids.length, decided_count: 0, blocked_count: 0, decided: [], blocked: [],
+  }
+  for (let start = 0; start < ids.length; start += limit) {
+    try {
+      const batch = await bulkDecideDrafts({ ...payload, draft_ids: ids.slice(start, start + limit) })
+      merged.decided.push(...batch.decided)
+      merged.blocked.push(...batch.blocked)
+    } catch (error) {
+      if (start === 0) throw error
+      const reason = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+      merged.blocked.push(...ids.slice(start).map(draft_id => ({
+        draft_id, status_code: 0, code: 'batch_not_processed', reason: typeof reason === 'string' ? reason : null,
+      })))
+      break
+    }
+  }
+  merged.decided_count = merged.decided.length
+  merged.blocked_count = merged.blocked.length
+  return merged
+}
+
 export async function restructureDraft(id: string) {
   const response = await client.post(`/governance/pending-drafts/${id}/restructure`)
   return response.data
