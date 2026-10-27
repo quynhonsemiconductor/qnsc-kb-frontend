@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Clock, Globe, KeyRound, Laptop, LogOut, Monitor, Save, ShieldCheck, Smartphone, UserCog } from 'lucide-react'
+import { Clock, Globe, KeyRound, Laptop, LogOut, Monitor, Plug, Save, ShieldCheck, Smartphone, UserCog } from 'lucide-react'
 import {
   listMyActivity, listMySessions, revokeMySession, revokeOtherSessions, updateMyProfile,
   type AccountActivity, type AccountSession,
@@ -7,6 +7,7 @@ import {
 import { getAccessToken, refreshSession } from '../../api/client'
 import { useAuth } from '../../auth/useAuth'
 import { ChangePasswordModal } from '../../auth/ChangePasswordModal'
+import { AccessTokensPanel } from '../../components/account/AccessTokensPanel'
 import { readStoredUser } from '../../store/authStore'
 import PageHeader from '../../components/ui/PageHeader'
 import { PageTransition } from '../../components/ui/PageTransition'
@@ -203,6 +204,10 @@ export default function AccountPage() {
               </li>
             })}
           </ul>}
+      </Section>
+
+      <Section icon={Plug} title={t('tokens.title')} hint={t('tokens.hint')}>
+        <AccessTokensPanel />
       </Section>
 
       <Section icon={Clock} title={t('account.activity')} hint={t('account.activityHint')}>
