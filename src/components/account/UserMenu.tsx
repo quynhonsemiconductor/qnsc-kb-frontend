@@ -6,6 +6,7 @@ import { ChangePasswordModal } from '../../auth/ChangePasswordModal'
 import { useLanguage } from '../../i18n/LanguageProvider'
 import { FloatingPanel } from '../ui/FloatingPanel'
 import { initials } from '../../lib/account'
+import { BuildInfoPanel } from './BuildInfoPanel'
 
 /**
  * Who is signed in, and the way out. The header had no sign-out at all on a desktop
@@ -43,6 +44,7 @@ export default function UserMenu() {
         <button type="button" role="menuitem" onClick={() => { setOpen(false); setPasswordOpen(true) }} className={item}><KeyRound size={15} className="text-muted-foreground" />{t('auth.changePassword')}</button>
         <button type="button" role="menuitem" onClick={() => { setOpen(false); void logout() }} className={`${item} text-destructive-text`}><LogOut size={15} />{t('nav.logOut')}</button>
       </div>
+      <BuildInfoPanel />
     </FloatingPanel>
     <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
   </>
