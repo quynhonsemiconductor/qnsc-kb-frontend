@@ -25,7 +25,14 @@ export type DraftManagementStatus = {
   state: DraftQueueState
   action: DraftPrimaryAction
   reason: DraftDecisionReason
+  /** Can be approved in bulk: nothing is left for a human to decide. */
   bulkEligible: boolean
+  /**
+   * Can be rejected in bulk. Rejecting needs no decision about department, layout, update
+   * target or approver, so every draft whose preparation has finished qualifies, including
+   * the ones that cannot be approved in bulk.
+   */
+  rejectEligible: boolean
   priority: number
 }
 
@@ -36,17 +43,17 @@ export function getDraftManagementStatus(
   // `deferred`: the AI provider is rate limiting and the backend has scheduled its own retry. Still
   // preparing (so polled, not actionable), but with a reason that says why it is taking longer.
   if (draft.restructure_status === 'deferred') {
-    return { state: 'processing', action: 'wait', reason: 'ai_deferred', bulkEligible: false, priority: 4 }
+    return { state: 'processing', action: 'wait', reason: 'ai_deferred', bulkEligible: false, rejectEligible: false, priority: 4 }
   }
   if (['queued', 'processing'].includes(draft.restructure_status || '')) {
-    return { state: 'processing', action: 'wait', reason: null, bulkEligible: false, priority: 4 }
+    return { state: 'processing', action: 'wait', reason: null, bulkEligible: false, rejectEligible: false, priority: 4 }
   }
   if (draft.restructure_status === 'stalled') {
-    return { state: 'stalled', action: 'retry', reason: null, bulkEligible: false, priority: 0 }
+    return { state: 'stalled', action: 'retry', reason: null, bulkEligible: false, rejectEligible: true, priority: 0 }
   }
 
   if ((draft.candidate_count || 0) > 1) {
-    return { state: 'split_review', action: 'review_sections', reason: null, bulkEligible: false, priority: 0 }
+    return { state: 'split_review', action: 'review_sections', reason: null, bulkEligible: false, rejectEligible: true, priority: 0 }
   }
 
   const needsApprover = !draft.assigned_approver_id && !context.canSelfApprove
@@ -77,10 +84,10 @@ export function getDraftManagementStatus(
             : null
 
   if (reason) {
-    return { state: 'decision', action: 'review_decision', reason, bulkEligible: false, priority: 1 }
+    return { state: 'decision', action: 'review_decision', reason, bulkEligible: false, rejectEligible: true, priority: 1 }
   }
 
-  return { state: 'ready', action: 'review', reason: null, bulkEligible: true, priority: 2 }
+  return { state: 'ready', action: 'review', reason: null, bulkEligible: true, rejectEligible: true, priority: 2 }
 }
 
 export type PublishBlocker = 'reviewer' | 'department' | 'layout' | 'version'
