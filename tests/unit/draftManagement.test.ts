@@ -18,6 +18,21 @@ describe('draft management status', () => {
     })
   })
 
+  it('lets every draft that finished preparing be rejected in bulk, but only decision-free ones approved', () => {
+    const rejectable = (overrides: Partial<ManageableDraft>) => getDraftManagementStatus(draft(overrides), context)
+    expect(rejectable({})).toMatchObject({ state: 'ready', bulkEligible: true, rejectEligible: true })
+    expect(rejectable({ requires_update_confirmation: true })).toMatchObject({ state: 'decision', bulkEligible: false, rejectEligible: true })
+    expect(rejectable({ dept: '', content_metadata: null })).toMatchObject({ state: 'decision', reason: 'missing_department', bulkEligible: false, rejectEligible: true })
+    expect(rejectable({ candidate_count: 3 })).toMatchObject({ state: 'split_review', bulkEligible: false, rejectEligible: true })
+    expect(rejectable({ restructure_status: 'stalled' })).toMatchObject({ state: 'stalled', bulkEligible: false, rejectEligible: true })
+  })
+
+  it('never offers a draft that is still being prepared for bulk rejection', () => {
+    for (const restructure_status of ['queued', 'processing', 'deferred']) {
+      expect(getDraftManagementStatus(draft({ restructure_status }), context)).toMatchObject({ rejectEligible: false, bulkEligible: false })
+    }
+  })
+
   it('treats a rate-limit-deferred AI formatting as still preparing, with its own reason', () => {
     expect(getDraftManagementStatus(draft({ restructure_status: 'deferred' }), context)).toMatchObject({
       state: 'processing', action: 'wait', reason: 'ai_deferred', bulkEligible: false,

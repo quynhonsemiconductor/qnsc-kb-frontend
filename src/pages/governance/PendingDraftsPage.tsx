@@ -340,14 +340,19 @@ export default function PendingDraftsPage() {
       || (queueFilter === 'decision' && state !== 'ready' && !isPreparationQueueState(state))
     return matchesSearch && matchesFilter
   }).sort(compareDraftManagementOrder), [drafts, query, queueFilter, statusById, total])
+  // Selectable = can be rejected in bulk (every draft that is done preparing). Approving is
+  // stricter, see `unapprovableCount`.
   const eligibleVisibleDrafts = useMemo(
-    () => filteredDrafts.filter(draft => statusById.get(draft.id)?.bulkEligible),
+    () => filteredDrafts.filter(draft => statusById.get(draft.id)?.rejectEligible),
     [filteredDrafts, statusById],
   )
   useEffect(() => {
-    setSelectedIds(current => current.filter(id => statusById.get(id)?.bulkEligible))
+    setSelectedIds(current => current.filter(id => statusById.get(id)?.rejectEligible))
   }, [statusById])
-  const selectedDrafts = useMemo(() => drafts.filter(draft => selectedIds.includes(draft.id) && statusById.get(draft.id)?.bulkEligible), [drafts, selectedIds, statusById])
+  const selectedDrafts = useMemo(() => drafts.filter(draft => selectedIds.includes(draft.id) && statusById.get(draft.id)?.rejectEligible), [drafts, selectedIds, statusById])
+  // Drafts in the selection that still need a person's decision (department, layout, update
+  // target, approver, split). They can be rejected with the rest but not approved in bulk.
+  const unapprovableCount = useMemo(() => selectedDrafts.filter(draft => !statusById.get(draft.id)?.bulkEligible).length, [selectedDrafts, statusById])
   const visibleSelectedCount = eligibleVisibleDrafts.filter(draft => selectedIds.includes(draft.id)).length
   const allVisibleSelected = eligibleVisibleDrafts.length > 0 && visibleSelectedCount === eligibleVisibleDrafts.length
   const someVisibleSelected = visibleSelectedCount > 0 && !allVisibleSelected
@@ -608,7 +613,7 @@ export default function PendingDraftsPage() {
   }
 
   const toggleDraftSelection = (draftId: string) => {
-    if (!statusById.get(draftId)?.bulkEligible) return
+    if (!statusById.get(draftId)?.rejectEligible) return
     setSelectedIds(current => current.includes(draftId) ? current.filter(id => id !== draftId) : [...current, draftId])
   }
 
@@ -637,7 +642,7 @@ export default function PendingDraftsPage() {
         clearSelection()
         return
       }
-      if ((event.key === 'x' || event.key === 'X') && focusedDraftId && statusById.get(focusedDraftId)?.bulkEligible) {
+      if ((event.key === 'x' || event.key === 'X') && focusedDraftId && statusById.get(focusedDraftId)?.rejectEligible) {
         event.preventDefault()
         toggleDraftSelection(focusedDraftId)
       }
@@ -650,6 +655,9 @@ export default function PendingDraftsPage() {
     const eligibleIds = selectedDrafts.map(draft => draft.id)
     if (!eligibleIds.length || bulkRunning) return
     const count = eligibleIds.length
+    // Approving publishes, so a selection holding drafts that still need a decision is refused;
+    // the button is disabled for the same reason, this is the guard behind it.
+    if (decision === 'approve' && unapprovableCount > 0) return
 
     let reviewNote: string | undefined
     if (decision === 'reject') {
@@ -845,9 +853,11 @@ export default function PendingDraftsPage() {
       {selectedIds.length > 0 && <section className="sticky top-2 z-sticky rounded-xl border border-primary/30 bg-surface-elevated/95 p-4 shadow-popover backdrop-blur">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0"><p className="text-sm font-semibold text-ink">{t('bulk.selectedCount', { count: selectedIds.length })}</p><p className="mt-0.5 text-body-sm text-stone">{bulkDeptAmbiguous ? t('bulk.deptMixed') : t('bulk.deptResolved', { dept: effectiveBulkDept })}</p></div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end"><Select value={bulkDept} onChange={event => setBulkDept(event.target.value)} className="w-full text-xs sm:w-auto sm:min-w-52" aria-label={t('bulk.deptLabel')}><option value="">{agreedDept ? t('bulk.deptInherited', { dept: agreedDept }) : t('bulk.deptChoose')}</option>{visibleDepartments.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</Select><Button variant="primary" size="sm" onClick={() => void runBulkDecision('approve')} disabled={bulkRunning || bulkDeptAmbiguous} icon={<Check size={14} />}>{bulkRunning ? t('bulk.working') : t('bulk.approveSelected', { count: selectedIds.length })}</Button><Button variant="danger" size="sm" onClick={() => void runBulkDecision('reject')} disabled={bulkRunning}>{t('bulk.rejectSelected', { count: selectedIds.length })}</Button><Button variant="ghost" size="sm" onClick={clearSelection} disabled={bulkRunning}>{t('bulk.clearSelection')}</Button></div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end"><Select value={bulkDept} onChange={event => setBulkDept(event.target.value)} className="w-full text-xs sm:w-auto sm:min-w-52" aria-label={t('bulk.deptLabel')}><option value="">{agreedDept ? t('bulk.deptInherited', { dept: agreedDept }) : t('bulk.deptChoose')}</option>{visibleDepartments.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</Select><Button variant="primary" size="sm" onClick={() => void runBulkDecision('approve')} disabled={bulkRunning || bulkDeptAmbiguous || unapprovableCount > 0} icon={<Check size={14} />}>{bulkRunning ? t('bulk.working') : t('bulk.approveSelected', { count: selectedIds.length })}</Button><Button variant="danger" size="sm" onClick={() => void runBulkDecision('reject')} disabled={bulkRunning}>{t('bulk.rejectSelected', { count: selectedIds.length })}</Button><Button variant="ghost" size="sm" onClick={clearSelection} disabled={bulkRunning}>{t('bulk.clearSelection')}</Button></div>
         </div>
-        {bulkDeptAmbiguous && <p className="mt-2 text-body-sm text-warning-text">{t('bulk.deptRequired')}</p>}
+        {unapprovableCount > 0
+          ? <p className="mt-2 text-body-sm text-warning-text">{t('bulk.approveNeedsDecision', { count: unapprovableCount })}</p>
+          : bulkDeptAmbiguous && <p className="mt-2 text-body-sm text-warning-text">{t('bulk.deptRequired')}</p>}
       </section>}
 
       {loading ? <div role="status" className="grid min-h-56 place-items-center rounded-xl border border-border bg-surface text-sm text-muted-foreground"><RefreshCw size={16} className="mr-2 animate-spin" />{t('drafts.loading')}</div> : filteredDrafts.length === 0 ? <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-border bg-surface/50 p-8 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-success/10 text-success-text"><Check size={24} /></div><h2 className="mt-4 text-base font-semibold">{drafts.length ? t('drafts.noMatch') : t('drafts.empty')}</h2><p className="mt-2 text-sm text-muted-foreground">{drafts.length ? t('drafts.noMatchHelp') : t('drafts.emptyHelp')}</p></div></div> : <div className="overflow-hidden rounded-xl border border-border bg-surface-elevated">{filteredDrafts.map(draft => {
@@ -858,7 +868,7 @@ export default function PendingDraftsPage() {
         const tone = status.state === 'ready' ? 'success' : status.state === 'processing' ? 'default' : 'warning'
         const actionLabel = status.action === 'retry' ? t('drafts.retryPreparation') : status.action === 'review_sections' ? t('drafts.reviewSections') : status.action === 'review_decision' ? t('drafts.reviewDecision') : status.action === 'wait' ? t('drafts.preparing') : t('drafts.review')
         return <article key={draft.id} tabIndex={0} onFocus={() => setFocusedDraftId(draft.id)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedDraftId(current => current === draft.id ? null : current) }} className={`grid gap-4 border-b border-border p-4 outline-none transition last:border-b-0 hover:bg-surface-muted/60 lg:grid-cols-[auto_minmax(0,1.4fr)_minmax(15rem,.8fr)_auto] lg:items-center ${selected ? 'bg-primary/5' : ''} ${focusedDraftId === draft.id ? 'ring-1 ring-inset ring-primary/30' : ''}`}>
-          <div className="w-5">{status.bulkEligible && <label className="inline-flex cursor-pointer" title={t('bulk.selectDraft')}><input type="checkbox" className="sr-only" checked={selected} onChange={() => toggleDraftSelection(draft.id)} aria-label={t('bulk.selectDraftNamed', { title: draft.title })} /><span className={`grid h-4 w-4 place-items-center rounded border ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-input'}`}>{selected && <Check size={11} strokeWidth={3} />}</span></label>}</div>
+          <div className="w-5">{status.rejectEligible && <label className="inline-flex cursor-pointer" title={t('bulk.selectDraft')}><input type="checkbox" className="sr-only" checked={selected} onChange={() => toggleDraftSelection(draft.id)} aria-label={t('bulk.selectDraftNamed', { title: draft.title })} /><span className={`grid h-4 w-4 place-items-center rounded border ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-input'}`}>{selected && <Check size={11} strokeWidth={3} />}</span></label>}</div>
           <div className="min-w-0"><h3 className="truncate text-sm font-semibold text-foreground">{draft.title}</h3><p className="mt-1 truncate text-body-sm text-muted-foreground">{draft.source_ref}</p><div className="mt-2 flex flex-wrap items-center gap-2 text-caption text-muted"><span>{draft.dept || t('drafts.noDepartment')}</span><span aria-hidden="true">·</span><span>{t('drafts.submittedOn', { date: formatDay(draft.created_at) })}</span></div></div>
           <div className="min-w-0"><Badge variant={tone} size="sm">{statusLabel}</Badge><p className="mt-1.5 text-body-sm leading-5 text-muted-foreground">{reason}</p></div>
           <div className="flex flex-wrap items-center gap-2 lg:justify-end"><Button variant="primary" size="sm" onClick={() => status.action === 'retry' ? void handleRestructure(draft) : void openReview(draft)} disabled={status.action === 'wait' || reviewLoadingId === draft.id || restructuringDraftId === draft.id} loading={reviewLoadingId === draft.id || restructuringDraftId === draft.id} icon={status.action === 'retry' ? <RefreshCw size={14} /> : status.action === 'review_sections' ? <Layers3 size={14} /> : status.action === 'wait' ? <RefreshCw size={14} className="animate-spin" /> : <Eye size={14} />}>{actionLabel}</Button>{status.action !== 'wait' && status.action !== 'retry' && <Button variant="ghost" size="sm" onClick={() => void handleReject(draft.id)} disabled={actingDraftId === draft.id}>{t('drafts.reject')}</Button>}{status.action !== 'retry' && canRetryAiFormat(draft) && <Button variant="ghost" size="sm" onClick={() => void handleRestructure(draft)} disabled={restructuringDraftId === draft.id} aria-label={t('drafts.retryPreparation')} icon={<RefreshCw size={13} />} />}</div>
