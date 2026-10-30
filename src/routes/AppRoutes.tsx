@@ -16,6 +16,7 @@ const BookmarksPage = lazy(() => import('../pages/BookmarksPage'))
 const ArticleListPage = lazy(() => import('../pages/articles/ArticleListPage'))
 const ArticleDetailPage = lazy(() => import('../pages/articles/ArticleDetailPage'))
 const ArticleEditPage = lazy(() => import('../pages/articles/ArticleEditPage'))
+const ArticleChunksPage = lazy(() => import('../pages/articles/ArticleChunksPage'))
 const SearchResultsPage = lazy(() => import('../pages/search/SearchResultsPage'))
 const AskPage = lazy(() => import('../pages/ai/AskPage'))
 const PendingDraftsPage = lazy(() => import('../pages/governance/PendingDraftsPage'))
@@ -63,6 +64,7 @@ export const routes = createRoutesFromElements(
       <Route path="articles/new" element={<ProtectedRoute permission="article.create"><ArticleEditPage /></ProtectedRoute>} />
       <Route path="articles/:id" element={<ProtectedRoute permission="article.read"><ArticleDetailPage /></ProtectedRoute>} />
       <Route path="articles/:id/edit" element={<ProtectedRoute permission="article.edit"><ArticleEditPage /></ProtectedRoute>} />
+      <Route path="articles/:id/chunks" element={<ProtectedRoute permission="article.edit"><ArticleChunksPage /></ProtectedRoute>} />
       <Route path="search" element={<SearchResultsPage />} />
       <Route path="ai" element={<AskPage />} />
 

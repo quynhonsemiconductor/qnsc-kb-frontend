@@ -7,6 +7,7 @@ export async function getArticles(params: any = {}) {
   return response.data
 }
 
+export async function getArticleChunks(id: string) { return (await client.get(`/articles/${id}/chunks`)).data }
 export async function getArticle(id: string) {
   const response = await client.get(`/articles/${id}`)
   return response.data

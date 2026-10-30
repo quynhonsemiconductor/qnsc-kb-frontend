@@ -29,6 +29,9 @@ export interface RetryableMessageState {
   unverifiedClaims?: unknown[]
 }
 
+/** How hard an answer looks: quick skips follow-up retrieval, thorough allows more of it. */
+export type AskDepth = 'quick' | 'standard' | 'thorough'
+
 interface AIAskPayloadOptions {
   question: string
   conversationId?: string
@@ -37,6 +40,7 @@ interface AIAskPayloadOptions {
   confirmEdit?: boolean
   editInstruction?: string
   retryFailed?: boolean
+  depth?: AskDepth
 }
 
 export function buildAIAskPayload({
@@ -47,6 +51,7 @@ export function buildAIAskPayload({
   confirmEdit = false,
   editInstruction,
   retryFailed = false,
+  depth = 'standard',
 }: AIAskPayloadOptions) {
   return {
     question,
@@ -56,6 +61,8 @@ export function buildAIAskPayload({
     confirm_edit: confirmEdit,
     edit_instruction: editInstruction || undefined,
     retry_failed: retryFailed,
+    // The server's default is standard, so only a different choice is sent.
+    depth: depth === 'standard' ? undefined : depth,
   }
 }
 
