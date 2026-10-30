@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckCircle2, RotateCcw } from 'lucide-react'
 import { getConflicts, reopenConflict, resolveConflict } from '../../api/knowledge'
@@ -21,17 +21,23 @@ export default function ConflictsPanel({ onChanged }: { onChanged?: () => void }
   const [tab, setTab] = useState<Tab>('open')
   const [items, setItems] = useState<Conflict[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const mayChoose = canChooseWinner(user)
 
-  const load = useCallback(async () => {
+  // `cancelled` drops the answer to a request the user has already moved past, so quickly
+  // switching tabs can never show the other tab's conflicts.
+  useEffect(() => {
+    let cancelled = false
     setItems(null)
-    setItems(await getConflicts(tab))
-  }, [tab])
-  useEffect(() => { void load().catch(console.error) }, [load])
+    getConflicts(tab)
+      .then(data => { if (!cancelled) setItems(data) })
+      .catch(error => { console.error(error); if (!cancelled) setItems([]) })
+    return () => { cancelled = true }
+  }, [tab, reloadKey])
 
   const run = async (id: string, action: () => Promise<unknown>) => {
     setBusy(id)
-    try { await action(); await load(); onChanged?.() }
+    try { await action(); setReloadKey(key => key + 1); onChanged?.() }
     catch (error) { await dialog.alert(apiErrorDetail(error) || 'The change could not be saved. Try again.', { title: 'Conflict' }) }
     finally { setBusy(null) }
   }

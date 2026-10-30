@@ -126,7 +126,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
     { to: '/governance/gap-queue', label: t('nav.gapQueue'), icon: AlertTriangle },
     { to: '/governance/health', label: t('nav.healthDashboard'), icon: Activity },
     { to: '/governance/coverage', label: 'Coverage', icon: ClipboardList },
-    { to: '/governance/feedback', label: 'Answer feedback', icon: ThumbsDown },
+    { to: '/governance/feedback', label: t('nav.feedbackReview'), icon: ThumbsDown },
     ...(has('article.publish') ? [{ to: '/governance/approval-rules', label: t('nav.approvalRules'), icon: FileCheck2 }] : []),
     ...(has('role.manage') ? [{ to: '/governance/audit-log', label: t('nav.auditLogs'), icon: ClipboardList }] : []),
   ] : []
@@ -143,7 +143,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
       { to: '/admin/roles', label: t('nav.rolesPermissions'), icon: Shield },
       { to: '/admin/features', label: t('nav.featureControls'), icon: Settings2 },
       { to: '/admin/llm', label: t('nav.aiProvider'), icon: Sparkles },
-      { to: '/admin/mcp-config', label: 'Team AI configuration', icon: Bot },
+      { to: '/admin/mcp-config', label: t('nav.mcpConfig'), icon: Bot },
     ] : []),
     ...(has('connector.manage') ? [{ to: '/admin/connectors', label: t('nav.sourceConnectors'), icon: FolderTree }] : []),
   ]

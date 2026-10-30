@@ -14,6 +14,7 @@ import {
 import { listDepartments } from '../../api/auth'
 import { useLanguage } from '../../i18n/LanguageProvider'
 import { useAuth } from '../../auth/useAuth'
+import { isAdminOrCeo } from '../../auth/roles'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { usePolling } from '../../hooks/usePolling'
 import { Select } from '../../components/ui/Select'
@@ -197,7 +198,7 @@ export default function PendingDraftsPage() {
   const dialog = useDialog()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const canSelfApprove = Boolean(user?.role === 'Admin' || user?.role === 'CEO' || user?.roles?.some((role: { name?: string }) => role.name === 'Admin' || role.name === 'CEO'))
+  const canSelfApprove = isAdminOrCeo(user)
   const managementContext = useMemo(() => ({ currentUserId: user?.id, canSelfApprove }), [canSelfApprove, user?.id])
   const visibleDepartments = useMemo(
     () => departments.filter(item => item.active && item.company_domain === user?.company_domain),

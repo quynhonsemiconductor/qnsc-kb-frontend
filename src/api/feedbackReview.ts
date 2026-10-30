@@ -1,6 +1,6 @@
 import client from './client'
 
-export type FeedbackReviewFilter = 'pending' | 'reviewed' | 'all'
+export type FeedbackReviewFilter = 'pending' | 'reviewed'
 
 export type FeedbackItem = {
   id: string

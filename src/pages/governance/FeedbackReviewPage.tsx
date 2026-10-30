@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, ThumbsDown } from 'lucide-react'
 import { listFeedbackForReview, markFeedbackReviewed, type FeedbackItem, type FeedbackReviewFilter } from '../../api/feedbackReview'
 import PageHeader from '../../components/ui/PageHeader'
@@ -8,31 +8,36 @@ import { Badge } from '../../components/ui/Badge'
 import { apiErrorDetail } from '../../lib/error-handler'
 import { formatDateTime } from '../../lib/formatters'
 
-const TABS: { value: Exclude<FeedbackReviewFilter, 'all'>; label: string }[] = [
+const TABS: { value: FeedbackReviewFilter; label: string }[] = [
   { value: 'pending', label: 'To review' },
   { value: 'reviewed', label: 'Reviewed' },
 ]
 
 export default function FeedbackReviewPage() {
   const dialog = useDialog()
-  const [tab, setTab] = useState<'pending' | 'reviewed'>('pending')
+  const [tab, setTab] = useState<FeedbackReviewFilter>('pending')
   const [items, setItems] = useState<FeedbackItem[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
 
-  const load = useCallback(async () => {
+  // `cancelled` drops the answer to a request the user has already moved past, so quickly
+  // switching tabs can never show the other tab's list.
+  useEffect(() => {
+    let cancelled = false
     setItems(null)
     setError('')
-    try { setItems(await listFeedbackForReview(tab)) }
-    catch (failure) { setItems([]); setError(apiErrorDetail(failure) || 'The feedback could not be loaded.') }
-  }, [tab])
-  useEffect(() => { void load() }, [load])
+    listFeedbackForReview(tab)
+      .then(data => { if (!cancelled) setItems(data) })
+      .catch(failure => { if (!cancelled) { setItems([]); setError(apiErrorDetail(failure) || 'The feedback could not be loaded.') } })
+    return () => { cancelled = true }
+  }, [tab, reloadKey])
 
   const review = async (item: FeedbackItem) => {
     const note = await dialog.prompt('What did you do about it? For example: added a missing article, fixed an outdated one, or the answer was right.', { title: 'Mark as reviewed', confirmLabel: 'Mark reviewed', placeholder: 'Optional note', multiline: true })
     if (note === null) return
     setBusy(item.id)
-    try { await markFeedbackReviewed(item.id, note); await load() }
+    try { await markFeedbackReviewed(item.id, note); setReloadKey(key => key + 1) }
     catch (failure) { await dialog.alert(apiErrorDetail(failure) || 'It could not be saved. Try again.', { title: 'Feedback' }) }
     finally { setBusy(null) }
   }

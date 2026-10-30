@@ -17,7 +17,7 @@ export async function getCoverage() { return (await client.get('/knowledge/cover
 export async function getConflicts(status: 'open' | 'resolved' | 'all' = 'open') { return (await client.get('/knowledge/conflicts', { params: { status } })).data }
 // A note closes a conflict; naming `keepArticleId` (Admin/CEO) also makes answers stop quoting the other articles.
 export async function resolveConflict(id: string, decision: string | { note?: string; keepArticleId?: string }) {
-  const body = typeof decision === 'string' ? { note: decision } : { note: decision.note ?? '', keep_article_id: decision.keepArticleId }
+  const body = typeof decision === 'string' ? { note: decision } : { ...(decision.note ? { note: decision.note } : {}), keep_article_id: decision.keepArticleId }
   return (await client.post(`/knowledge/conflicts/${id}/resolve`, body)).data
 }
 export async function reopenConflict(id: string) { return (await client.post(`/knowledge/conflicts/${id}/reopen`)).data }

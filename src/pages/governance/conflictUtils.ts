@@ -1,3 +1,5 @@
+import { isAdminOrCeo } from '../../auth/roles'
+
 export type ConflictArticle = {
   id: string
   title: string | null
@@ -12,11 +14,13 @@ export type Conflict = {
   id: string
   fact: string
   contradiction_type: string | null
-  detection_method: 'pattern' | 'llm' | string
+  // 'pattern' (labelled-fact lines) or 'llm'; the backend may add more
+  detection_method: string
   article_ids: string[]
   articles: ConflictArticle[]
   evidence: ConflictEvidence[]
-  status: 'open' | 'resolved' | string
+  // 'open' or 'resolved'
+  status: string
   kept_article_id: string | null
   resolution_note: string | null
   resolved_at: string | null
@@ -59,7 +63,4 @@ export function newerArticleId(conflict: Conflict): string | null {
 }
 
 /** Admin and CEO may decide which article is right; anyone with governance access may close with a note. */
-export function canChooseWinner(user: { role?: string; roles?: { name?: string }[] } | null | undefined): boolean {
-  if (!user) return false
-  return user.role === 'Admin' || user.role === 'CEO' || Boolean(user.roles?.some(role => role.name === 'Admin' || role.name === 'CEO'))
-}
+export const canChooseWinner = isAdminOrCeo

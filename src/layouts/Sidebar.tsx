@@ -68,7 +68,7 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
           <DrawerLink to="/governance/gap-queue" icon={AlertTriangle}>{t('nav.gapQueue')}</DrawerLink>
           <DrawerLink to="/governance/health" icon={Activity}>{t('nav.healthDashboard')}</DrawerLink>
           <DrawerLink to="/governance/coverage" icon={ClipboardList}>Coverage</DrawerLink>
-          <DrawerLink to="/governance/feedback" icon={ThumbsDown}>Answer feedback</DrawerLink>
+          <DrawerLink to="/governance/feedback" icon={ThumbsDown}>{t('nav.feedbackReview')}</DrawerLink>
           {has('article.publish') && <DrawerLink to="/governance/approval-rules" icon={Bot}>{t('nav.approvalRules')}</DrawerLink>}
           {has('role.manage') && <DrawerLink to="/governance/audit-log" icon={ClipboardList}>{t('nav.auditLogs')}</DrawerLink>}
         </DrawerSection>}
@@ -85,7 +85,7 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
           {has('connector.manage') && <DrawerLink to="/admin/connectors" icon={FolderTree}>{t('nav.sourceConnectors')}</DrawerLink>}
           {has('role.manage') && <DrawerLink to="/admin/features" icon={Settings2}>{t('nav.featureControls')}</DrawerLink>}
           {has('role.manage') && <DrawerLink to="/admin/llm" icon={Sparkles}>{t('nav.aiProvider')}</DrawerLink>}
-          {has('role.manage') && <DrawerLink to="/admin/mcp-config" icon={Bot}>Team AI configuration</DrawerLink>}
+          {has('role.manage') && <DrawerLink to="/admin/mcp-config" icon={Bot}>{t('nav.mcpConfig')}</DrawerLink>}
         </DrawerSection>}
       </nav>
 

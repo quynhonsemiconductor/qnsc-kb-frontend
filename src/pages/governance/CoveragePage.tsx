@@ -1,27 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { AlertTriangle, BarChart3, CheckCircle2, FileQuestion } from 'lucide-react'
+import { AlertTriangle, BarChart3, FileQuestion } from 'lucide-react'
 import { getConflicts, getCoverage } from '../../api/knowledge'
 import ConflictsPanel from './ConflictsPanel'
 import PageHeader from '../../components/ui/PageHeader'
-import { useDialog } from '../../components/ui/DialogProvider'
-import { Button } from '../../components/ui/Button'
-import { Badge } from '../../components/ui/Badge'
-
-// Mirrors src/domain/ai_service.py::FACT_TAXONOMY -- a lookup over the same small, fixed
-// label set the backend's contradiction detection produces, not a general classifier.
-// "other" (an unrecognised or not-yet-classified label) renders no badge at all rather
-// than a misleading generic one.
-const CONTRADICTION_TYPE_LABELS: Record<string, string> = {
-  date: 'Date',
-  status: 'Status',
-  numerical: 'Numerical',
-  ownership: 'Ownership',
-}
 
 export default function CoveragePage() {
   const [data, setData] = useState<any>(null)
   const [conflicts, setConflicts] = useState<any[]>([])
-  const dialog = useDialog()
   const load = async () => { setData(await getCoverage()); setConflicts(await getConflicts()) }
   useEffect(() => { void load().catch(console.error) }, [])
   if (!data) return <div className="page-shell p-8 text-muted-foreground">Loading coverage map…</div>

@@ -8,8 +8,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Textarea } from '../../components/ui/Textarea'
 import { apiErrorDetail } from '../../lib/error-handler'
 import { formatDateTime } from '../../lib/formatters'
-
-type ApiFailure = { response?: { status?: number } }
+import { describeSaveFailure } from './mcpConfigUtils'
 
 export default function McpConfigPage() {
   const dialog = useDialog()
@@ -18,10 +17,13 @@ export default function McpConfigPage() {
   const [history, setHistory] = useState<McpConfigVersion[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // Set by a 409: the text the editor held when the server's version moved on, kept so nothing typed is lost.
+  const [lostDraft, setLostDraft] = useState<string | null>(null)
+  const [stale, setStale] = useState(false)
 
   const load = useCallback(async () => {
     setError('')
-    const [current, versions] = await Promise.all([getMcpConfig(), getMcpConfigHistory().catch(() => [] as McpConfigVersion[])])
+    const [current, versions] = await Promise.all([getMcpConfig(), getMcpConfigHistory().catch(failure => { console.error(failure); return [] as McpConfigVersion[] })])
     setConfig(current)
     setDraft(current.content_md)
     setHistory(versions)
@@ -40,9 +42,14 @@ export default function McpConfigPage() {
       await saveMcpConfig(draft, config.version)
       await load()
     } catch (failure) {
-      const status = (failure as ApiFailure).response?.status
-      setError(status === 409 ? 'Someone else changed this while you were editing. Your text is still here; reload to see theirs, then merge.' : apiErrorDetail(failure) || 'It could not be saved.')
+      const { message, stale } = describeSaveFailure(failure)
+      setError(message)
+      if (stale) { setLostDraft(draft); setStale(true) }
     } finally { setSaving(false) }
+  }
+  const loadLatest = async () => {
+    try { await load(); setStale(false); setError('') }
+    catch (failure) { setError(apiErrorDetail(failure) || 'The latest version could not be loaded.') }
   }
 
   return <div className="page-shell page-stack">
@@ -55,9 +62,17 @@ export default function McpConfigPage() {
       <Textarea className="mt-4 min-h-72 resize-y font-mono text-sm" value={draft} onChange={event => setDraft(event.target.value)} aria-label="Team configuration" placeholder="For example: search the knowledge base before answering questions about the project, and record decisions with record_lesson." />
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <span className={`text-xs ${tooLong ? 'text-destructive' : 'text-muted'}`}>{draft.length.toLocaleString()} / {MCP_CONFIG_MAX_CHARS.toLocaleString()} characters</span>
-        <Button icon={<Save size={14} />} loading={saving} disabled={!changed || tooLong || !draft.trim() || saving} onClick={save}>Publish</Button>
+        <Button icon={<Save size={14} />} loading={saving} disabled={!changed || tooLong || !draft.trim() || saving || stale} onClick={save}>Publish</Button>
       </div>
       {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+      {lostDraft !== null && <div className="mt-3 rounded-xl border border-warning/30 bg-warning/5 p-3">
+        <Button size="sm" variant="secondary" onClick={() => void loadLatest()}>Load the latest version</Button>
+        <details className="mt-3" open>
+          <summary className="cursor-pointer text-xs font-semibold text-muted">Your text, kept so you can copy from it</summary>
+          <Textarea readOnly className="mt-2 min-h-40 resize-y font-mono text-xs" value={lostDraft} aria-label="Your unpublished text" />
+          <Button className="mt-2" size="sm" variant="ghost" onClick={() => setLostDraft(null)}>Done, hide my text</Button>
+        </details>
+      </div>}
       <p className="mt-4 text-xs text-muted">Assistants keep this between two marker lines in CLAUDE.md and replace only that block. The text is written by your administrators, so assistants are told to say what changed.</p>
     </section>
     {history.length > 0 && <section className="glass-panel rounded-2xl border border-border p-5">
