@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity, AlertTriangle, BookOpen, Bookmark, Bot, ClipboardList, Compass,
   FileText, FolderTree, KeyRound, LogOut, Search, UserCog,
-  Settings2, Tag, Users, Shield, Sparkles, X, Building2, Home, Globe, Monitor,
+  Settings2, Tag, Users, Shield, Sparkles, X, Building2, Home, Globe, Monitor, ThumbsDown,
   type LucideIcon,
 } from 'lucide-react'
 import { BrandMarkGlyph } from '../components/ui/BrandMark'
@@ -68,6 +68,7 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
           <DrawerLink to="/governance/gap-queue" icon={AlertTriangle}>{t('nav.gapQueue')}</DrawerLink>
           <DrawerLink to="/governance/health" icon={Activity}>{t('nav.healthDashboard')}</DrawerLink>
           <DrawerLink to="/governance/coverage" icon={ClipboardList}>Coverage</DrawerLink>
+          <DrawerLink to="/governance/feedback" icon={ThumbsDown}>Answer feedback</DrawerLink>
           {has('article.publish') && <DrawerLink to="/governance/approval-rules" icon={Bot}>{t('nav.approvalRules')}</DrawerLink>}
           {has('role.manage') && <DrawerLink to="/governance/audit-log" icon={ClipboardList}>{t('nav.auditLogs')}</DrawerLink>}
         </DrawerSection>}
@@ -84,6 +85,7 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
           {has('connector.manage') && <DrawerLink to="/admin/connectors" icon={FolderTree}>{t('nav.sourceConnectors')}</DrawerLink>}
           {has('role.manage') && <DrawerLink to="/admin/features" icon={Settings2}>{t('nav.featureControls')}</DrawerLink>}
           {has('role.manage') && <DrawerLink to="/admin/llm" icon={Sparkles}>{t('nav.aiProvider')}</DrawerLink>}
+          {has('role.manage') && <DrawerLink to="/admin/mcp-config" icon={Bot}>Team AI configuration</DrawerLink>}
         </DrawerSection>}
       </nav>
 
