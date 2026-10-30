@@ -16,6 +16,7 @@ const BookmarksPage = lazy(() => import('../pages/BookmarksPage'))
 const ArticleListPage = lazy(() => import('../pages/articles/ArticleListPage'))
 const ArticleDetailPage = lazy(() => import('../pages/articles/ArticleDetailPage'))
 const ArticleEditPage = lazy(() => import('../pages/articles/ArticleEditPage'))
+const ArticleChunksPage = lazy(() => import('../pages/articles/ArticleChunksPage'))
 const SearchResultsPage = lazy(() => import('../pages/search/SearchResultsPage'))
 const AskPage = lazy(() => import('../pages/ai/AskPage'))
 const PendingDraftsPage = lazy(() => import('../pages/governance/PendingDraftsPage'))
@@ -24,6 +25,7 @@ const GapQueuePage = lazy(() => import('../pages/governance/GapQueuePage'))
 const AuditLogPage = lazy(() => import('../pages/governance/AuditLogPage'))
 const HealthDashboardPage = lazy(() => import('../pages/governance/HealthDashboardPage'))
 const CoveragePage = lazy(() => import('../pages/governance/CoveragePage'))
+const FeedbackReviewPage = lazy(() => import('../pages/governance/FeedbackReviewPage'))
 const TagsPage = lazy(() => import('../pages/meta/TagsPage'))
 const GlossaryPage = lazy(() => import('../pages/meta/GlossaryPage'))
 const UsersPage = lazy(() => import('../pages/admin/UsersPage'))
@@ -33,6 +35,7 @@ const FeatureFlagsPage = lazy(() => import('../pages/admin/FeatureFlagsPage'))
 const RolesPage = lazy(() => import('../pages/admin/RolesPage'))
 const ApprovalRulesPage = lazy(() => import('../pages/admin/ApprovalRulesPage'))
 const LLMSettingsPage = lazy(() => import('../pages/admin/LLMSettingsPage'))
+const McpConfigPage = lazy(() => import('../pages/admin/McpConfigPage'))
 const UiCatalogPage = lazy(() => import('../pages/dev/UiCatalogPage'))
 
 // The route tree is declared as elements and converted with createRoutesFromElements
@@ -61,6 +64,7 @@ export const routes = createRoutesFromElements(
       <Route path="articles/new" element={<ProtectedRoute permission="article.create"><ArticleEditPage /></ProtectedRoute>} />
       <Route path="articles/:id" element={<ProtectedRoute permission="article.read"><ArticleDetailPage /></ProtectedRoute>} />
       <Route path="articles/:id/edit" element={<ProtectedRoute permission="article.edit"><ArticleEditPage /></ProtectedRoute>} />
+      <Route path="articles/:id/chunks" element={<ProtectedRoute permission="article.edit"><ArticleChunksPage /></ProtectedRoute>} />
       <Route path="search" element={<SearchResultsPage />} />
       <Route path="ai" element={<AskPage />} />
 
@@ -71,6 +75,7 @@ export const routes = createRoutesFromElements(
       <Route path="governance/audit-log" element={<ProtectedRoute permission="governance.read"><AuditLogPage /></ProtectedRoute>} />
       <Route path="governance/health" element={<ProtectedRoute permission="governance.read"><HealthDashboardPage /></ProtectedRoute>} />
       <Route path="governance/coverage" element={<ProtectedRoute permission="governance.read"><CoveragePage /></ProtectedRoute>} />
+      <Route path="governance/feedback" element={<ProtectedRoute permission="governance.read"><FeedbackReviewPage /></ProtectedRoute>} />
 
       {/* Meta */}
       <Route path="meta/tags" element={<TagsPage />} />
@@ -83,6 +88,7 @@ export const routes = createRoutesFromElements(
       <Route path="admin/roles" element={<ProtectedRoute permission="role.manage"><RolesPage /></ProtectedRoute>} />
       <Route path="governance/approval-rules" element={<ProtectedRoute permission="article.publish"><ApprovalRulesPage /></ProtectedRoute>} />
       <Route path="admin/llm" element={<ProtectedRoute permission="role.manage"><LLMSettingsPage /></ProtectedRoute>} />
+      <Route path="admin/mcp-config" element={<ProtectedRoute permission="role.manage"><McpConfigPage /></ProtectedRoute>} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Route>,

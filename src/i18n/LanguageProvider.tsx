@@ -38,6 +38,8 @@ const messages: Record<Language, Record<string, string>> = {
     'nav.departments': 'Departments',
     'nav.rolesPermissions': 'Roles & permissions',
     'nav.aiProvider': 'AI provider',
+    'nav.feedbackReview': 'Answer feedback',
+    'nav.mcpConfig': 'Team AI configuration',
     'nav.sourcesFiles': 'Sources & files',
     // Names the <nav> landmark itself, not one of its sections.
     'nav.mainLandmark': 'Main navigation',
@@ -772,6 +774,8 @@ const messages: Record<Language, Record<string, string>> = {
     'nav.departments': 'Phòng ban',
     'nav.rolesPermissions': 'Vai trò & quyền',
     'nav.aiProvider': 'Nhà cung cấp AI',
+    'nav.feedbackReview': 'Phản hồi về câu trả lời',
+    'nav.mcpConfig': 'Cấu hình AI của nhóm',
     'nav.sourcesFiles': 'Nguồn & tệp',
     'nav.mainLandmark': 'Điều hướng chính',
     'header.searchPlaceholder': 'Tìm tài liệu, yêu cầu thiếu hụt hoặc thuật ngữ...',

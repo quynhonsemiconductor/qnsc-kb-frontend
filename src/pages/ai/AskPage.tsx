@@ -25,7 +25,7 @@ import TableArtifactView from '../../components/ai/TableArtifactView'
 import { coverageText, parseArtifacts, parseCoverage, parseSteps, parseUnverifiedNumbers, upsertStep } from '../../lib/agent'
 import EvidenceTable from '../../components/ai/EvidenceTable'
 import type { AgentArtifact, AgentStep, AnalyticsResult, AnswerCoverage, Citation, EvidenceStatus } from '../../types/ai'
-import { collapseDuplicateFailedRetries, resetFailedMessageForRetry } from '../../lib/ai-retry'
+import { collapseDuplicateFailedRetries, resetFailedMessageForRetry, type AskDepth } from '../../lib/ai-retry'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
 import { Button } from '../../components/ui/Button'
@@ -239,6 +239,7 @@ export default function AskPage() {
   const requestArticleTitle = searchParams.get('articleTitle') || 'this article'
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [depth, setDepth] = useState<AskDepth>('standard')
   const [messages, setMessages] = useState<Message[]>([])
   const [question, setQuestion] = useState(() => searchParams.get('prompt') || '')
   const [loading, setLoading] = useState(false)
@@ -646,6 +647,7 @@ export default function AskPage() {
         (status) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, evidenceStatus: status } : message)),
         retryFailed,
         (step) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, agentSteps: upsertStep(message.agentSteps || [], step) } : message)),
+        depth,
       )
       await refreshConversations()
     } catch (requestError: any) {
@@ -1270,6 +1272,14 @@ export default function AskPage() {
                <div className="mb-2 flex items-center gap-1.5 text-body-sm text-stone">
                  <Badge variant="info" size="sm" dot className="font-bold">Grounded mode</Badge>
                  <span className="hidden sm:inline">Press <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Enter</kbd> to send · <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Shift+Enter</kbd> for a new line</span>
+                <label className="flex items-center gap-1 text-caption text-stone" title="Quick answers sooner with fewer follow-up searches. Thorough searches more when the first pass misses part of the question.">
+                  <span className="sr-only">How hard to look</span>
+                  <select aria-label="How hard to look" value={depth} onChange={(event) => setDepth(event.target.value as AskDepth)} disabled={loading} className="rounded-md border border-hairline bg-surface px-1.5 py-0.5 text-caption font-semibold text-steel">
+                    <option value="quick">Quick</option>
+                    <option value="standard">Standard</option>
+                    <option value="thorough">Thorough</option>
+                  </select>
+                </label>
                 <span className="ml-auto tabular-nums">{question.length}/4000</span>
               </div>
                <div className="gradient-border flex items-end gap-2 rounded-2xl border bg-surface p-2 transition-all duration-200 focus-within:shadow-lg focus-within:ring-2 focus-within:ring-minimaxBlue/20">

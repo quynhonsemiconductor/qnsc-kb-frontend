@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   Activity, AlertTriangle, Bell, BookOpen, Bookmark, Bot, Building2, ChevronDown,
   ClipboardList, Compass, FileCheck2, FileText, FolderTree, Globe,
-  Home, Menu, Monitor, Plus, Search, Settings2, Shield, Sparkles, Tag, Users,
+  Home, Menu, Monitor, Plus, Search, Settings2, Shield, Sparkles, Tag, ThumbsDown, Users,
   type LucideIcon,
 } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageProvider'
@@ -126,6 +126,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
     { to: '/governance/gap-queue', label: t('nav.gapQueue'), icon: AlertTriangle },
     { to: '/governance/health', label: t('nav.healthDashboard'), icon: Activity },
     { to: '/governance/coverage', label: 'Coverage', icon: ClipboardList },
+    { to: '/governance/feedback', label: t('nav.feedbackReview'), icon: ThumbsDown },
     ...(has('article.publish') ? [{ to: '/governance/approval-rules', label: t('nav.approvalRules'), icon: FileCheck2 }] : []),
     ...(has('role.manage') ? [{ to: '/governance/audit-log', label: t('nav.auditLogs'), icon: ClipboardList }] : []),
   ] : []
@@ -142,6 +143,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
       { to: '/admin/roles', label: t('nav.rolesPermissions'), icon: Shield },
       { to: '/admin/features', label: t('nav.featureControls'), icon: Settings2 },
       { to: '/admin/llm', label: t('nav.aiProvider'), icon: Sparkles },
+      { to: '/admin/mcp-config', label: t('nav.mcpConfig'), icon: Bot },
     ] : []),
     ...(has('connector.manage') ? [{ to: '/admin/connectors', label: t('nav.sourceConnectors'), icon: FolderTree }] : []),
   ]

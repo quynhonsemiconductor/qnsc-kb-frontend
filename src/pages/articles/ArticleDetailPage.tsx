@@ -7,6 +7,7 @@ import {
   Calendar, 
   User as UserIcon, 
   Edit, 
+  Layers,
   Trash2, 
   Bookmark, 
   ThumbsUp, 
@@ -471,6 +472,14 @@ export default function ArticleDetailPage() {
                 className="rounded-xl border border-border bg-surface px-3 py-2 text-muted-foreground transition-all hover:bg-surface-soft hover:text-foreground"
               >
                 <Edit size={18} />
+              </Link>
+              <Link
+                to={`/articles/${article.id}/chunks`}
+                aria-label="See how this article was cut into passages"
+                title="See how this article was cut into passages"
+                className="rounded-xl border border-border bg-surface px-3 py-2 text-muted-foreground transition-all hover:bg-surface-soft hover:text-foreground"
+              >
+                <Layers size={18} />
               </Link>
             
               <Button
