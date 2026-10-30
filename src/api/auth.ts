@@ -55,7 +55,7 @@ export async function createDepartment(data: { name: string; description: string
   return (await client.post('/auth/departments', data)).data
 }
 
-export async function updateDepartment(departmentId: string, data: { name?: string; description?: string; active?: boolean }) {
+export async function updateDepartment(departmentId: string, data: { name?: string; description?: string; active?: boolean; review_required?: boolean }) {
   return (await client.patch(`/auth/departments/${departmentId}`, data)).data
 }
 
