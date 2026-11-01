@@ -61,7 +61,7 @@ jobs:
       pull-requests: read
     steps:
       - id: paths
-        uses: quynhonsemiconductor/ci/actions/changed-paths@2a85ef7bb3c793edbc9b424ba2abeaed8080aab6 # v1.24.3
+        uses: quynhonsemiconductor/ci/actions/changed-paths@4ab3aaec8d70a2f0fb9a38e8a5a96cebe90e58e5 # v1.27.0
         with:
           ignore: |
             **/*.md
@@ -79,7 +79,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -111,7 +111,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -132,7 +132,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -181,7 +181,7 @@ jobs:
           path: backend
           persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -265,12 +265,12 @@ jobs:
       # gate fails: "could not decide" never becomes a pass.
       - name: Every job must have succeeded
         if: ${{ needs.changes.outputs.run == 'true' }}
-        uses: quynhonsemiconductor/ci/actions/assert-jobs-succeeded@2a85ef7bb3c793edbc9b424ba2abeaed8080aab6 # v1.24.3
+        uses: quynhonsemiconductor/ci/actions/assert-jobs-succeeded@4ab3aaec8d70a2f0fb9a38e8a5a96cebe90e58e5 # v1.27.0
         with:
           results: ${{ join(needs.*.result, ',') }}
 
       - name: Nothing here to test (every changed file is ignorable)
         if: ${{ needs.changes.outputs.run != 'true' }}
-        uses: quynhonsemiconductor/ci/actions/assert-jobs-succeeded@2a85ef7bb3c793edbc9b424ba2abeaed8080aab6 # v1.24.3
+        uses: quynhonsemiconductor/ci/actions/assert-jobs-succeeded@4ab3aaec8d70a2f0fb9a38e8a5a96cebe90e58e5 # v1.27.0
         with:
           results: ${{ needs.changes.result }}
