@@ -43,7 +43,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: '20' # matches the Dockerfile's node:20-alpine build stage
+  NODE_VERSION: '24' # matches the Dockerfile's node:24-alpine3.22 build stage
 
 jobs:
   # ── Which parts changed ─────────────────────────────────────────────────────
@@ -139,12 +139,10 @@ jobs:
 
       - run: npm ci
 
-      # VITE_API_BASE_URL is baked in at BUILD time, so the value used here is only a
-      # placeholder to prove the bundle compiles. The deployed value comes from the
-      # environment-scoped Actions variable the deploy workflow passes.
+      # The API base URL is NOT baked in: the bundle reads it from `/config.json` at runtime, so one
+      # build serves every environment (DELIVERY-DESIGN-2026-11 §3.1). This step proves the bundle
+      # compiles; the deployed value comes from the gitops-rendered ConfigMap.
       - name: Build
-        env:
-          VITE_API_BASE_URL: /api/v1
         run: npm run build
 
       - name: Audit critical production vulnerabilities
@@ -237,6 +235,27 @@ jobs:
         working-directory: backend
         run: docker compose down -v
 
+  # ── The web image's contract ────────────────────────────────────────────────
+  # Builds the image from the repo root and runs it the way the chart runs it: read-only root
+  # filesystem, /tmp the only writable path, config.json mounted at /srv/config.json, an arbitrary
+  # non-root uid, port 8080. `scripts/web-image-test.sh` asserts the contract, the cache headers,
+  # the security headers, the /config.json behaviour and the SPA fallback against real responses.
+  container:
+    name: Web image
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the image and test its contract
+        run: scripts/web-image-test.sh
+
   # ── The aggregate gate ──────────────────────────────────────────────────────
   # `Web CI required` is THE required check for this workflow. It exists because GitHub counts a
   # SKIPPED or CANCELLED required check as PASSING, so naming each job in the ruleset
@@ -254,7 +273,7 @@ jobs:
   ci-required:
     name: Web CI required
     if: always()
-    needs: [changes, quality, test, build]
+    needs: [changes, quality, test, build, container]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

@@ -1,0 +1,98 @@
+# =============================================================================
+# The QNSC KB web image's server — Caddy as an unprivileged static server.
+#
+# Why Caddy over nginx (this file replaced nginx.conf): one static binary that parses and validates
+# its own config (`caddy validate`, run at image build) instead of a root-master/worker process
+# model, no writable directory it insists on owning, and a single `/healthz` to answer. The image
+# runs with a read-only root filesystem; Caddy's only writes go to the `XDG_*` directories under
+# /tmp, which a deployment mounts as emptyDir (see the Dockerfile).
+#
+# IMAGE CONTRACT (the qnsc-service chart, `web:` block):
+#
+#   listens on 8080             (web.port)
+#   doc root   /srv             (dist/ at its root)
+#   config     /srv/config.json (ConfigMap, mounted with subPath — replacing this one file)
+#   health     /healthz         (both probes)
+#   /tmp        the ONLY writable path (read-only root filesystem, any non-root uid)
+#
+# What it serves:
+#
+#   /config.json            the runtime config a deployment mounts (gitops ConfigMap), no-cache
+#   /assets/*               content-hashed build output, immutable
+#   /fonts/*                self-hosted webfonts, named by upstream content hash, immutable
+#   everything else         the built files; an unknown path falls back to index.html (SPA route)
+#   /healthz                liveness/readiness for the probes
+#
+# HEADERS: public/_headers is the Cloudflare manifest of the same policy; the CSP and its "why"
+# comment live there. Both files must change together.
+# =============================================================================
+{
+	admin off
+	# Everything arrives from cloudflared over plain HTTP inside the cluster; TLS ends at the edge
+	# (Cloudflare). A local certificate would be noise, and Caddy would try to bind :443.
+	auto_https off
+}
+
+:8080 {
+	root * /srv
+	encode zstd gzip
+
+	# The security policy of public/_headers, header for header. Declared once, at site level: Caddy
+	# merges it with every response, and no handler below sets one of these again.
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; img-src 'self' data: blob:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self' blob:; worker-src 'self' blob:;"
+	}
+
+	# Any request whose RAW uri carries an encoded separator (`%2F`, `%5C`) is refused: Caddy decodes
+	# and cleans paths before routing, so `/assets%2F..%2Fx` would otherwise be routed as some OTHER
+	# path. Static files never need an encoded separator.
+	@encodedSeparator expression {http.request.uri}.contains('%2F') || {http.request.uri}.contains('%2f') || {http.request.uri}.contains('%5C') || {http.request.uri}.contains('%5c')
+	handle @encodedSeparator {
+		respond "" 404
+	}
+
+	# Probe endpoint. No log line, no dependency: a probe must say "the process answers", not "the
+	# API is healthy" (ArgoCD and the API have their own).
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	# The runtime config, mounted over the app root by the deployment. It is absent in the image on
+	# purpose: a baked copy would be correct in exactly one environment. A missing file is a 404, which
+	# the SPA reports on its error screen instead of booting with defaults.
+	handle /config.json {
+		header Cache-Control "no-cache"
+		file_server
+	}
+
+	# Content-hashed filenames: the bytes behind a given URL never change. `immutable` is asserted
+	# only when the file EXISTS: a missing /assets/* is a 404, and a 404 promising immutability would
+	# be cached by the browser for a year.
+	handle /assets/* {
+		@exists file {path}
+		header @exists Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	handle /fonts/* {
+		@exists file {path}
+		header @exists Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Every SPA route is a client-side route with no file behind it.
+	handle {
+		# Everything here is either a file whose name carries no content hash (index.html, the brand
+		# mark, theme-boot.js) or a rewritten SPA route, so it always revalidates. The hashed assets
+		# and fonts keep their own immutable header above.
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -1,57 +1,20 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
+/**
+ * The SPA's entry point.
+ *
+ * It loads NO app code itself: `boot.ts` fetches `/config.json`, validates it and applies it first,
+ * and only then does this file `import('./bootstrap')`. Keep the static imports here to plain
+ * modules — an early import of `App` would evaluate the module graph (the router, the API client)
+ * before the config exists.
+ */
+import { boot } from './boot'
+// The stylesheet is static so the build links it in index.html: the first paint (and the config error
+// screen) then has the app's colours instead of waiting for the app chunk.
 import './index.css'
-import { registerPreloadErrorReload } from './lib/preload-error'
 
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { error: Error | null }
-> {
-  state: { error: Error | null } = { error: null }
+const root = document.getElementById('root')
 
-  static getDerivedStateFromError(error: Error) {
-    return { error }
-  }
-
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('Unhandled render error', error, info.componentStack)
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="grid min-h-screen place-items-center bg-background p-8 text-center">
-          <div className="max-w-md space-y-4">
-            <h1 className="text-xl font-bold text-foreground">Something went wrong</h1>
-            <p className="text-sm text-muted-foreground">
-              An unexpected error interrupted the app. Reloading usually fixes it.
-            </p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground"
-            >
-              Reload
-            </button>
-          </div>
-        </div>
-      )
-    }
-    return this.props.children
-  }
+if (!root) {
+  throw new Error('The SPA entry is missing #root in index.html')
 }
 
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled promise rejection', event.reason)
-})
-
-registerPreloadErrorReload()
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>,
-)
+void boot({ root, loadApp: () => import('./bootstrap') })

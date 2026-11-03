@@ -1,10 +1,11 @@
 # =============================================================================
 # Security · Scan — thin caller of the shared reusable (ci).
 #
-# scan_container is false: the Dockerfile here builds an nginx image for the
-# single-VPS Compose stack, and nothing deploys it — the SPA ships to Cloudflare
-# Pages as static assets. Scanning an image that never runs would report CVEs nobody
-# can act on while missing nothing real. Semgrep, gitleaks and OSV still run.
+# scan_container is false: the Dockerfile here builds the SPA's static web image, which
+# ghcr-publish.yml builds and scans (CRITICAL fixable vulns + secrets) BEFORE pushing it, so
+# the image that runs is the image that passed that gate. Rebuilding it here would duplicate
+# that scan on every PR; the weekly run does not need a second copy of the same answer.
+# Semgrep, gitleaks and OSV still run.
 # =============================================================================
 name: Security · Scan
 

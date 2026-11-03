@@ -18,7 +18,7 @@
     <script src="/theme-boot.js"></script>
     <!-- Fonts are self-hosted from /fonts (see public/fonts/fonts.css) rather than
          fetched from fonts.googleapis.com. A third-party stylesheet origin would have to
-         be whitelisted in all three places this app declares a CSP — nginx.conf,
+         be whitelisted in all three places this app declares a CSP — Caddyfile,
          public/_headers and the backend's docker/Caddyfile — and a remote stylesheet can
          pull in further resources, which is the injection path the policy exists to
          close. Self-hosted, `style-src 'self'` and `font-src 'self'` cover everything and

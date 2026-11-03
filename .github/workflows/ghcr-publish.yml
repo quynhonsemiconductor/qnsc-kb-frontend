@@ -1,0 +1,55 @@
+# =============================================================================
+# GHCR · Publish — on-prem image delivery trigger for the KB SPA.
+#
+# On every merge to main this builds the web image, PRE-PUSH scans it (CRITICAL fixable vulns + ANY
+# secret), and pushes ghcr.io/quynhonsemiconductor/kb-web with the immutable sha-<commit> tag.
+# This is the only image build: the reusable refuses any ref except refs/heads/main.
+#
+# The SPA is an image of its own (DELIVERY-DESIGN-2026-11 §3.1): the Vite bundle in a read-only
+# Caddy, served from the cluster behind the same tunnel as the API, with `/config.json` mounted per
+# environment. The backend's services are published from qnsc-kb-backend (product `kb`); this job
+# adds the `web` one under the same product prefix.
+#
+# The reusable's `digests` output (JSON, service → sha256) is what a gitops bump writes into its
+# values files. The job is intentionally NOT wired to a bump yet: gitops values/kb has no `web`
+# image until the chart's `web:` block lands, and a value the chart does not know would be noise in
+# every dev bump.
+# =============================================================================
+name: GHCR · Publish
+
+on:
+  push:
+    branches: [main]
+    # Skip when a merge touches ONLY paths this product does not ship (docs). paths-ignore fires
+    # only if EVERY changed file matches — a shared change still builds, so under-deploy is
+    # impossible.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.claude/**'
+
+  # Manual run of whatever main currently holds.
+  workflow_dispatch:
+
+concurrency:
+  # One GHCR publish for this image at a time (the reusable declares a group of its own per
+  # product); a push racing a workflow_dispatch serialises instead of racing.
+  group: ghcr-publish-kb-web
+  cancel-in-progress: false
+
+jobs:
+  publish-web:
+    # Ceiling for the reusable's inner grants: packages: write is the GHCR push.
+    permissions:
+      contents: read
+      packages: write
+    # SHA-pinned, NOT @v1 — ci's v1 tag is frozen and must not be used.
+    uses: quynhonsemiconductor/ci/.github/workflows/ghcr-publish.yml@3b998f73d2fd4648aa1d22f1c2c3354c323de590 # v1.29.0
+    with:
+      product: kb
+      services-json: '["web"]'
+      dockerfile: Dockerfile
+      # The on-prem k3s host is amd64; native amd64 runner (a QEMU build of this Vite/npm build
+      # fails — see the reusable's build_runner note).
+      platforms: linux/amd64
+      build_runner: ubuntu-24.04

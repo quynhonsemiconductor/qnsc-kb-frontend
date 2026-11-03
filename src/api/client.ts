@@ -1,23 +1,16 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
 import { retryAfterSeconds } from '../lib/error-handler'
+import { getApiBaseUrl } from '../config/runtime'
 
-// No `|| '/api/v1'` fallback in a production build, deliberately. This app calls its API
-// cross-origin on the Cloudflare Pages deploy, where the origin is baked in at build time
-// (see .github/workflows/web-deploy.yml). A relative base there is not a degraded mode: it
-// is answered by Pages' own SPA fallback, so every GET returns index.html with status 200
-// and every POST returns 405 — the app looks healthy and cannot log in. Failing at module
-// load turns a silent misbuild into an immediate, obvious one. The docker path passes the
-// relative `/api/v1` explicitly via the Dockerfile ARG, so it is unaffected.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
-if (!API_BASE_URL && import.meta.env.PROD) {
-  throw new Error('VITE_API_BASE_URL is required in a production build')
-}
-
+// The API origin comes from the runtime `/config.json`, not from the build: one bundle serves every
+// environment (DELIVERY-DESIGN-2026-11 §3.1). `boot.ts` applies the config before this module is
+// imported, so the value is in place when the axios instance below is created. In the unit tests,
+// where no config is fetched, `getApiBaseUrl()` returns the dev server's proxied default.
 let accessToken: string | null = null
 
 const client = axios.create({
-  baseURL: API_BASE_URL || '/api/v1',
+  baseURL: getApiBaseUrl(),
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

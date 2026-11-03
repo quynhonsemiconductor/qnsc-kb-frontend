@@ -5,7 +5,7 @@
    Content-Security-Policy can stay at `style-src 'self'` / `font-src 'self'` and match
    the backend edge policy in docker/Caddyfile byte for byte. Loading the stylesheet from
    Google would have required whitelisting two more origins in every one of the three
-   places a CSP is declared (nginx.conf, public/_headers, Caddyfile), and a third-party
+   places a CSP is declared (Caddyfile, public/_headers, the backend's docker/Caddyfile), and a third-party
    stylesheet origin is exactly the injection path a CSP exists to close.
 
    DM Sans and Manrope ship as variable fonts, so several requested weights resolve to a
