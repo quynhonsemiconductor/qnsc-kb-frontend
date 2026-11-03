@@ -2,6 +2,7 @@ import client, { clearExpiredSession, getAccessToken, refreshSession } from './c
 import type { AIStreamEvent, AgentStep, AnalyticsResult, EvidenceStatus } from '../types/ai'
 import { dispatchAIStreamPayload } from '../lib/ai-stream'
 import { buildAIAskPayload, type AskDepth } from '../lib/ai-retry'
+import { getApiBaseUrl } from '../config/runtime'
 
 export async function askAI(
   question: string,
@@ -40,7 +41,7 @@ export async function askAIStream(
   onStep?: (step: AgentStep) => void,
   depth: AskDepth = 'standard',
 ) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+  const baseUrl = getApiBaseUrl()
   const token = getAccessToken()
   const response = await fetch(`${baseUrl}/ai/ask/stream`, {
     method: 'POST',

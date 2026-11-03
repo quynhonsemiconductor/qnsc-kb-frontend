@@ -2,9 +2,9 @@
 # publishes dist/, and Pages reads this file from the root of what it publishes — public/
 # is copied there verbatim by Vite).
 #
-# Without this file the Pages-hosted production SPA carried NO CSP at all: nginx.conf only
-# applies to the docker/Caddy path, and the two hosting paths ship the same bundle. The
-# header set below is kept byte-identical to nginx.conf and the backend's docker/Caddyfile.
+# Without this file the Pages-hosted production SPA carried NO CSP at all: the Caddyfile only
+# applies to the cluster image, and the two hosting paths ship the same bundle. The
+# header set below is kept byte-identical to Caddyfile and the backend's docker/Caddyfile.
 # There is no mechanism enforcing that — three copies of one policy, so an edit to one is a
 # silent divergence.
 #

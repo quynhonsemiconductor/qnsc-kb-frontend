@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type Connect, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -28,6 +28,35 @@ function appCommit(): string {
   }
 }
 
+// `/config.json` for the dev server and for `vite preview`.
+//
+// A deployment mounts the real file next to the build (the web image serves it from `/srv`); there
+// is nothing to mount locally, and a checked-in copy would be one accident away from being deployed
+// as if it were real. So the dev server answers the same path, from `.env`'s `VITE_API_BASE_URL`.
+// `apply: 'serve'` covers `vite` and `vite preview`; a build never contains this file.
+const DEV_CONFIG = {
+  apiBaseUrl: dotenv.VITE_API_BASE_URL || '/api/v1',
+}
+
+const devConfigMiddleware: Connect.NextHandleFunction = (req, res, next) => {
+  if ((req.url ?? '').split('?')[0] !== '/config.json') return next()
+  res.statusCode = 200
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.end(JSON.stringify(DEV_CONFIG))
+}
+
+const devConfigPlugin: Plugin = {
+  name: 'dev-config',
+  apply: 'serve',
+  configureServer(server) {
+    server.middlewares.use(devConfigMiddleware)
+  },
+  configurePreviewServer(server) {
+    server.middlewares.use(devConfigMiddleware)
+  },
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   define: {
@@ -37,6 +66,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    devConfigPlugin,
     /**
      * Widens `connect-src` in the emitted `dist/_headers` to include the API origin.
      *
