@@ -1,9 +1,10 @@
 import client from './client'
 import { fileNameFromContentDisposition } from '../utils/sourcePreview'
 import type { EditPayloadRow } from '../lib/selectionEdit'
+import { articleListParams } from '../lib/articleList'
 
 export async function getArticles(params: any = {}) {
-  const response = await client.get('/articles', { params })
+  const response = await client.get('/articles', { params: articleListParams(params) })
   return response.data
 }
 
