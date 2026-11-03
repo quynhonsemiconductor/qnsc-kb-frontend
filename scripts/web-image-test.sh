@@ -178,7 +178,10 @@ expect_status "a missing asset is 404" 404 "$base/assets/does-not-exist.js"
 expect_no_header "a 404 asset promises no cache lifetime" "Cache-Control" "$base/assets/does-not-exist.js"
 
 expect_status "the self-hosted font CSS is served" 200 "$base/fonts/fonts.css"
-expect_header "font CSS is immutable" "Cache-Control" "public, max-age=31536000, immutable" "$base/fonts/fonts.css"
+expect_header "font CSS is not immutable (its name carries no hash)" "Cache-Control" "no-cache" "$base/fonts/fonts.css"
+expect_status "a hashed font is served" 200 "$base/fonts/dm-sans-rP2Hp2ywxg089UriCZ2IHSeH.woff2"
+expect_header "a hashed font is immutable" "Cache-Control" "public, max-age=31536000, immutable" "$base/fonts/dm-sans-rP2Hp2ywxg089UriCZ2IHSeH.woff2"
+expect_header_contains "the brand mark is served as SVG" "Content-Type" "image/svg+xml" "$base/brand-mark.svg"
 expect_header "unhashed files revalidate" "Cache-Control" "no-cache" "$base/brand-mark.svg"
 
 # -----------------------------------------------------------------------------
@@ -206,6 +209,7 @@ expect_no_header "no Server fingerprint" "Server" "$base/"
 # -----------------------------------------------------------------------------
 expect_status "an encoded separator is refused" 404 "$base/assets%2F..%2Findex.html"
 expect_status "an encoded backslash is refused" 404 "$base/assets%5C..%5Cindex.html"
+expect_status "a query string may carry an encoded separator" 200 "$base/?q=a%2Fb"
 
 printf '\n%d passed, %d failed\n' "$pass" "$failed"
 [ "$failed" -eq 0 ]

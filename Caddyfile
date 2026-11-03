@@ -19,7 +19,7 @@
 #
 #   /config.json            the runtime config a deployment mounts (gitops ConfigMap), no-cache
 #   /assets/*               content-hashed build output, immutable
-#   /fonts/*                self-hosted webfonts, named by upstream content hash, immutable
+#   /fonts/*.woff2          self-hosted webfonts, named by upstream content hash, immutable
 #   everything else         the built files; an unknown path falls back to index.html (SPA route)
 #   /healthz                liveness/readiness for the probes
 #
@@ -49,10 +49,12 @@
 		Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; img-src 'self' data: blob:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self' blob:; worker-src 'self' blob:;"
 	}
 
-	# Any request whose RAW uri carries an encoded separator (`%2F`, `%5C`) is refused: Caddy decodes
-	# and cleans paths before routing, so `/assets%2F..%2Fx` would otherwise be routed as some OTHER
-	# path. Static files never need an encoded separator.
-	@encodedSeparator expression {http.request.uri}.contains('%2F') || {http.request.uri}.contains('%2f') || {http.request.uri}.contains('%5C') || {http.request.uri}.contains('%5c')
+	# Any request whose RAW PATH carries an encoded separator (`%2F`, `%5C`) is refused: Caddy
+	# decodes and cleans paths before routing, so `/assets%2F..%2Fx` would otherwise be routed as
+	# some OTHER path. Static files never need an encoded separator. The RAW uri minus its query
+	# string: `{http.request.uri.path}` is already decoded (so the guard never saw `%2F`), and
+	# matching the whole URI would 404 a query that legitimately carries one (`/?q=a%2Fb`).
+	@encodedSeparator expression {http.request.uri}.split('?')[0].contains('%2F') || {http.request.uri}.split('?')[0].contains('%2f') || {http.request.uri}.split('?')[0].contains('%5C') || {http.request.uri}.split('?')[0].contains('%5c')
 	handle @encodedSeparator {
 		respond "" 404
 	}
@@ -80,7 +82,10 @@
 		file_server
 	}
 
-	handle /fonts/* {
+	# Only the WOFF2 files are immutable: their names carry the upstream content hash. `fonts.css`
+	# and the `.ttf` fallbacks name no hash, so they revalidate through the generic handler below.
+	@hashedFonts path_regexp ^/fonts/[^/]+\.woff2$
+	handle @hashedFonts {
 		@exists file {path}
 		header @exists Cache-Control "public, max-age=31536000, immutable"
 		file_server

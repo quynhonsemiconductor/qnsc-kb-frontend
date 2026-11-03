@@ -41,9 +41,8 @@ describe('runtime config', () => {
     expect(getApiBaseUrl()).toBe('/kb-api')
   })
 
-  it('falls back to the dev default when the config names the same origin', async () => {
-    await loadConfig(responding({ apiBaseUrl: '' }))
-    expect(getApiBaseUrl()).toBe(DEFAULT_API_BASE_URL)
+  it('rejects the empty same-origin value: the API does not live at the origin root', async () => {
+    await expect(loadConfig(responding({ apiBaseUrl: '' }))).rejects.toThrow(ConfigError)
   })
 
   it('reports a non-2xx answer as a ConfigError naming the status', async () => {
@@ -78,9 +77,9 @@ describe('runtime config', () => {
     expect(getApiBaseUrl()).toBe('/api/v1')
   })
 
-  it('accepts only a relative path or the empty same-origin value', () => {
+  it('accepts only a path on this origin', () => {
     expect(configSchema.safeParse({ apiBaseUrl: '/api/v1' }).success).toBe(true)
-    expect(configSchema.safeParse({ apiBaseUrl: '' }).success).toBe(true)
+    expect(configSchema.safeParse({ apiBaseUrl: '' }).success).toBe(false)
     expect(configSchema.safeParse({ apiBaseUrl: 'api/v1' }).success).toBe(false)
     expect(configSchema.safeParse({ apiBaseUrl: 1 }).success).toBe(false)
   })

@@ -5,10 +5,10 @@
 # secret), and pushes ghcr.io/quynhonsemiconductor/kb-web with the immutable sha-<commit> tag.
 # This is the only image build: the reusable refuses any ref except refs/heads/main.
 #
-# The SPA is an image of its own (DELIVERY-DESIGN-2026-11 §3.1): the Vite bundle in a read-only
-# Caddy, served from the cluster behind the same tunnel as the API, with `/config.json` mounted per
-# environment. The backend's services are published from qnsc-kb-backend (product `kb`); this job
-# adds the `web` one under the same product prefix.
+# The SPA is an image of its own: the Vite bundle in a read-only Caddy, served from the cluster
+# behind the same tunnel as the API, with `/config.json` mounted per environment. The backend's
+# services are published from qnsc-kb-backend (product `kb`); this job adds the `web` one under the
+# same product prefix.
 #
 # The reusable's `digests` output (JSON, service → sha256) is what a gitops bump writes into its
 # values files. The job is intentionally NOT wired to a bump yet: gitops values/kb has no `web`
@@ -39,12 +39,16 @@ concurrency:
 
 jobs:
   publish-web:
-    # Ceiling for the reusable's inner grants: packages: write is the GHCR push.
+    # Ceiling for the reusable's inner grants: packages: write is the GHCR push; id-token and
+    # attestations are the provenance attestation the reusable makes for the pushed digest (a
+    # called workflow can only REDUCE the caller's permissions, never elevate them).
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
     # SHA-pinned, NOT @v1 — ci's v1 tag is frozen and must not be used.
-    uses: quynhonsemiconductor/ci/.github/workflows/ghcr-publish.yml@3b998f73d2fd4648aa1d22f1c2c3354c323de590 # v1.29.0
+    uses: quynhonsemiconductor/ci/.github/workflows/ghcr-publish.yml@7e8f6136a017c7b1f57a2e9a288dae3cd008950f # v1.31.1
     with:
       product: kb
       services-json: '["web"]'

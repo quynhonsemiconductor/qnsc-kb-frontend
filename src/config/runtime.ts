@@ -19,16 +19,16 @@ export const CONFIG_PATH = '/config.json'
 export const DEFAULT_API_BASE_URL = '/api/v1'
 
 /**
- * `''` (same origin) or a path on this origin (`/api/v1`). Absolute origins are deliberately
- * refused: the SPA and its API are served by one host through the tunnel, and a config naming
- * another origin can only be a mistake. The path is resolved against a dummy origin and must land
- * back on it: `//evil` (protocol-relative) and `/\evil` (a backslash is a slash to the URL parser)
- * both leave it.
+ * A path on this origin (`/api/v1`). Absolute origins are deliberately refused: the SPA and its
+ * API are served by one host through the tunnel, and a config naming another origin can only be a
+ * mistake. The empty string is refused too — the API does not live at this origin's root, so `''`
+ * would send every request to `/auth/...` instead of `/api/v1/auth/...`. The path is resolved
+ * against a dummy origin and must land back on it: `//evil` (protocol-relative) and `/\evil` (a
+ * backslash is a slash to the URL parser) both leave it.
  */
 const SAME_ORIGIN = 'http://same-origin.invalid'
 
 function isApiBaseUrl(value: string): boolean {
-  if (value === '') return true
   if (!value.startsWith('/') || value.startsWith('//')) return false
   try {
     return new URL(value, SAME_ORIGIN).origin === SAME_ORIGIN
@@ -46,7 +46,7 @@ export const configSchema = z.object({
     .string()
     .refine(
       isApiBaseUrl,
-      'must be "" (same origin) or a path on this origin starting with a single "/"',
+      'must be a path on this origin starting with a single "/" (for example "/api/v1")',
     ),
 })
 
@@ -78,7 +78,7 @@ export function applyConfig(config: RuntimeConfig): void {
 
 /** The API origin prefix for every request this bundle makes. */
 export function getApiBaseUrl(): string {
-  return current.apiBaseUrl || DEFAULT_API_BASE_URL
+  return current.apiBaseUrl
 }
 
 /**
