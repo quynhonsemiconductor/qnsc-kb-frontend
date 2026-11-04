@@ -11,6 +11,8 @@ export async function search(params: {
   date_from?: string
   date_to?: string
   limit?: number
+  /** documents: reviewed uploads only; lessons: what AI assistants saved; all (the server's default): both. */
+  scope?: 'all' | 'documents' | 'lessons'
 }, signal?: AbortSignal) {
   const response = await client.get('/search', { params, signal })
   return response.data

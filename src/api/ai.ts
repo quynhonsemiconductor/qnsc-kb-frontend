@@ -1,7 +1,7 @@
 import client, { clearExpiredSession, getAccessToken, refreshSession } from './client'
 import type { AIStreamEvent, AgentStep, AnalyticsResult, EvidenceStatus } from '../types/ai'
 import { dispatchAIStreamPayload } from '../lib/ai-stream'
-import { buildAIAskPayload, type AskDepth } from '../lib/ai-retry'
+import { buildAIAskPayload, type AskDepth, type AskSources } from '../lib/ai-retry'
 import { getApiBaseUrl } from '../config/runtime'
 
 export async function askAI(
@@ -40,6 +40,7 @@ export async function askAIStream(
   retryFailed = false,
   onStep?: (step: AgentStep) => void,
   depth: AskDepth = 'standard',
+  sources: AskSources = 'default',
 ) {
   const baseUrl = getApiBaseUrl()
   const token = getAccessToken()
@@ -59,11 +60,12 @@ export async function askAIStream(
       editInstruction,
       retryFailed,
       depth,
+      sources,
     })),
     signal,
   })
   if (response.status === 401 && retry && await refreshSession()) {
-    return askAIStream(question, conversationId, language, onToken, onSources, onDone, articleId, signal, false, confirmEdit, editInstruction, onAnalytics, onEvidenceStatus, retryFailed, onStep, depth)
+    return askAIStream(question, conversationId, language, onToken, onSources, onDone, articleId, signal, false, confirmEdit, editInstruction, onAnalytics, onEvidenceStatus, retryFailed, onStep, depth, sources)
   }
   if (response.status === 401) clearExpiredSession()
   if (!response.ok || !response.body) throw new Error(`AI stream failed (${response.status})`)
