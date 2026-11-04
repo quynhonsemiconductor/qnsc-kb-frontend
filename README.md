@@ -4,7 +4,7 @@ React + TypeScript + Vite + TailwindCSS application for QNSC Knowledge Base.
 
 ## Run it locally
 
-You need Node.js 20 or newer and a running backend. The backend is
+You need Node.js 24 or newer and pnpm (corepack activates the version pinned in `packageManager`) and a running backend. The backend is
 [`qnsc-kb-backend`](https://github.com/quynhonsemiconductor/qnsc-kb-backend): its README has the
 five commands that start it (Postgres, Redis, API, worker, beat) from a clean clone, and no API keys.
 
@@ -12,8 +12,9 @@ five commands that start it (Postgres, Redis, API, worker, beat) from a clean cl
 git clone https://github.com/quynhonsemiconductor/qnsc-kb-frontend.git
 cd qnsc-kb-frontend
 cp .env.example .env          # optional; the defaults below are what it contains
-npm ci
-npm run dev                   # http://localhost:5173
+corepack enable
+pnpm install
+pnpm run dev                   # http://localhost:5173
 ```
 
 Open <http://localhost:5173> and sign in with the backend's bootstrap administrator:
@@ -30,7 +31,7 @@ For more accounts, the backend README shows how to seed the Admin, CEO, Reviewer
 `VITE_API_BASE_URL=/api/v1` is a relative path, so the browser calls the dev server and the dev
 server proxies `/api` to `http://localhost:8000` (the backend's default port). That means no CORS
 and same-origin cookies. To use a backend somewhere else, set `VITE_DEV_API_TARGET` in `.env` and
-restart `npm run dev`. If the backend's port had to change (`KB_API_PORT` in its `.env`), set
+restart `pnpm run dev`. If the backend's port had to change (`KB_API_PORT` in its `.env`), set
 `VITE_DEV_API_TARGET=http://localhost:<port>` to match.
 
 An absolute `VITE_API_BASE_URL` is not supported: the app fetches its API settings from
@@ -38,7 +39,7 @@ An absolute `VITE_API_BASE_URL` is not supported: the app fetches its API settin
 cookie is same-origin). The dev server answers `/config.json` from `.env`; a deployment mounts the
 real file next to `dist/`, so one build serves every environment.
 
-The dev port is pinned to 5173 (`FRONTEND_DEV_PORT` in `.env` to change it). If it is taken, `npm run dev` fails with
+The dev port is pinned to 5173 (`FRONTEND_DEV_PORT` in `.env` to change it). If it is taken, `pnpm run dev` fails with
 `Port 5173 is already in use` rather than moving: the backend's `CORS_ORIGINS` are set for this origin.
 
 ### Run a second copy
@@ -57,8 +58,8 @@ For Microsoft sign-in, set `MICROSOFT_LOGIN_REDIRECT_URI` to that origin's callb
 ### Checks
 
 ```bash
-npm run lint
-npx tsc --noEmit
-npm test
-npm run build
+pnpm run lint
+pnpm exec tsc --noEmit
+pnpm test
+pnpm run build
 ```

@@ -79,21 +79,23 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       # Separate from `build`, which also runs tsc: a type error should fail as a type
       # error in seconds, not as a build failure minutes later with a bundler stack
       # trace on top of it.
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: pnpm exec tsc --noEmit
 
   # Mirrors the backend's `test` job so both repositories present the same gate set.
   #
@@ -111,15 +113,17 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       - name: Unit tests
-        run: npm test
+        run: pnpm test
 
   build:
     name: Build
@@ -132,25 +136,27 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       # The API base URL is NOT baked in: the bundle reads it from `/config.json` at runtime, so one
       # build serves every environment (DELIVERY-DESIGN-2026-11 §3.1). This step proves the bundle
       # compiles; the deployed value comes from the gitops-rendered ConfigMap.
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: Audit critical production vulnerabilities
-        run: npm audit --omit=dev --audit-level=critical
+        run: pnpm audit --prod --audit-level critical
 
   # ── Local quickstart ────────────────────────────────────────────────────────
   # The README's commands from the example env, against a REAL backend: starts qnsc-kb-backend's compose stack
-  # from its `main` (its own example env, no model bake, zero-vector embeddings), starts `npm run dev`, then
+  # from its `main` (its own example env, no model bake, zero-vector embeddings), starts `pnpm run dev`, then
   # proves the dev server serves the app, that `/api` is proxied to the backend, and that one authenticated call
   # works through that proxy. Catches a broken proxy target, a base URL the dev server cannot reach, and drift
   # in the backend's published sign-in.
@@ -179,10 +185,12 @@ jobs:
           path: backend
           persist-credentials: false
 
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
       - name: Start the backend (its example env, with no model bake for CI)
         working-directory: backend
@@ -206,8 +214,8 @@ jobs:
       - name: Install and start the dev server (from the example env)
         run: |
           cp .env.example .env
-          npm ci
-          nohup npm run dev -- --host 127.0.0.1 --port 5173 --strictPort > dev.log 2>&1 &
+          pnpm install --frozen-lockfile
+          nohup pnpm run dev --host 127.0.0.1 --port 5173 --strictPort > dev.log 2>&1 &
           for _ in $(seq 1 40); do
             if curl -fsS http://127.0.0.1:5173/ -o index.html 2>/dev/null; then break; fi
             sleep 1

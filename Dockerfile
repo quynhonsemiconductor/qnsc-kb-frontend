@@ -28,14 +28,17 @@ FROM node:24-alpine3.22@sha256:191c9f0080fcbbc6547a85dc0ff7988072214a355aabdc1d2
 
 WORKDIR /app
 
+# pnpm is not pinned here: corepack reads `packageManager` from package.json.
+RUN corepack enable
+
 # Dependency manifests first, so a source-only change reuses the install layer.
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 
 COPY . .
 
 # TypeScript project build + Vite bundle → dist
-RUN npm run build
+RUN pnpm run build
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2 │ web  (the image)
