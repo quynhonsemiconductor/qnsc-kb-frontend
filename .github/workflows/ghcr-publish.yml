@@ -36,6 +36,9 @@ concurrency:
   group: ghcr-publish-kb-web
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   publish-web:
     # Ceiling for the reusable's inner grants: packages: write is the GHCR push; id-token and
