@@ -25,7 +25,7 @@ import TableArtifactView from '../../components/ai/TableArtifactView'
 import { coverageText, parseArtifacts, parseCoverage, parseSteps, parseUnverifiedNumbers, upsertStep } from '../../lib/agent'
 import EvidenceTable from '../../components/ai/EvidenceTable'
 import type { AgentArtifact, AgentStep, AnalyticsResult, AnswerCoverage, Citation, EvidenceStatus } from '../../types/ai'
-import { collapseDuplicateFailedRetries, resetFailedMessageForRetry, type AskDepth } from '../../lib/ai-retry'
+import { collapseDuplicateFailedRetries, resetFailedMessageForRetry, type AskDepth, type AskSources } from '../../lib/ai-retry'
 import { useDialog } from '../../components/ui/DialogProvider'
 import { useLanguage } from '../../i18n/LanguageProvider'
 import { Button } from '../../components/ui/Button'
@@ -240,6 +240,7 @@ export default function AskPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [depth, setDepth] = useState<AskDepth>('standard')
+  const [sources, setSources] = useState<AskSources>('default')
   const [messages, setMessages] = useState<Message[]>([])
   const [question, setQuestion] = useState(() => searchParams.get('prompt') || '')
   const [loading, setLoading] = useState(false)
@@ -648,6 +649,7 @@ export default function AskPage() {
         retryFailed,
         (step) => setMessages((previous) => previous.map((message) => message.id === assistantMessageId ? { ...message, agentSteps: upsertStep(message.agentSteps || [], step) } : message)),
         depth,
+        sources,
       )
       await refreshConversations()
     } catch (requestError: any) {
@@ -1278,6 +1280,14 @@ export default function AskPage() {
                     <option value="quick">Quick</option>
                     <option value="standard">Standard</option>
                     <option value="thorough">Thorough</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-1 text-caption text-stone" title="Team lessons are what AI assistants saved through the MCP server. They are shared at once and are not reviewed by an editor; an answer that relies on one says so. Choose Documents only to answer from reviewed documents alone.">
+                  <span className="sr-only">Sources</span>
+                  <select aria-label="Sources" value={sources} onChange={(event) => setSources(event.target.value as AskSources)} disabled={loading} className="rounded-md border border-hairline bg-surface px-1.5 py-0.5 text-caption font-semibold text-steel">
+                    <option value="default">Default sources</option>
+                    <option value="all">Documents + team lessons</option>
+                    <option value="documents">Documents only</option>
                   </select>
                 </label>
                 <span className="ml-auto tabular-nums">{question.length}/4000</span>

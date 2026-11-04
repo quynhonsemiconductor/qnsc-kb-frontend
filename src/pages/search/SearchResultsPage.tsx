@@ -29,6 +29,7 @@ export default function SearchResultsPage() {
   const [dept, setDept] = useState('')
   const [tag, setTag] = useState('')
   const [status, setStatus] = useState('published')
+  const [scope, setScope] = useState<'all' | 'documents' | 'lessons'>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [results, setResults] = useState<any[]>([])
@@ -88,6 +89,7 @@ export default function SearchResultsPage() {
         status: status || undefined,
         date_from: dateFrom || undefined,
         date_to: dateTo ? `${dateTo}T23:59:59` : undefined,
+        scope: scope === 'all' ? undefined : scope,
         limit: nextLimit
       }, controller.signal)
       setResults(data)
@@ -119,11 +121,12 @@ export default function SearchResultsPage() {
     setDept('')
     setTag('')
     setStatus('published')
+    setScope('all')
     setDateFrom('')
     setDateTo('')
   }
 
-  const hasActiveFilters = dept || tag || status !== 'published' || dateFrom || dateTo
+  const hasActiveFilters = dept || tag || status !== 'published' || scope !== 'all' || dateFrom || dateTo
 
   return (
     <PageTransition className="page-shell page-stack">
@@ -235,6 +238,22 @@ export default function SearchResultsPage() {
               </Select>
             </div>
 
+            {/* Source: reviewed documents and/or the team lessons AI assistants saved */}
+            <div className="space-y-1.5">
+              <label className="block text-body-sm font-medium text-muted-foreground">
+                {t('search.source')}
+              </label>
+              <Select
+                value={scope}
+                onChange={(e) => setScope(e.target.value as 'all' | 'documents' | 'lessons')}
+                aria-label="Source filter"
+              >
+                <option value="all">{t('search.sourceAll')}</option>
+                <option value="documents">{t('search.sourceDocuments')}</option>
+                <option value="lessons">{t('search.sourceLessons')}</option>
+              </Select>
+            </div>
+
             {/* Date range — spans one column, but uses inline flex for "from/to" */}
             <div className="space-y-1.5">
               <label className="block text-body-sm font-medium text-muted-foreground">
@@ -341,6 +360,13 @@ export default function SearchResultsPage() {
                     <Badge variant="default" size="sm">
                       {res.dept}
                     </Badge>
+                    {res.type === 'LESSON' && (
+                      <span title={t('search.teamLessonHint')}>
+                        <Badge variant="warning" size="sm">
+                          {t('search.teamLesson')}
+                        </Badge>
+                      </span>
+                    )}
                     {res.section_ref && (
                       <Badge variant="primary" size="sm">
                         {res.section_ref}

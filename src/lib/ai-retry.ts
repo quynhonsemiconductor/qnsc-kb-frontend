@@ -32,6 +32,12 @@ export interface RetryableMessageState {
 /** How hard an answer looks: quick skips follow-up retrieval, thorough allows more of it. */
 export type AskDepth = 'quick' | 'standard' | 'thorough'
 
+/**
+ * What an answer may read. `default` leaves it to the server (AI_INCLUDE_LESSONS_DEFAULT), `all` is the reviewed
+ * documents plus the team lessons AI assistants saved, `documents` is the reviewed documents only.
+ */
+export type AskSources = 'default' | 'all' | 'documents'
+
 interface AIAskPayloadOptions {
   question: string
   conversationId?: string
@@ -41,6 +47,7 @@ interface AIAskPayloadOptions {
   editInstruction?: string
   retryFailed?: boolean
   depth?: AskDepth
+  sources?: AskSources
 }
 
 export function buildAIAskPayload({
@@ -52,6 +59,7 @@ export function buildAIAskPayload({
   editInstruction,
   retryFailed = false,
   depth = 'standard',
+  sources = 'default',
 }: AIAskPayloadOptions) {
   return {
     question,
@@ -63,6 +71,8 @@ export function buildAIAskPayload({
     retry_failed: retryFailed,
     // The server's default is standard, so only a different choice is sent.
     depth: depth === 'standard' ? undefined : depth,
+    // Nothing for the default, so the server's own setting applies.
+    sources: sources === 'default' ? undefined : sources,
   }
 }
 
