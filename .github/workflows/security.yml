@@ -1,10 +1,11 @@
 # =============================================================================
 # Security · Scan — thin caller of the shared reusable (ci).
 #
-# scan_container is false: the Dockerfile here builds an nginx image for the
-# single-VPS Compose stack, and nothing deploys it — the SPA ships to Cloudflare
-# Pages as static assets. Scanning an image that never runs would report CVEs nobody
-# can act on while missing nothing real. Semgrep, gitleaks and OSV still run.
+# scan_container is false: the Dockerfile here builds the SPA's static web image, which
+# ghcr-publish.yml builds and scans (CRITICAL fixable vulns + secrets) BEFORE pushing it, so
+# the image that runs is the image that passed that gate. Rebuilding it here would duplicate
+# that scan on every PR; the daily scheduled run does not need a second copy of the same answer.
+# Semgrep, gitleaks and OSV still run.
 # =============================================================================
 name: Security · Scan
 
@@ -23,8 +24,6 @@ on:
     #
     # `main` is this repo's only long-lived branch, so the filter skipped nothing anyone
     # wanted skipped. No upside, one silent failure mode.
-  schedule:
-    - cron: "0 4 * * 1" # Monday 04:00 UTC
 
 concurrency:
   # A PUSH TO MAIN IS NEVER CANCELLED (one group per commit); pull_request keeps one group
@@ -44,7 +43,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    uses: quynhonsemiconductor/ci/.github/workflows/actions-security.yml@2a85ef7bb3c793edbc9b424ba2abeaed8080aab6 # v1.24.3
+    uses: quynhonsemiconductor/ci/.github/workflows/actions-security.yml@400b7e9868e9ba6d172d956a08041ba19b574689 # v1.33.1
     with:
       blocking: true
       combine: true # actionlint + zizmor as ONE job; the required check is `actions-security / Workflow security (actionlint, zizmor)`
@@ -59,7 +58,7 @@ jobs:
       contents: read
       security-events: write # SARIF upload
       packages: read
-    uses: quynhonsemiconductor/ci/.github/workflows/security.yml@2a85ef7bb3c793edbc9b424ba2abeaed8080aab6 # v1.24.3
+    uses: quynhonsemiconductor/ci/.github/workflows/security.yml@400b7e9868e9ba6d172d956a08041ba19b574689 # v1.33.1
     with:
       product: qnsc-kb-frontend
       # Gitleaks + osv-scanner + Semgrep as ONE job; the required check is
