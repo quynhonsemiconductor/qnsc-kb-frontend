@@ -44,7 +44,7 @@ export function Modal({ open, onClose, title, children, size = 'md', className =
       aria-label={title ? undefined : 'Dialog'}
     >
       <div
-        className="absolute inset-0 bg-background/75 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-background/75 backdrop-blur-xs animate-in fade-in duration-200"
         onClick={onClose}
         aria-hidden="true"
       />

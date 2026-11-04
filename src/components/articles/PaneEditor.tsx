@@ -213,7 +213,7 @@ function SelectionPopover({
                 onChange={event => setDraft(event.target.value)}
                 aria-label={t('select.replaceWith')}
                 placeholder={t('select.replaceWith')}
-                className="mt-2 w-full rounded-lg border border-border bg-input px-2.5 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                className="mt-2 w-full rounded-lg border border-border bg-input px-2.5 py-1.5 text-sm text-foreground outline-hidden focus:border-primary"
               />
               <div role="status" className="mt-1.5 min-h-[1.25rem] space-y-1 text-caption">
                 {checking && <p className="text-muted-foreground">{t('select.checking')}</p>}

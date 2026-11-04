@@ -106,7 +106,7 @@ export function TimeSeriesChart({ labels, series, ariaLabel, emptyText, hint, he
           onPointerLeave={() => setActive(null)}
           onKeyDown={onKeyDown}
           onBlur={() => setActive(null)}
-          className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          className="rounded-lg outline-hidden focus-visible:ring-2 focus-visible:ring-primary/50"
         >
           <svg viewBox={`0 0 ${WIDTH} ${height}`} preserveAspectRatio="none" className="block w-full" style={{ height }} aria-hidden="true">
             {[0, 0.5, 1].map((fraction) => (
@@ -154,7 +154,7 @@ export function TimeSeriesChart({ labels, series, ariaLabel, emptyText, hint, he
         <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-muted-foreground">
           {series.map((s) => (
             <li key={s.id} className="flex items-center gap-1.5">
-              <span className={`inline-block h-2 w-2 rounded-sm ${s.swatchClassName}`} aria-hidden="true" />
+              <span className={`inline-block h-2 w-2 rounded-xs ${s.swatchClassName}`} aria-hidden="true" />
               {s.label}
             </li>
           ))}

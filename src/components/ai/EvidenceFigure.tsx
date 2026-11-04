@@ -92,7 +92,7 @@ export default function EvidenceFigure({ item, previews, onSelect, labels, onAsk
           type="button"
           onClick={() => setZoomed(true)}
           title={labels.zoom}
-          className="ask-press group relative block w-full cursor-zoom-in overflow-hidden rounded-xl border border-hairline bg-canvas transition hover:border-info/40 hover:shadow-sm"
+          className="ask-press group relative block w-full cursor-zoom-in overflow-hidden rounded-xl border border-hairline bg-canvas transition hover:border-info/40 hover:shadow-xs"
         >
           <img
             src={url}
@@ -101,7 +101,7 @@ export default function EvidenceFigure({ item, previews, onSelect, labels, onAsk
             decoding="async"
             className="max-h-96 w-full object-contain"
           />
-          <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-control bg-surface/90 text-steel opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-visible:opacity-100"><ZoomIn size={14} /></span>
+          <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-control bg-surface/90 text-steel opacity-0 shadow-xs transition group-hover:opacity-100 group-focus-visible:opacity-100"><ZoomIn size={14} /></span>
         </button>
       ) : (
         <button

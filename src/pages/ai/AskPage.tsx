@@ -788,7 +788,7 @@ export default function AskPage() {
                       onChange={(event) => setHistoryQuery(event.target.value)}
                       placeholder={t('chat.findChat')}
                       aria-label="Search chat history"
-                      className="w-full rounded-lg border border-hairline bg-canvas py-2 pl-8 pr-2 text-body text-ink outline-none placeholder:text-stone focus:border-minimaxBlue focus:ring-2 focus:ring-minimaxBlue/20"
+                      className="w-full rounded-lg border border-hairline bg-canvas py-2 pl-8 pr-2 text-body text-ink outline-hidden placeholder:text-stone focus:border-minimaxBlue focus:ring-2 focus:ring-minimaxBlue/20"
                     />
                   </label>
                 )}
@@ -804,7 +804,7 @@ export default function AskPage() {
                       key={conversation.id}
                       onClick={() => !editing && void loadConversation(conversation.id)}
                       style={{ animationDelay: `${Math.min(conversationIndex, 8) * 30}ms` }}
-                      className={`ask-fade-up group relative flex cursor-pointer items-center gap-2 rounded-lg border-l-2 px-3 py-2.5 transition-colors duration-150 ${active ? 'border-minimaxBlue bg-surface text-ink shadow-sm' : 'border-transparent text-steel hover:border-hairline hover:bg-surface hover:text-ink'}`}
+                      className={`ask-fade-up group relative flex cursor-pointer items-center gap-2 rounded-lg border-l-2 px-3 py-2.5 transition-colors duration-150 ${active ? 'border-minimaxBlue bg-surface text-ink shadow-xs' : 'border-transparent text-steel hover:border-hairline hover:bg-surface hover:text-ink'}`}
                     >
                       <MessageSquare size={15} className={`shrink-0 transition-colors duration-150 ${active ? 'text-minimaxBlue' : ''}`} />
                       {editing ? (
@@ -815,7 +815,7 @@ export default function AskPage() {
                           onClick={(event) => event.stopPropagation()}
                           onKeyDown={(event) => { if (event.key === 'Enter') void saveRename(conversation.id); if (event.key === 'Escape') setEditingId(null) }}
                           onBlur={() => void saveRename(conversation.id)}
-                          className="min-w-0 flex-1 rounded border border-minimaxBlue bg-canvas px-1.5 py-0.5 text-xs text-ink outline-none ring-2 ring-minimaxBlue/20 transition-shadow"
+                          className="min-w-0 flex-1 rounded border border-minimaxBlue bg-canvas px-1.5 py-0.5 text-xs text-ink outline-hidden ring-2 ring-minimaxBlue/20 transition-shadow"
                         />
                       ) : (
                         <span
@@ -940,7 +940,7 @@ export default function AskPage() {
                         key={prompt.text}
                         onClick={() => void handleAsk(prompt.text)}
                         style={{ animationDelay: `${220 + suggestionIndex * 60}ms` }}
-                        className="ask-fade-up ask-press group flex min-h-28 flex-col items-start justify-between rounded-2xl border border-hairline bg-canvas p-4 text-left transition-all duration-200 hover:-translate-y-1 hover:border-minimaxBlue hover:bg-surface hover:text-ink hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-minimaxBlue/40"
+                        className="ask-fade-up ask-press group flex min-h-28 flex-col items-start justify-between rounded-2xl border border-hairline bg-canvas p-4 text-left transition-all duration-200 hover:-translate-y-1 hover:border-minimaxBlue hover:bg-surface hover:text-ink hover:shadow-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-minimaxBlue/40"
                       >
                         <span className={`rounded-full border px-2 py-1 text-caption font-bold uppercase tracking-[.14em] ${prompt.tone}`}>{prompt.label}</span>
                         <span className="mt-3 text-sm leading-5 text-steel transition group-hover:text-ink">{prompt.text}</span>
@@ -962,7 +962,7 @@ export default function AskPage() {
                     if (message.sender === 'user') return (
                       <div key={messageId} className="ask-fade-up group flex justify-end">
                         <div className="flex w-full max-w-[96%] flex-col items-end gap-1">
-                          <p className="whitespace-pre-wrap rounded-2xl border border-hairline bg-surface px-4 py-2.5 text-body leading-6 text-ink transition-shadow duration-200 group-hover:shadow-sm">{message.text}</p>
+                          <p className="whitespace-pre-wrap rounded-2xl border border-hairline bg-surface px-4 py-2.5 text-body leading-6 text-ink transition-shadow duration-200 group-hover:shadow-xs">{message.text}</p>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1078,7 +1078,7 @@ export default function AskPage() {
                                   <p className="mb-2 text-caption font-bold uppercase tracking-widest text-warning">Article found</p>
                                   <p className="text-sm font-bold text-warning">{message.articleTitle || 'Matching article'}</p>
                                   <div className="mt-3 rounded-lg border border-warning/20 bg-black/10 px-3 py-2"><p className="text-caption font-bold uppercase tracking-widest text-warning">Original information</p><p className="mt-1 text-xs leading-5 text-warning/80">{message.originalInformation || message.articlePreview || 'The matched source passage is unavailable.'}</p></div>
-                                  <div className="mt-3"><label className="text-caption font-bold uppercase tracking-widest text-warning" htmlFor={`edit-instruction-${messageId}`}>Will update</label><textarea id={`edit-instruction-${messageId}`} value={editDraft} onChange={(event) => updatePendingEditInstruction(event.target.value)} rows={4} className="mt-1 w-full resize-y rounded-lg border border-warning/20 bg-black/10 px-3 py-2 text-xs leading-5 text-warning outline-none placeholder:text-warning/50 focus:border-warning/50" placeholder="Describe the corrected information" /></div>
+                                  <div className="mt-3"><label className="text-caption font-bold uppercase tracking-widest text-warning" htmlFor={`edit-instruction-${messageId}`}>Will update</label><textarea id={`edit-instruction-${messageId}`} value={editDraft} onChange={(event) => updatePendingEditInstruction(event.target.value)} rows={4} className="mt-1 w-full resize-y rounded-lg border border-warning/20 bg-black/10 px-3 py-2 text-xs leading-5 text-warning outline-hidden placeholder:text-warning/50 focus:border-warning/50" placeholder="Describe the corrected information" /></div>
                                   <div className="mt-3 flex flex-wrap gap-2">
                                     <Button
                                       variant="primary"
@@ -1159,7 +1159,7 @@ export default function AskPage() {
                                     key={`${citation.article_id}-${citationIndex}`}
                                     onClick={() => setSelectedSource(citation)}
                                     style={{ animationDelay: `${citationIndex * 40}ms` }}
-                                    className="ask-fade-up flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-surface hover:shadow-sm"
+                                    className="ask-fade-up flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-surface hover:shadow-xs"
                                   >
                                     <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-info/20 text-body-sm font-semibold text-info transition-transform duration-150 group-hover:scale-105">{citation.source_index ?? citationIndex + 1}</span>
                                     {citation.evidence_kind === 'table'
@@ -1303,7 +1303,7 @@ export default function AskPage() {
                   disabled={loading}
                   maxLength={4000}
                   placeholder={t('chat.askPlaceholder')}
-                  className="max-h-44 min-h-[28px] flex-1 resize-none overflow-hidden bg-transparent px-2 py-1.5 text-body leading-6 text-ink outline-none placeholder:text-stone"
+                  className="max-h-44 min-h-[28px] flex-1 resize-none overflow-hidden bg-transparent px-2 py-1.5 text-body leading-6 text-ink outline-hidden placeholder:text-stone"
                 />
                 {loading && (
                   <Button

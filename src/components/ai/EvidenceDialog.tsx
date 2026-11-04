@@ -26,7 +26,7 @@ export default function EvidenceDialog({ title, closeLabel, onClose, actions, ch
 
   return (
     <div className="fixed inset-0 z-modal flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <div className="absolute inset-0 bg-scrim/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-scrim/60 backdrop-blur-xs" onClick={onClose} aria-hidden="true" />
       <FocusTrap className="contents">
         <div className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-6xl flex-col overflow-hidden rounded-panel border border-border bg-surface-elevated shadow-modal sm:max-h-[calc(100dvh-3rem)]">
           <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">

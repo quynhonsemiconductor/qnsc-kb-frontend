@@ -172,7 +172,7 @@ export default function ChartArtifactView({ chart }: { chart: ChartArtifact }) {
       {chart.chart_type !== 'pie' && chart.series.length > 1 && (
         <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted-foreground">
           {chart.series.map((series, index) => (
-            <li key={series.name} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: COLORS[index % COLORS.length] }} />{series.name}</li>
+            <li key={series.name} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs" style={{ backgroundColor: COLORS[index % COLORS.length] }} />{series.name}</li>
           ))}
         </ul>
       )}

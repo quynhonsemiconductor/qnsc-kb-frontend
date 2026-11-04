@@ -23,7 +23,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   // `duration-fast` + `ease-standard` rather than `duration-200`: a button press is state
-  // feedback the user must not wait on. `shadow-raised`/`shadow-overlay` replace `shadow-sm`
+  // feedback the user must not wait on. `shadow-raised`/`shadow-overlay` replace `shadow-xs`
   // and `shadow-md` so depth comes from the elevation scale and tracks --shadow in both themes.
   const baseStyle = 'ui-button relative inline-flex items-center justify-center gap-2 font-semibold transition-colors duration-fast ease-standard disabled:pointer-events-none disabled:opacity-50'
 
