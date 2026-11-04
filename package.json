@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -37,8 +37,6 @@
   "devDependencies": {
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "@typescript-eslint/eslint-plugin": "^7.11.0",
-    "@typescript-eslint/parser": "^7.11.0",
     "@vitejs/plugin-react": "^6.0.5",
     "@xmldom/xmldom": "^0.9.12",
     "autoprefixer": "^10.4.19",
@@ -48,6 +46,9 @@
     "tailwindcss": "^3.4.3",
     "typescript": "^5.2.2",
     "vite": "^8.2.1",
-    "vitest": "^4.1.12"
+    "vitest": "^4.1.12",
+    "eslint": "^9.39.5",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
+    "@typescript-eslint/parser": "^8.72.1"
   }
 }
