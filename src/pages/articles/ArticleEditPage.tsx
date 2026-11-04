@@ -49,7 +49,7 @@ function DepartmentPicker({ value, options, onChange }: { value: string[]; optio
       </div>
     </FloatingPanel>
     {selected.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{selected.map((item, index) => <Badge key={item.id} variant={index === 0 ? 'primary' : 'default'} size="sm" className="gap-1">
-      {item.name}{index === 0 && <span className="text-caption uppercase tracking-wide opacity-70">primary</span>}
+      {item.name}{index === 0 && <span className="text-caption uppercase tracking-wide opacity-70">{t('editor.primary')}</span>}
       <button type="button" aria-label={`Remove ${item.name}`} onClick={() => toggle(item.id)} className="rounded-full p-0.5 hover:bg-white/10"><X size={11} /></button>
     </Badge>)}</div>}
   </div>
