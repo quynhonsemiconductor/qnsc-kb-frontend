@@ -63,8 +63,8 @@ export default function PdfTextViewer({
         pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
         const task = pdfjs.getDocument({
           data: new Uint8Array(await blob.arrayBuffer()),
-          // No eval in a page whose CSP forbids it, and no network fetches for fonts or CMaps.
-          isEvalSupported: false,
+          // pdfjs-dist 5 removed `isEvalSupported` (and the eval path with it), so the CSP's
+          // no-eval rule holds without the option. No network fetches for fonts or CMaps.
           disableFontFace: false,
           useSystemFonts: true,
         })
