@@ -14,9 +14,14 @@ import { Badge } from '../components/ui/Badge'
 
 const PAGE_SIZE = 24
 
+// The tag a lesson is saved with marks it for the server; the person sees the Team lesson badge instead.
+const INTERNAL_TAGS = new Set(['session-lesson'])
+
 function topicsFor(article: ArticleCard) {
-  const topics = (article.tags || []).map(tag => tag.trim()).filter(Boolean)
-  return topics.length ? topics : ['General knowledge']
+  const topics = (article.tags || []).map(tag => tag.trim()).filter(tag => tag && !INTERNAL_TAGS.has(tag))
+  if (topics.length) return topics
+  // A lesson with nothing but its internal tag is not "General knowledge": the badge says what it is.
+  return article.type === 'LESSON' ? [] : ['General knowledge']
 }
 
 function browsePath(basePath: string, dept?: string, topic?: string, query?: string) {
@@ -29,11 +34,12 @@ function browsePath(basePath: string, dept?: string, topic?: string, query?: str
 }
 
 function DocumentRow({ article, canEdit, canAsk }: { article: ArticleCard; canEdit: boolean; canAsk: boolean }) {
+  const { t } = useLanguage()
   const requestPrompt = `I need help identifying who is allowed to change the knowledge-base article "${article.title}" (article ID: ${article.id}). I cannot change it directly. Please explain which role or person owns this responsibility and help me prepare a clear request for them.`
   return <article className="group grid min-h-[4.75rem] grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3 transition hover:bg-surface-elevated lg:grid-cols-[2.25rem_minmax(0,1fr)_10rem_7rem_auto]">
     <span className="grid h-9 w-8 place-items-center rounded-lg border border-border bg-background font-mono text-caption font-semibold text-primary">DOC</span>
     <div className="min-w-0">
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">{topicsFor(article).slice(0, 2).map(topic => <span key={topic} className="rounded-md bg-primary/10 px-1.5 py-0.5 text-caption font-semibold text-primary-text">#{topic}</span>)}</div>
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">{article.type === 'LESSON' && <span title={t('search.teamLessonHint')}><Badge variant="warning" size="sm">{t('search.teamLesson')}</Badge></span>}{topicsFor(article).slice(0, 2).map(topic => <span key={topic} className="rounded-md bg-primary/10 px-1.5 py-0.5 text-caption font-semibold text-primary-text">#{topic}</span>)}</div>
       <Link to={`/articles/${article.id}`} className="mt-1.5 block truncate text-body font-bold text-foreground no-underline group-hover:text-primary">{article.title}</Link>
       <p className="mt-1 truncate font-mono text-caption text-muted">v{article.version}</p>
     </div>

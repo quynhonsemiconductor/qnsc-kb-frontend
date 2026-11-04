@@ -558,6 +558,12 @@ export default function ArticleDetailPage() {
               )}
             </div>
 
+            {article.type === 'LESSON' && (
+              <div role="note" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-300">
+                {t('articles.teamLessonNotice')}
+              </div>
+            )}
+
             {indexNeedsAttention(article.index_status, article.status) && (
               <div role="status" className={`rounded-lg border px-3 py-2 text-sm font-semibold ${article.index_status === 'failed' ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>
                 {article.index_status === 'failed'
