@@ -1168,6 +1168,7 @@ export default function AskPage() {
                                         ? <FileImage size={14} className="shrink-0 text-info" />
                                         : <FileText size={14} className="shrink-0 text-stone" />}
                                     <span className="min-w-0 flex-1 truncate text-body text-steel">{citation.evidence_label || citation.title}</span>
+                                    {citation.article_type === 'LESSON' && <span title={t('search.teamLessonHint')} className="shrink-0 rounded-md bg-warning/15 px-1.5 py-0.5 text-caption font-semibold text-warning-text">{t('search.teamLesson')}</span>}
                                     <span className="ml-auto shrink-0 text-body-sm text-stone">{citation.evidence_kind ? t(`chat.evidence.${citation.evidence_kind}`) : (citation.section_ref || t('chat.general'))}</span>
                                   </button>
                                 ))}

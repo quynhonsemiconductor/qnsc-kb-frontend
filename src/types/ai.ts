@@ -25,6 +25,8 @@ export interface Citation {
   source_index?: number
   article_id: string
   title: string
+  /** LESSON: what an AI assistant saved, shared without an editor's review. */
+  article_type?: string | null
   source_ref?: string
   section_ref?: string
   excerpt?: string
