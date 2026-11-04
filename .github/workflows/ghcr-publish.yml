@@ -10,10 +10,9 @@
 # services are published from qnsc-kb-backend (product `kb`); this job adds the `web` one under the
 # same product prefix.
 #
-# The reusable's `digests` output (JSON, service → sha256) is what a gitops bump writes into its
-# values files. The job is intentionally NOT wired to a bump yet: gitops values/kb has no `web`
-# image until the chart's `web:` block lands, and a value the chart does not know would be noise in
-# every dev bump.
+# The reusable's `digests` output (JSON, service → sha256) is what the `bump-dev` job writes into
+# gitops values/kb/tags.dev.yaml, as top-level `web.image` — the path the chart's SPA component
+# reads (charts/qnsc-service/templates/web.yaml), not services.web.
 # =============================================================================
 name: GHCR · Publish
 
@@ -57,3 +56,47 @@ jobs:
       # fails — see the reusable's build_runner note).
       platforms: linux/amd64
       build_runner: ubuntu-24.04
+
+  # kb-dev follows main: this repo bumps `web` ONLY.
+  #
+  # qnsc-kb-backend's bump owns api/worker/migrator and this job owns web, so the two writers never
+  # overwrite each other's services in values/kb/tags.dev.yaml. They share the file but not a key;
+  # each PR touches its own lines, and gitops's branch rules still gate the merge.
+  #
+  # Not the reusable's `bump-dev` input: that writes every service of its own publish call and
+  # carries the reusable's own pinned action version. This job needs the ci action that knows `web`
+  # is written under top-level `web.image`, not under services.
+  bump-dev:
+    needs: publish-web
+    if: ${{ github.ref == 'refs/heads/main' && needs.publish-web.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    concurrency:
+      # One bump per product/env from this repo. kb-backend's bump is a different workflow and does
+      # not serialise with this one; their diffs are disjoint (see above).
+      group: gitops-bump-kb-dev
+      cancel-in-progress: false
+    steps:
+      # App token scoped to the gitops repo only: branch push + open PR + enable auto-merge.
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
+        with:
+          app-id: ${{ vars.QNSC_AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.QNSC_AUTOMATION_PRIVATE_KEY }}
+          owner: quynhonsemiconductor
+          repositories: gitops
+          permission-contents: write
+          permission-pull-requests: write
+      # SHA-pinned, NOT @v1 — ci's v1 tag is frozen and must not be used.
+      - uses: quynhonsemiconductor/ci/actions/bump-gitops-tag@b696a7d77e650057b4ee1de16be84bcce3936566  # v1.34.0
+        with:
+          product: kb
+          env: dev
+          services: web
+          tag: ${{ needs.publish-web.outputs.tag }}
+          digests: ${{ needs.publish-web.outputs.digests }}
+          mode: pull-request
+          auto-merge: 'true'
+          gitops-token: ${{ steps.app.outputs.token }}
