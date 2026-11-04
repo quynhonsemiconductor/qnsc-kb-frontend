@@ -6,7 +6,7 @@
 # a writable /tmp, config.json mounted at /srv/config.json, an arbitrary non-root uid, port 8080),
 # and exercises the contract.
 #
-#   contract      /healthz 200; doc root /srv; the process runs as the image's non-root uid;
+#   contract      /healthz and /livez 200; doc root /srv; the process runs as the image's non-root uid;
 #                 nothing outside /tmp is writable
 #   caching       / and SPA routes no-cache; an existing /assets/* and /fonts/* immutable; a MISSING
 #                 asset 404 with no Cache-Control promise
@@ -145,6 +145,7 @@ done
 # Contract
 # -----------------------------------------------------------------------------
 expect_status "/healthz answers" 200 "$base/healthz"
+expect_status "/livez answers" 200 "$base/livez"
 expect_body_contains "/healthz says ok" "ok" "$base/healthz"
 if [ "$(docker exec "$web" id -u)" = "0" ]; then
   bad "runs as a non-root user" "uid 0"
