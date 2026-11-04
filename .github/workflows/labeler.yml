@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   labeler:
-    uses: quynhonsemiconductor/ci/.github/workflows/labeler.yml@2a85ef7bb3c793edbc9b424ba2abeaed8080aab6 # v1.24.3
+    uses: quynhonsemiconductor/ci/.github/workflows/labeler.yml@400b7e9868e9ba6d172d956a08041ba19b574689 # v1.33.1
     permissions:
       contents: read
       pull-requests: write

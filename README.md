@@ -33,9 +33,10 @@ and same-origin cookies. To use a backend somewhere else, set `VITE_DEV_API_TARG
 restart `npm run dev`. If the backend's port had to change (`KB_API_PORT` in its `.env`), set
 `VITE_DEV_API_TARGET=http://localhost:<port>` to match.
 
-An absolute `VITE_API_BASE_URL` skips the proxy and calls the backend cross-origin; that only works
-from an origin its `CORS_ORIGINS` lists, which is `http://localhost:5173` by default. A production
-build (`npm run build`) refuses to compile without `VITE_API_BASE_URL`.
+An absolute `VITE_API_BASE_URL` is not supported: the app fetches its API settings from
+`/config.json` at runtime and refuses an origin that would send it cross-site (the session refresh
+cookie is same-origin). The dev server answers `/config.json` from `.env`; a deployment mounts the
+real file next to `dist/`, so one build serves every environment.
 
 The dev port is pinned to 5173 (`FRONTEND_DEV_PORT` in `.env` to change it). If it is taken, `npm run dev` fails with
 `Port 5173 is already in use` rather than moving: the backend's `CORS_ORIGINS` are set for this origin.

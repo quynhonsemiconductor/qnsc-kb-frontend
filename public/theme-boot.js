@@ -4,7 +4,7 @@
    This lives in its own file rather than inline in index.html so `script-src 'self'`
    covers it. The inline alternative needs either 'unsafe-inline' — which would undo the
    protection the whole policy is for — or a sha256 hash repeated in the three places this
-   app declares a CSP (nginx.conf, public/_headers, the backend's docker/Caddyfile), where
+   app declares a CSP (Caddyfile, public/_headers, the backend's docker/Caddyfile), where
    the first edit that forgets one of them silently blocks the script.
 
    It stays a plain parser-blocking <script> placed above the stylesheet in <head>: an
