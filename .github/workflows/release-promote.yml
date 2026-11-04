@@ -1,0 +1,75 @@
+# =============================================================================
+# Release · Promote — a vX.Y.Z tag RETAGS the already-published SPA digest and
+# opens the reviewed gitops prod PR. It builds NOTHING.
+#
+# WHY IT LIVES HERE AND NOT IN qnsc-kb-backend: the SPA image is published by
+# THIS repository's GHCR · Publish (`product: kb`, `services-json: '["web"]'`),
+# tagged `sha-<this repo's commit>`. qnsc-kb-backend's promote runs on ITS own
+# commit, whose sha was never used to build a web image, so adding `web` there
+# would make release-retag fail with "not published for this commit". One
+# repository promotes the images it builds.
+#
+# The release streams are independent on purpose (kb-fe versions itself), so a
+# prod promotion is two PRs to gitops: backend (api/worker/migrator) and this one
+# (`web.image`). They write different keys of values/kb/tags.prod.yaml.
+#
+# GATED: kb prod is not launched yet. Set the repository variable
+# KB_PROD_PROMOTE_ENABLED=true at the P3 cutover. Unset is a clean skip, not red.
+# While values/kb/tags.prod.yaml does not exist, the reusable stops with its own
+# "no prod values" message — also the intended state before P3.
+# =============================================================================
+name: Release · Promote
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-promote-kb-web
+  cancel-in-progress: false
+
+jobs:
+  # A tag can be pushed while the same commit's GHCR · Publish is still building;
+  # release-retag looks for sha-<12> once, so wait for it first and propagate its
+  # conclusion.
+  wait-for-publish:
+    if: ${{ vars.KB_PROD_PROMOTE_ENABLED == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read # wait-for-run reads the run list
+    steps:
+      - uses: quynhonsemiconductor/ci/actions/wait-for-run@400b7e9868e9ba6d172d956a08041ba19b574689  # v1.33.1
+        with:
+          workflow: ghcr-publish.yml
+          sha: ${{ github.sha }}
+          branch: main
+          label: GHCR · Publish
+          max-wait-minutes: '45'
+          failure-message: "The GHCR · Publish run for this release commit did not succeed, so there is no sha-<12> web image to retag. Fix the build, then re-run this release job."
+          missing-message: "No GHCR · Publish run exists for this commit. Cut the release from a commit that was published to main."
+
+  promote:
+    needs: wait-for-publish
+    # Ceiling for the reusable's jobs: retag pushes an image tag and verifies
+    # attestations.
+    permissions:
+      contents: read
+      packages: write
+      attestations: read
+    # Pins the merged ci commit that writes web to web.image (#305); the last
+    # release before it, v1.34.0, maps every service to services.<name>.image.
+    # Re-pin to the release that ships the fix once cut.
+    uses: quynhonsemiconductor/ci/.github/workflows/release-promote.yml@355d3c2c5893cb3b60fc68977d19e87554ed8648  # merged main, ci#305
+    with:
+      product: kb
+      gitops-product: kb
+      release-tag: ${{ github.ref_name }}
+      commit: ${{ github.sha }}
+      services: web
+    secrets:
+      QNSC_AUTOMATION_PRIVATE_KEY: ${{ secrets.QNSC_AUTOMATION_PRIVATE_KEY }}
