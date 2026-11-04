@@ -5,6 +5,7 @@ import { search } from '../../api/search'
 import { listDepartments } from '../../api/auth'
 import { useAuth } from '../../auth/useAuth'
 import { useLanguage } from '../../i18n/LanguageProvider'
+import { highlightParts, searchTerms, tidySnippet } from '../../lib/searchSnippet'
 import { requestContent } from '../../api/knowledge'
 import { safeExternalUrl } from '../../lib/formatters'
 import PageHeader from '../../components/ui/PageHeader'
@@ -41,6 +42,8 @@ export default function SearchResultsPage() {
   const [limit, setLimit] = useState(SEARCH_LIMIT_STEP)
   const [requested, setRequested] = useState(false)
   const [error, setError] = useState(false)
+  // The words the shown results were found for. The input box moves on as the user types; the marks must not.
+  const [shownQuery, setShownQuery] = useState('')
   const [departments, setDepartments] = useState<{ id: string; name: string; company_domain: string; active: boolean }[]>([])
 
   const { t } = useLanguage()
@@ -93,6 +96,7 @@ export default function SearchResultsPage() {
         limit: nextLimit
       }, controller.signal)
       setResults(data)
+      setShownQuery(query)
       setLimit(nextLimit)
     } catch (err) {
       // A cancelled request is not a failure: its replacement is already in flight, and
@@ -125,6 +129,8 @@ export default function SearchResultsPage() {
     setDateFrom('')
     setDateTo('')
   }
+
+  const shownTerms = useMemo(() => searchTerms(shownQuery), [shownQuery])
 
   const hasActiveFilters = dept || tag || status !== 'published' || scope !== 'all' || dateFrom || dateTo
 
@@ -395,7 +401,15 @@ export default function SearchResultsPage() {
 
                   {/* Excerpt */}
                   <p className="whitespace-pre-wrap border-l-2 border-border pl-4 text-body leading-relaxed text-muted-foreground">
-                    {res.chunk_text}
+                    {highlightParts(tidySnippet(String(res.chunk_text ?? '')), shownTerms).map((part, at) =>
+                      part.match ? (
+                        <mark key={at} className="rounded bg-warning/25 px-0.5 text-foreground">
+                          {part.text}
+                        </mark>
+                      ) : (
+                        <React.Fragment key={at}>{part.text}</React.Fragment>
+                      ),
+                    )}
                   </p>
 
                   {/* Source link */}
