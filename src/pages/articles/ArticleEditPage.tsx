@@ -29,23 +29,23 @@ function DepartmentPicker({ value, options, onChange }: { value: string[]; optio
   return <div className="relative">
     <div className="mb-1.5 flex items-center justify-between gap-2">
       <label className="block text-xs font-semibold text-slate-400">{t('editor.departments')}</label>
-      <span className="text-caption font-semibold text-slate-500">{selected.length} selected</span>
+      <span className="text-caption font-semibold text-slate-500">{t('editor.selectedCount', { count: selected.length })}</span>
     </div>
     <button ref={anchorRef} type="button" aria-expanded={open} onClick={() => setOpen(current => !current)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 text-left text-xs text-foreground outline-none transition hover:border-brand-500/70 focus:border-brand-500">
-      <span className={selected.length ? 'font-semibold text-foreground' : 'text-slate-500'}>{selected.length ? `${selected.length} department${selected.length === 1 ? '' : 's'} selected` : 'Choose departments'}</span>
+      <span className={selected.length ? 'font-semibold text-foreground' : 'text-slate-500'}>{selected.length ? t(selected.length === 1 ? 'editor.departmentsSelectedOne' : 'editor.departmentsSelectedMany', { count: selected.length }) : t('editor.chooseDepartments')}</span>
       <ChevronDown size={15} className={`shrink-0 text-slate-500 transition ${open ? 'rotate-180 text-brand-400' : ''}`} />
     </button>
     <FloatingPanel anchorRef={anchorRef} open={open} onClose={() => setOpen(false)} className="border-slate-700 bg-slate-900 p-1.5 shadow-2xl shadow-black/40">
       <div className="flex items-center justify-between border-b border-slate-800 px-2.5 py-2">
         <span className="text-caption font-bold uppercase tracking-[.14em] text-slate-500">{t('editor.visibility')}</span>
-        {selected.length > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])} className="text-caption font-semibold text-brand-400 hover:text-brand-300">Clear all</Button>}
+        {selected.length > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])} className="text-caption font-semibold text-brand-400 hover:text-brand-300">{t('editor.clearAll')}</Button>}
       </div>
       <div className="py-1">
         {options.length ? options.map(item => { const checked = value.includes(item.id); return <button key={item.id} type="button" onClick={() => toggle(item.id)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-xs text-slate-200 transition hover:bg-slate-800">
           <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${checked ? 'border-brand-500 bg-brand-500 text-primary-foreground' : 'border-slate-600 bg-slate-950'}`}>{checked && <Check size={11} strokeWidth={3} />}</span>
           <span className="min-w-0 flex-1 truncate font-semibold">{item.name}</span>
-          {checked && value[0] === item.id && <span className="text-caption font-semibold text-brand-400">Primary</span>}
-        </button> }) : <p className="px-2.5 py-3 text-xs text-slate-500">No departments available.</p>}
+          {checked && value[0] === item.id && <span className="text-caption font-semibold text-brand-400">{t('editor.primary')}</span>}
+        </button> }) : <p className="px-2.5 py-3 text-xs text-slate-500">{t('editor.noDepartments')}</p>}
       </div>
     </FloatingPanel>
     {selected.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{selected.map((item, index) => <Badge key={item.id} variant={index === 0 ? 'primary' : 'default'} size="sm" className="gap-1">
@@ -290,7 +290,7 @@ export default function ArticleEditPage() {
     return (
       <div className="flex justify-center items-center h-64 text-slate-400">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-500 mr-3" />
-        <span>Preparing editor panel...</span>
+        <span>{t('editor.preparing')}</span>
       </div>
     )
   }
@@ -304,10 +304,10 @@ export default function ArticleEditPage() {
           onClick={() => navigate(-1)}
           icon={<ArrowLeft size={16} />}
         >
-          Back
+          {t('editor.back')}
         </Button>
         <h1 className="font-display text-xl font-extrabold text-foreground">
-          {isEditMode ? 'Modify Article' : 'Submit New Article'}
+          {isEditMode ? t('editor.titleModify') : t('editor.titleNew')}
         </h1>
       </div>
 
@@ -323,9 +323,9 @@ export default function ArticleEditPage() {
         <div className="lg:col-span-2 space-y-5">
           {/* Title */}
           <Input
-            label="Document Title"
+            label={t('editor.docTitle')}
             type="text"
-            placeholder="e.g., Incident Response Playbook: Database Outages"
+            placeholder={t('editor.docTitlePlaceholder')}
             value={title}
             onChange={(e) => { setTitle(e.target.value); setDirty(true) }}
             className="py-3"
@@ -335,29 +335,29 @@ export default function ArticleEditPage() {
           {/* Markdown Content */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-semibold text-slate-300">Body Markdown</label>
+              <label className="block text-sm font-semibold text-slate-300">{t('editor.body')}</label>
               <Button type="button" variant="ghost" size="sm" onClick={insertTemplate}>
-                Insert basic template
+                {t('editor.insertTemplate')}
               </Button>
             </div>
             <textarea
-              placeholder="# Introduction&#10;Write details about procedures, policies, or decision log references here..."
+              placeholder={t('editor.bodyPlaceholder')}
               value={bodyMd}
               onChange={(e) => { setBodyMd(e.target.value); setDirty(true) }}
               className="field h-96 resize-y p-4 font-mono"
               required
             />
-            <p className="text-body-sm leading-5 text-slate-500">Use standard Markdown links or wiki links such as <code className="rounded bg-slate-800 px-1 py-0.5 text-slate-300">[[Incident Response Playbook]]</code>. Matching document titles become clickable links when published.</p>
+            <p className="text-body-sm leading-5 text-slate-500">{t('editor.bodyHelpBefore')}<code className="rounded bg-slate-800 px-1 py-0.5 text-slate-300">[[Incident Response Playbook]]</code>{t('editor.bodyHelpAfter')}</p>
           </div>
 
           {/* Tags */}
           <Input
-            label="Tags"
+            label={t('editor.tags')}
             type="text"
-            placeholder="incident, database, runbook (comma separated)"
+            placeholder={t('editor.tagsPlaceholder')}
             value={tagsInput}
             onChange={(e) => { setTagsInput(e.target.value); setDirty(true) }}
-            hint="Tags become topics in the library. Add the primary topic first, then any secondary topics."
+            hint={t('editor.tagsHint')}
             className="py-2.5"
           />
         </div>
@@ -367,13 +367,13 @@ export default function ArticleEditPage() {
           {/* Properties card */}
           <div className="glass-panel rounded-2xl border border-border p-5 space-y-4">
             <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-800 pb-2">
-              Parameters
+              {t('editor.parameters')}
             </h3>
 
             <div className="space-y-4">
               <div>
                 <DepartmentPicker value={departmentIds} options={articleDepartments} onChange={ids => { setDepartmentIds(ids); setDept(articleDepartments.find(item => item.id === ids[0])?.name || ''); setDirty(true) }} />
-                <p className="mt-1.5 text-body-sm leading-5 text-slate-500">Select all departments that should access this article. The first selected department is the primary department.</p>
+                <p className="mt-1.5 text-body-sm leading-5 text-slate-500">{t('editor.departmentsHint')}</p>
               </div>
 
               <div>
@@ -390,12 +390,12 @@ export default function ArticleEditPage() {
                   {visibility === 'users' && <option value="users">{t('editor.visibilityUsers')}</option>}
                 </Select>
                 {visibility === 'users' && <p className="mt-1.5 text-body-sm leading-5 text-amber-300/90">{t('editor.visibilityUsersLocked')}</p>}
-                <p className="mt-1.5 text-body-sm leading-5 text-slate-500">Explicit deny entries always override other access grants.</p>
+                <p className="mt-1.5 text-body-sm leading-5 text-slate-500">{t('editor.denyHint')}</p>
               </div>
 
               {isEditMode && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Document type</label>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">{t('editor.docType')}</label>
                   <Select
                     value={docType}
                     disabled={!canManageArticlePermissions}
@@ -404,7 +404,7 @@ export default function ArticleEditPage() {
                   >
                     {ARTICLE_TYPES.map(value => <option key={value} value={value}>{value}</option>)}
                   </Select>
-                  <label className="mt-3 block text-xs font-semibold text-slate-400 mb-1.5">Sensitivity</label>
+                  <label className="mt-3 block text-xs font-semibold text-slate-400 mb-1.5">{t('editor.sensitivity')}</label>
                   <Select
                     value={sensitivity}
                     disabled={!canManageArticlePermissions}
@@ -413,16 +413,16 @@ export default function ArticleEditPage() {
                   >
                     {SENSITIVITY_LEVELS.map(value => <option key={value} value={value}>{value}</option>)}
                   </Select>
-                  {!canManageArticlePermissions && <p className="mt-1.5 text-body-sm leading-5 text-slate-500">Only permission managers can reclassify a document's type or sensitivity.</p>}
-                  {canManageArticlePermissions && <p className="mt-1.5 text-body-sm leading-5 text-amber-300/90">Sensitivity controls who can see this article. A change is submitted for approval like any other edit.</p>}
+                  {!canManageArticlePermissions && <p className="mt-1.5 text-body-sm leading-5 text-slate-500">{t('editor.typeLocked')}</p>}
+                  {canManageArticlePermissions && <p className="mt-1.5 text-body-sm leading-5 text-amber-300/90">{t('editor.sensitivityNote')}</p>}
                 </div>
               )}
 
               {canManageArticlePermissions && (explicitUserIds.length > 0 || deniedUserIds.length > 0) && (
                 <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
                   <div>
-                    <p className="text-xs font-semibold text-slate-300">Specific user access</p>
-                    <p className="mt-1 text-body-sm leading-5 text-slate-500">Choose allowed users, then optionally deny selected users. A user cannot be in both lists.</p>
+                    <p className="text-xs font-semibold text-slate-300">{t('editor.userAccess')}</p>
+                    <p className="mt-1 text-body-sm leading-5 text-slate-500">{t('editor.userAccessHint')}</p>
                   </div>
                   <div className="max-h-48 space-y-1 overflow-y-auto">
                     {visibleUsers.length ? visibleUsers.map(employee => {
@@ -433,7 +433,7 @@ export default function ArticleEditPage() {
                         <Button type="button" variant="ghost" size="sm" onClick={() => { setExplicitUserIds(current => allowed ? current.filter(item => item !== employee.id) : [...current, employee.id]); setDeniedUserIds(current => current.filter(item => item !== employee.id)); setDirty(true) }} className={`rounded-md border px-2 py-1 text-caption font-semibold ${allowed ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300' : 'border-slate-700 text-slate-500'}`}>Allow</Button>
                         <Button type="button" variant="ghost" size="sm" onClick={() => { setDeniedUserIds(current => denied ? current.filter(item => item !== employee.id) : [...current, employee.id]); setExplicitUserIds(current => current.filter(item => item !== employee.id)); setDirty(true) }} className={`rounded-md border px-2 py-1 text-caption font-semibold ${denied ? 'border-rose-500/50 bg-rose-500/15 text-rose-300' : 'border-slate-700 text-slate-500'}`}>Deny</Button>
                       </div>
-                    }) : <p className="py-2 text-body-sm text-slate-500">No company users are available.</p>}
+                    }) : <p className="py-2 text-body-sm text-slate-500">{t('editor.noUsers')}</p>}
                   </div>
                 </div>
               )}
@@ -445,11 +445,11 @@ export default function ArticleEditPage() {
                   onChange={(e) => { setLanguage(e.target.value); setDirty(true) }}
                   className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-none focus:border-brand-500"
                 >
-                  <option value="en">English</option>
-                  <option value="vi">Vietnamese</option>
-                  <option value="ja">Japanese</option>
-                  <option value="ko">Korean</option>
-                  <option value="zh">Chinese</option>
+                  <option value="en">{t('editor.langEn')}</option>
+                  <option value="vi">{t('editor.langVi')}</option>
+                  <option value="ja">{t('editor.langJa')}</option>
+                  <option value="ko">{t('editor.langKo')}</option>
+                  <option value="zh">{t('editor.langZh')}</option>
                 </Select>
               </div>
 
@@ -470,7 +470,7 @@ export default function ArticleEditPage() {
 
               <div>
                 <Input
-                  label="Next Review Date"
+                  label={t('editor.nextReview')}
                   type="date"
                   value={nextReview}
                   onChange={(e) => { setNextReview(e.target.value); setDirty(true) }}
