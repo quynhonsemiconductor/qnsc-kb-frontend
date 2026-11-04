@@ -6,7 +6,7 @@
 # a writable /tmp, config.json mounted at /srv/config.json, an arbitrary non-root uid, port 8080),
 # and exercises the contract.
 #
-#   contract      /healthz and /livez 200; doc root /srv; the process runs as the image's non-root uid;
+#   contract      ALL caps dropped + no-new-privileges, uid 1001; /healthz and /livez 200; doc root /srv;
 #                 nothing outside /tmp is writable
 #   caching       / and SPA routes no-cache; an existing /assets/* and /fonts/* immutable; a MISSING
 #                 asset 404 with no Cache-Control promise
@@ -128,6 +128,9 @@ JSON
 docker run -d --name "$web" \
   --read-only \
   --tmpfs /tmp \
+  --cap-drop ALL \
+  --security-opt no-new-privileges \
+  --user 1001 \
   -p 127.0.0.1::8080 \
   -v "$tmpdir/config.json:/srv/config.json:ro" \
   "$image" >/dev/null
