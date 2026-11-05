@@ -52,7 +52,17 @@ export default function SearchResultsPage() {
   // resolve after a newer one and overwrite the results the user is looking at.
   const requestRef = useRef<AbortController | null>(null)
 
-  useEffect(() => () => requestRef.current?.abort(), [])
+  // Declared before the effect that runs the URL's query: when this cleanup runs, that query must be allowed to run
+  // again. React's StrictMode (the dev server) mounts, unmounts and mounts a page once, so without the reset the
+  // seeded search was aborted by the first unmount, never repeated, and the page stayed on "Searching...".
+  const seededRef = useRef(false)
+  useEffect(
+    () => () => {
+      requestRef.current?.abort()
+      seededRef.current = false
+    },
+    [],
+  )
 
   useEffect(() => {
     void listDepartments().then(setDepartments).catch((err) => console.error('Failed to load departments', err))
@@ -114,7 +124,6 @@ export default function SearchResultsPage() {
   // nothing. The ref guard is what holds this to a single request — `handleSearch` closes
   // over the filter state, so declaring it a dependency would re-fire the search on every
   // filter change and take the explicit Search button out of the user's hands.
-  const seededRef = useRef(false)
   useEffect(() => {
     if (seededRef.current) return
     seededRef.current = true
