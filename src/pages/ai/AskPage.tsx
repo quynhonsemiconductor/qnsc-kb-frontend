@@ -1272,22 +1272,22 @@ export default function AskPage() {
                )}
                {requestStatus && <div role="status" className="mb-3 rounded-lg border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">{requestStatus}</div>}
                <div className="mb-2 flex items-center gap-1.5 text-body-sm text-stone">
-                 <Badge variant="info" size="sm" dot className="font-bold">Grounded mode</Badge>
-                 <span className="hidden sm:inline">Press <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Enter</kbd> to send · <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Shift+Enter</kbd> for a new line</span>
-                <label className="flex items-center gap-1 text-caption text-stone" title="Quick answers sooner with fewer follow-up searches. Thorough searches more when the first pass misses part of the question.">
-                  <span className="sr-only">How hard to look</span>
-                  <select aria-label="How hard to look" value={depth} onChange={(event) => setDepth(event.target.value as AskDepth)} disabled={loading} className="rounded-md border border-hairline bg-surface px-1.5 py-0.5 text-caption font-semibold text-steel">
-                    <option value="quick">Quick</option>
-                    <option value="standard">Standard</option>
-                    <option value="thorough">Thorough</option>
+                 <Badge variant="info" size="sm" dot className="font-bold">{t('askbar.grounded')}</Badge>
+                 <span className="hidden sm:inline">{t('askbar.pressEnter')} <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Enter</kbd> {t('askbar.toSend')} · <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Shift+Enter</kbd> {t('askbar.forNewLine')}</span>
+                <label className="flex items-center gap-1 text-caption text-stone" title={t('askbar.depthHint')}>
+                  <span className="sr-only">{t('askbar.depthLabel')}</span>
+                  <select aria-label={t('askbar.depthLabel')} value={depth} onChange={(event) => setDepth(event.target.value as AskDepth)} disabled={loading} className="rounded-md border border-hairline bg-surface px-1.5 py-0.5 text-caption font-semibold text-steel">
+                    <option value="quick">{t('askbar.depthQuick')}</option>
+                    <option value="standard">{t('askbar.depthStandard')}</option>
+                    <option value="thorough">{t('askbar.depthThorough')}</option>
                   </select>
                 </label>
-                <label className="flex items-center gap-1 text-caption text-stone" title="Team lessons are what AI assistants saved through the MCP server. They are shared at once and are not reviewed by an editor; an answer that relies on one says so. Choose Documents only to answer from reviewed documents alone.">
-                  <span className="sr-only">Sources</span>
-                  <select aria-label="Sources" value={sources} onChange={(event) => setSources(event.target.value as AskSources)} disabled={loading} className="rounded-md border border-hairline bg-surface px-1.5 py-0.5 text-caption font-semibold text-steel">
-                    <option value="default">Default sources</option>
-                    <option value="all">Documents + team lessons</option>
-                    <option value="documents">Documents only</option>
+                <label className="flex items-center gap-1 text-caption text-stone" title={t('askbar.sourcesHint')}>
+                  <span className="sr-only">{t('askbar.sourcesLabel')}</span>
+                  <select aria-label={t('askbar.sourcesLabel')} value={sources} onChange={(event) => setSources(event.target.value as AskSources)} disabled={loading} className="rounded-md border border-hairline bg-surface px-1.5 py-0.5 text-caption font-semibold text-steel">
+                    <option value="default">{t('askbar.sourcesDefault')}</option>
+                    <option value="all">{t('search.sourceAll')}</option>
+                    <option value="documents">{t('search.sourceDocuments')}</option>
                   </select>
                 </label>
                 <span className="ml-auto tabular-nums">{question.length}/4000</span>
