@@ -20,10 +20,9 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
 
-    /* Paths mapping */
-    "baseUrl": ".",
+    /* Paths mapping (no baseUrl: TS 6 deprecates it and resolves paths from this file) */
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src"],
