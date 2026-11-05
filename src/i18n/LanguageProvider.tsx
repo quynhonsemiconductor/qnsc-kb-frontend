@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { setDisplayLocale } from '../lib/formatters'
 
 export type Language = 'en' | 'vi'
 
@@ -1923,6 +1924,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = language
   }, [language])
+
+  // Set while rendering, not in an effect: the pages below format their dates in this same render.
+  setDisplayLocale(language === 'vi' ? 'vi-VN' : undefined)
 
   const value = useMemo<LanguageContextValue>(() => ({
     language,
