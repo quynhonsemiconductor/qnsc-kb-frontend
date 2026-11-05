@@ -50,7 +50,7 @@ jobs:
       id-token: write
       attestations: write
     # SHA-pinned, NOT @v1 — ci's v1 tag is frozen and must not be used.
-    uses: quynhonsemiconductor/ci/.github/workflows/ghcr-publish.yml@400b7e9868e9ba6d172d956a08041ba19b574689 # v1.33.1
+    uses: quynhonsemiconductor/ci/.github/workflows/ghcr-publish.yml@956804ad4aa2dcf930909553d306d72b3708fd5d # v1.34.1+ci#308
     with:
       product: kb
       services-json: '["web"]'
@@ -93,7 +93,7 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
       # SHA-pinned, NOT @v1 — ci's v1 tag is frozen and must not be used.
-      - uses: quynhonsemiconductor/ci/actions/bump-gitops-tag@b696a7d77e650057b4ee1de16be84bcce3936566  # v1.34.0
+      - uses: quynhonsemiconductor/ci/actions/bump-gitops-tag@956804ad4aa2dcf930909553d306d72b3708fd5d # v1.34.1+ci#308
         with:
           product: kb
           env: dev
