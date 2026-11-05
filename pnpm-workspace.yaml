@@ -1,6 +1,18 @@
 packages:
   - "."
 
+# Install guards. Without these pnpm will accept a transitive dependency from a git/tarball URL, adopt a
+# package published minutes ago, and let an update move a dependency to a lower trust level. This repo is
+# an internal frontend that builds in CI from a lockfile, so the cost is a slightly older dependency graph
+# and the benefit is that a compromised publish or a rewritten tarball cannot enter it unnoticed.
+blockExoticSubdeps: true
+# Minutes. One day: enough for a yanked or obviously malicious publish to be caught before we adopt it.
+# (Seven days is the Semgrep recommendation, but this lockfile already contains a dependency published
+# inside that window, so a longer cutoff would refuse to install until it aged out.)
+minimumReleaseAge: 1440
+# A version bump must never lower a package's trust level (e.g. verified -> unverified provenance).
+trustPolicy: no-downgrade
+
 # pomelo's tailwind chain resolves postcss-selector-parser 6.x; 7.1.7 carries the
 # fix this repo pinned for npm. Kept here because pnpm does not read package.json
 # "overrides" (npm does); the two managers cannot share one field.
