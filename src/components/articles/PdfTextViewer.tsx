@@ -3,6 +3,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { RefreshCw } from 'lucide-react'
 import { CONTEXT_CHARS, cleanSelectedText, contextAround, spansLines, toFractions, type Overlay, type PendingEdit, type SelectionInfo } from '../../lib/selectionEdit'
 import { useLanguage } from '../../i18n/LanguageProvider'
+import { startPdfLoad } from './pdfLoad'
 
 /** Pages are laid out at the width of the pane, never narrower than this (readable) or wider than that (sharp). */
 const MIN_WIDTH = 360
@@ -50,43 +51,44 @@ export default function PdfTextViewer({
   // Load the document.
   useEffect(() => {
     let alive = true
-    let loaded: PDFDocumentProxy | null = null
     setStatus('loading')
     setDoc(null)
-    void (async () => {
-      try {
+    const load = startPdfLoad(
+      async () => {
         const [pdfjs, workerUrl] = await Promise.all([
           import('pdfjs-dist'),
           import('pdfjs-dist/build/pdf.worker.min.mjs?url').then(module => module.default),
           import('pdfjs-dist/web/pdf_viewer.css'),
         ])
         pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
-        const task = pdfjs.getDocument({
-          data: new Uint8Array(await blob.arrayBuffer()),
-          // pdfjs-dist 5 removed `isEvalSupported` (and the eval path with it), so the CSP's
-          // no-eval rule holds without the option. No network fetches for fonts or CMaps.
-          disableFontFace: false,
-          useSystemFonts: true,
-        })
-        loaded = await task.promise
-        if (!alive) {
-          void loaded.destroy()
-          return
-        }
-        const first = await loaded.getPage(1)
-        const base = first.getViewport({ scale: 1 })
-        setSlots(Array.from({ length: loaded.numPages }, (_, index) => ({ number: index + 1, width: base.width, height: base.height })))
-        setDoc(loaded)
-        setStatus('ready')
-      } catch {
-        if (alive) setStatus('failed')
-      }
-    })()
+        return pdfjs
+      },
+      blob,
+      {
+        onDocument: document => {
+          void (async () => {
+            try {
+              const first = await document.getPage(1)
+              if (!alive) return
+              const base = first.getViewport({ scale: 1 })
+              setSlots(Array.from({ length: document.numPages }, (_, index) => ({ number: index + 1, width: base.width, height: base.height })))
+              setDoc(document)
+              setStatus('ready')
+            } catch {
+              if (alive) setStatus('failed')
+            }
+          })()
+        },
+        onError: () => {
+          if (alive) setStatus('failed')
+        },
+      },
+    )
     return () => {
       alive = false
       for (const job of rendered.current.values()) job.cancel()
       rendered.current.clear()
-      if (loaded) void loaded.destroy()
+      load.cancel()
     }
   }, [blob])
 
