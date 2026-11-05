@@ -7,7 +7,7 @@
  * the app. A missing or invalid config is an ERROR SCREEN (`startup-error.ts`), never a blank page:
  * the alternative is a white window and a console nobody reads.
  *
- * The dev server answers `/config.json` itself (`vite.config.ts`, `devConfigPlugin`), so `npm run dev`
+ * The dev server answers `/config.json` itself (`vite.config.ts`, `devConfigPlugin`), so `pnpm run dev`
  * needs no file and a build never contains one.
  */
 import { z } from 'zod'
