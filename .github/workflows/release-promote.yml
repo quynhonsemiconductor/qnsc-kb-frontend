@@ -61,10 +61,11 @@ jobs:
       contents: read
       packages: write
       attestations: read
-    # Pins the merged ci commit that writes web to web.image (#305); the last
-    # release before it, v1.34.0, maps every service to services.<name>.image.
-    # Re-pin to the release that ships the fix once cut.
-    uses: quynhonsemiconductor/ci/.github/workflows/release-promote.yml@355d3c2c5893cb3b60fc68977d19e87554ed8648  # merged main, ci#305
+    # v1.34.1 is the first RELEASE carrying ci#305 (web → web.image, and a
+    # promotion branch unique per source repository). The earlier pin was the
+    # merged commit itself; re-pinning to the release keeps this caller on a
+    # versioned ref instead of a raw sha.
+    uses: quynhonsemiconductor/ci/.github/workflows/release-promote.yml@0cc991aa5f421622ce37c831b90f818676c94add  # v1.34.1
     with:
       product: kb
       gitops-product: kb
