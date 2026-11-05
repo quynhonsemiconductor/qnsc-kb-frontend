@@ -1271,7 +1271,7 @@ export default function AskPage() {
                  </div>
                )}
                {requestStatus && <div role="status" className="mb-3 rounded-lg border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">{requestStatus}</div>}
-               <div className="mb-2 flex items-center gap-1.5 text-body-sm text-stone">
+               <div className="mb-2 flex flex-wrap items-center gap-1.5 text-body-sm text-stone">
                  <Badge variant="info" size="sm" dot className="font-bold">{t('askbar.grounded')}</Badge>
                  <span className="hidden sm:inline">{t('askbar.pressEnter')} <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Enter</kbd> {t('askbar.toSend')} · <kbd className="rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-caption text-steel">Shift+Enter</kbd> {t('askbar.forNewLine')}</span>
                 <label className="flex items-center gap-1 text-caption text-stone" title={t('askbar.depthHint')}>
