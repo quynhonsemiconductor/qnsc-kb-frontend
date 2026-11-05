@@ -95,16 +95,17 @@ function MarkdownLink({ href, children, ...props }: React.ComponentProps<'a'>) {
 }
 
 function VersionDiff({ oldText, newText }: { oldText: string; newText: string }) {
+  const { t } = useLanguage()
   const tokens = diffWords(oldText, newText)
   if (!tokens) {
     return (
       <p className="text-xs text-slate-400">
-        These versions are too large to highlight word-by-word. Open each version separately to compare.
+        {t('article.diffTooLarge')}
       </p>
     )
   }
   if (!tokens.some(token => token.type !== 'same')) {
-    return <p className="text-xs text-slate-400">No wording differs between this version and the current one.</p>
+    return <p className="text-xs text-slate-400">{t('article.diffNone')}</p>
   }
   return (
     <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6 text-slate-300">
@@ -549,11 +550,11 @@ export default function ArticleDetailPage() {
 
               {(article.structured_metadata?.document_number || article.structured_metadata?.issue_date || article.structured_metadata?.expiry_date || article.structured_metadata?.signed_by || canEdit) && (
                 <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 text-xs text-slate-400">
-                  {article.structured_metadata?.document_number && <span><span className="text-slate-500">No.</span> <span className="font-semibold text-slate-200">{article.structured_metadata.document_number}</span></span>}
-                  {article.structured_metadata?.issue_date && <span><span className="text-slate-500">Issued</span> <span className="font-semibold text-slate-200">{article.structured_metadata.issue_date}</span></span>}
-                  {article.structured_metadata?.expiry_date && <span><span className="text-slate-500">Expires</span> <span className="font-semibold text-slate-200">{article.structured_metadata.expiry_date}</span></span>}
-                  {article.structured_metadata?.signed_by && <span><span className="text-slate-500">Signed by</span> <span className="font-semibold text-slate-200">{article.structured_metadata.signed_by}</span></span>}
-                  {canEdit && <Button variant="ghost" size="sm" onClick={openMetadataEditor} icon={<Edit size={12} />} className="ml-auto text-slate-500">Edit details</Button>}
+                  {article.structured_metadata?.document_number && <span><span className="text-slate-500">{t('article.metaNumber')}</span> <span className="font-semibold text-slate-200">{article.structured_metadata.document_number}</span></span>}
+                  {article.structured_metadata?.issue_date && <span><span className="text-slate-500">{t('article.metaIssued')}</span> <span className="font-semibold text-slate-200">{article.structured_metadata.issue_date}</span></span>}
+                  {article.structured_metadata?.expiry_date && <span><span className="text-slate-500">{t('article.metaExpires')}</span> <span className="font-semibold text-slate-200">{article.structured_metadata.expiry_date}</span></span>}
+                  {article.structured_metadata?.signed_by && <span><span className="text-slate-500">{t('article.metaSignedBy')}</span> <span className="font-semibold text-slate-200">{article.structured_metadata.signed_by}</span></span>}
+                  {canEdit && <Button variant="ghost" size="sm" onClick={openMetadataEditor} icon={<Edit size={12} />} className="ml-auto text-slate-500">{t('article.editDetails')}</Button>}
                 </div>
               )}
             </div>
@@ -839,12 +840,12 @@ export default function ArticleDetailPage() {
         <Modal
           open
           onClose={() => setViewingVersion(null)}
-          title={`${t('articles.versionHistory')} · Version ${viewingVersion.version}`}
+          title={`${t('articles.versionHistory')} · ${t('article.versionTitle', { number: viewingVersion.version })}`}
           size="lg"
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
-              <span>{formatDateTime(viewingVersion.created_at)} · Edited by {viewingVersion.editor?.name || 'Owner'}</span>
+              <span>{formatDateTime(viewingVersion.created_at)} · {t('article.editedByInline', { name: viewingVersion.editor?.name || t('article.ownerFallback') })}</span>
               {viewingVersion.version !== article?.version && (
                 <Button
                   variant={compareWithCurrent ? 'primary' : 'secondary'}
@@ -852,7 +853,7 @@ export default function ArticleDetailPage() {
                   icon={<GitCompare size={14} />}
                   onClick={() => setCompareWithCurrent(current => !current)}
                 >
-                  {compareWithCurrent ? 'Showing differences' : 'Compare with current'}
+                  {compareWithCurrent ? t('article.showingDiff') : t('article.compareCurrent')}
                 </Button>
               )}
             </div>
@@ -866,7 +867,7 @@ export default function ArticleDetailPage() {
               )}
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
-              <Button variant="ghost" size="sm" onClick={() => setViewingVersion(null)}>Close</Button>
+              <Button variant="ghost" size="sm" onClick={() => setViewingVersion(null)}>{t('article.close')}</Button>
               {canEdit && viewingVersion.version !== article?.version && (
                 <Button
                   variant="primary"
@@ -881,15 +882,15 @@ export default function ArticleDetailPage() {
         </Modal>
       )}
       {editingMetadata && (
-        <Modal open onClose={() => setEditingMetadata(false)} title="Document details" size="sm">
+        <Modal open onClose={() => setEditingMetadata(false)} title={t('article.documentDetails')} size="sm">
           <div className="space-y-4">
-            <Input label="Document number" value={metadataDraft.document_number || ''} onChange={e => setMetadataDraft(current => ({ ...current, document_number: e.target.value }))} placeholder="e.g. SOP-114" />
-            <Input label="Issue date" type="date" value={metadataDraft.issue_date || ''} onChange={e => setMetadataDraft(current => ({ ...current, issue_date: e.target.value }))} />
-            <Input label="Expiry date" type="date" value={metadataDraft.expiry_date || ''} onChange={e => setMetadataDraft(current => ({ ...current, expiry_date: e.target.value }))} />
-            <Input label="Signed by" value={metadataDraft.signed_by || ''} onChange={e => setMetadataDraft(current => ({ ...current, signed_by: e.target.value }))} placeholder="Name or title" />
+            <Input label={t('article.fieldNumber')} value={metadataDraft.document_number || ''} onChange={e => setMetadataDraft(current => ({ ...current, document_number: e.target.value }))} placeholder={t('article.fieldNumberPlaceholder')} />
+            <Input label={t('article.fieldIssue')} type="date" value={metadataDraft.issue_date || ''} onChange={e => setMetadataDraft(current => ({ ...current, issue_date: e.target.value }))} />
+            <Input label={t('article.fieldExpiry')} type="date" value={metadataDraft.expiry_date || ''} onChange={e => setMetadataDraft(current => ({ ...current, expiry_date: e.target.value }))} />
+            <Input label={t('article.fieldSignedBy')} value={metadataDraft.signed_by || ''} onChange={e => setMetadataDraft(current => ({ ...current, signed_by: e.target.value }))} placeholder={t('article.fieldSignedByPlaceholder')} />
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
-              <Button variant="ghost" size="sm" onClick={() => setEditingMetadata(false)}>Cancel</Button>
-              <Button variant="primary" size="sm" disabled={savingMetadata} loading={savingMetadata} onClick={() => void saveMetadata()}>Save</Button>
+              <Button variant="ghost" size="sm" onClick={() => setEditingMetadata(false)}>{t('article.cancel')}</Button>
+              <Button variant="primary" size="sm" disabled={savingMetadata} loading={savingMetadata} onClick={() => void saveMetadata()}>{t('article.save')}</Button>
             </div>
           </div>
         </Modal>
