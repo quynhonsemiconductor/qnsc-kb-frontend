@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/quynhonsemiconductor/qnsc-kb-frontend/compare/v0.2.0...v0.2.1) (2026-11-05)
+
+
+### 🐛 Bug Fixes
+
+* **kb-fe:** own the PDF load task; destroy it at every cancellation point ([#175](https://github.com/quynhonsemiconductor/qnsc-kb-frontend/issues/175)) ([cf02723](https://github.com/quynhonsemiconductor/qnsc-kb-frontend/commit/cf0272384d2db83eda7760ea58bd586103456ef0))
+
 ## [0.2.0](https://github.com/quynhonsemiconductor/qnsc-kb-frontend/compare/v0.1.1...v0.2.0) (2026-11-05)
 
 
