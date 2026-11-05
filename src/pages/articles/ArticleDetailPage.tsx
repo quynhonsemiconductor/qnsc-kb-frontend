@@ -95,16 +95,17 @@ function MarkdownLink({ href, children, ...props }: React.ComponentProps<'a'>) {
 }
 
 function VersionDiff({ oldText, newText }: { oldText: string; newText: string }) {
+  const { t } = useLanguage()
   const tokens = diffWords(oldText, newText)
   if (!tokens) {
     return (
       <p className="text-xs text-slate-400">
-        These versions are too large to highlight word-by-word. Open each version separately to compare.
+        {t('article.diffTooLarge')}
       </p>
     )
   }
   if (!tokens.some(token => token.type !== 'same')) {
-    return <p className="text-xs text-slate-400">No wording differs between this version and the current one.</p>
+    return <p className="text-xs text-slate-400">{t('article.diffNone')}</p>
   }
   return (
     <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6 text-slate-300">
@@ -379,7 +380,7 @@ export default function ArticleDetailPage() {
     return (
       <div className="flex justify-center items-center h-64 text-slate-400">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-500 mr-3" />
-        <span>Loading article...</span>
+        <span>{t('article.loading')}</span>
       </div>
     )
   }
@@ -389,17 +390,17 @@ export default function ArticleDetailPage() {
       return (
         <div className="page-shell page-stack">
           <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            <span>Failed to load. Please retry.</span>
-            <Button type="button" variant="danger" size="sm" onClick={() => void loadArticleDetails()}>Retry</Button>
+            <span>{t('article.loadFailed')}</span>
+            <Button type="button" variant="danger" size="sm" onClick={() => void loadArticleDetails()}>{t('article.retry')}</Button>
           </div>
         </div>
       )
     }
     return (
       <div className="text-center p-12">
-        <h3 className="text-xl font-bold text-rose-500">Article not found</h3>
-        <p className="text-slate-400 mt-2">This document does not exist or has been deleted.</p>
-        <Link to="/articles" className="mt-4 inline-block text-brand-400 underline">Back to Articles</Link>
+        <h3 className="text-xl font-bold text-rose-500">{t('article.notFound')}</h3>
+        <p className="text-slate-400 mt-2">{t('article.notFoundHint')}</p>
+        <Link to="/articles" className="mt-4 inline-block text-brand-400 underline">{t('article.backToArticles')}</Link>
       </div>
     )
   }
@@ -431,7 +432,7 @@ export default function ArticleDetailPage() {
             variant="ghost"
             size="sm"
             onClick={handleBookmarkToggle}
-            aria-label={bookmarked ? "Bookmarked" : "Bookmark article"}
+            aria-label={bookmarked ? t('article.ariaBookmarked') : t('article.ariaBookmark')}
             className={`rounded-xl border p-2 ${
               bookmarked 
                 ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
@@ -444,7 +445,7 @@ export default function ArticleDetailPage() {
             variant="ghost"
             size="sm"
             onClick={() => void handleFollowToggle()}
-            aria-label={following ? "Unfollow article" : "Follow article"}
+            aria-label={following ? t('article.ariaUnfollow') : t('article.ariaFollow')}
             className={`rounded-xl border p-2 ${following ? 'border-info/30 bg-info/10 text-info' : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-foreground'}`}
             icon={<Bell size={18} fill={following ? 'currentColor' : 'none'} />}
           />
@@ -454,7 +455,7 @@ export default function ArticleDetailPage() {
             variant="ghost"
             size="sm"
             onClick={() => { setShowHistory(value => !value); setDetailsOpen(true) }}
-            aria-label="Version History"
+            aria-label={t('article.ariaHistory')}
             className={`rounded-xl border p-2 ${
               showHistory 
                 ? 'bg-brand-500/10 border-brand-500/30 text-brand-400' 
@@ -468,15 +469,15 @@ export default function ArticleDetailPage() {
             <>
               <Link
                 to={`/articles/${article.id}/edit`}
-                aria-label="Edit article"
+                aria-label={t('article.ariaEdit')}
                 className="rounded-xl border border-border bg-surface px-3 py-2 text-muted-foreground transition-all hover:bg-surface-soft hover:text-foreground"
               >
                 <Edit size={18} />
               </Link>
               <Link
                 to={`/articles/${article.id}/chunks`}
-                aria-label="See how this article was cut into passages"
-                title="See how this article was cut into passages"
+                aria-label={t('article.ariaChunks')}
+                title={t('article.ariaChunks')}
                 className="rounded-xl border border-border bg-surface px-3 py-2 text-muted-foreground transition-all hover:bg-surface-soft hover:text-foreground"
               >
                 <Layers size={18} />
@@ -486,7 +487,7 @@ export default function ArticleDetailPage() {
                 variant="ghost"
                 size="sm"
                 onClick={handleDelete}
-                aria-label="Soft Delete"
+                aria-label={t('article.ariaDelete')}
                 className="rounded-xl border border-destructive/20 bg-surface px-3 py-2 text-destructive hover:bg-destructive/10"
                 icon={<Trash2 size={18} />}
               />
@@ -495,11 +496,11 @@ export default function ArticleDetailPage() {
           )}
           {!canEdit && has('ai.ask') && (
             <Link to={`/ai?articleId=${encodeURIComponent(article.id)}&articleTitle=${encodeURIComponent(article.title)}&prompt=${encodeURIComponent(requestEditPrompt)}`} className="inline-flex items-center gap-1.5 rounded-xl border border-info/30 bg-info/10 px-3 py-2 text-xs font-semibold text-info transition hover:bg-info/15" title="Ask who can update this article">
-              <MessageSquare size={16} /> <span className="hidden sm:inline">Request edit</span>
+              <MessageSquare size={16} /> <span className="hidden sm:inline">{t('article.requestEdit')}</span>
             </Link>
           )}
           <Button variant="secondary" size="sm" onClick={() => setDetailsOpen(value => !value)}>
-            {detailsOpen ? 'Hide details' : 'Details'}
+            {detailsOpen ? t('article.hideDetails') : t('article.details')}
           </Button>
           {article.source_available && (
             <Button
@@ -509,7 +510,7 @@ export default function ArticleDetailPage() {
               disabled={sourceLoading}
               loading={sourceLoading}
             >
-              {sourceLoading ? 'Loading source…' : 'Review source'}
+              {sourceLoading ? t('article.loadingSource') : t('article.reviewSource')}
             </Button>
           )}
         </div>
@@ -530,30 +531,30 @@ export default function ArticleDetailPage() {
               <div className="flex flex-wrap items-center gap-4 text-slate-500 text-xs mt-4">
                 <span className="flex items-center gap-1">
                   <UserIcon size={14} />
-                  <span>{article.owner?.name || 'Owner'}</span>
+                  <span>{article.owner?.name || t('article.ownerFallback')}</span>
                 </span>
                 <span className="flex items-center gap-1">
                   <Calendar size={14} />
-                  <span>Created {formatDay(article.created_at)}</span>
+                  <span>{t('article.created', { date: formatDay(article.created_at) })}</span>
                 </span>
                 <Badge variant="default" size="sm" className="uppercase">
                   v{article.version}
                 </Badge>
-                {article.self_approved && <Badge variant="warning" size="sm">Self-approved</Badge>}
-                {article.source_changed && <Badge variant="danger" size="sm">Source changed</Badge>}
-                {article.legal_hold && <Badge variant="danger" size="sm">Legal hold</Badge>}
+                {article.self_approved && <Badge variant="warning" size="sm">{t('article.selfApprovedBadge')}</Badge>}
+                {article.source_changed && <Badge variant="danger" size="sm">{t('article.sourceChanged')}</Badge>}
+                {article.legal_hold && <Badge variant="danger" size="sm">{t('article.legalHold')}</Badge>}
                 {!article.legal_hold && article.retention_until && new Date(article.retention_until) >= new Date(new Date().toDateString()) && (
-                  <Badge variant="warning" size="sm">Retained until {formatDay(article.retention_until)}</Badge>
+                  <Badge variant="warning" size="sm">{t('article.retainedUntil', { date: formatDay(article.retention_until) })}</Badge>
                 )}
               </div>
 
               {(article.structured_metadata?.document_number || article.structured_metadata?.issue_date || article.structured_metadata?.expiry_date || article.structured_metadata?.signed_by || canEdit) && (
                 <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 text-xs text-slate-400">
-                  {article.structured_metadata?.document_number && <span><span className="text-slate-500">No.</span> <span className="font-semibold text-slate-200">{article.structured_metadata.document_number}</span></span>}
-                  {article.structured_metadata?.issue_date && <span><span className="text-slate-500">Issued</span> <span className="font-semibold text-slate-200">{article.structured_metadata.issue_date}</span></span>}
-                  {article.structured_metadata?.expiry_date && <span><span className="text-slate-500">Expires</span> <span className="font-semibold text-slate-200">{article.structured_metadata.expiry_date}</span></span>}
-                  {article.structured_metadata?.signed_by && <span><span className="text-slate-500">Signed by</span> <span className="font-semibold text-slate-200">{article.structured_metadata.signed_by}</span></span>}
-                  {canEdit && <Button variant="ghost" size="sm" onClick={openMetadataEditor} icon={<Edit size={12} />} className="ml-auto text-slate-500">Edit details</Button>}
+                  {article.structured_metadata?.document_number && <span><span className="text-slate-500">{t('article.metaNumber')}</span> <span className="font-semibold text-slate-200">{article.structured_metadata.document_number}</span></span>}
+                  {article.structured_metadata?.issue_date && <span><span className="text-slate-500">{t('article.metaIssued')}</span> <span className="font-semibold text-slate-200">{article.structured_metadata.issue_date}</span></span>}
+                  {article.structured_metadata?.expiry_date && <span><span className="text-slate-500">{t('article.metaExpires')}</span> <span className="font-semibold text-slate-200">{article.structured_metadata.expiry_date}</span></span>}
+                  {article.structured_metadata?.signed_by && <span><span className="text-slate-500">{t('article.metaSignedBy')}</span> <span className="font-semibold text-slate-200">{article.structured_metadata.signed_by}</span></span>}
+                  {canEdit && <Button variant="ghost" size="sm" onClick={openMetadataEditor} icon={<Edit size={12} />} className="ml-auto text-slate-500">{t('article.editDetails')}</Button>}
                 </div>
               )}
             </div>
@@ -620,13 +621,13 @@ export default function ArticleDetailPage() {
 
             {/* Voting Bar */}
             <div className="flex items-center gap-4 border-t border-slate-800/40 pt-5">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Was this helpful?</span>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('article.helpful')}</span>
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleVote(1)}
-                  aria-label="Vote up"
+                  aria-label={t('article.ariaVoteUp')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs ${
                     userVote === 1
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-md'
@@ -640,7 +641,7 @@ export default function ArticleDetailPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleVote(-1)}
-                  aria-label="Vote down"
+                  aria-label={t('article.ariaVoteDown')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs ${
                     userVote === -1
                       ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 shadow-md'
@@ -658,7 +659,7 @@ export default function ArticleDetailPage() {
           <div className="bg-slate-900/30 border border-slate-800/80 rounded-xl p-5 space-y-5">
             <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
               <MessageSquare size={18} />
-              <span>Comments ({comments.length})</span>
+              <span>{t('article.comments', { count: comments.length })}</span>
             </h3>
 
             {/* Comments Thread list */}
@@ -684,7 +685,7 @@ export default function ArticleDetailPage() {
                         onClick={() => handleCommentDelete(comm.id)}
                         className="text-xs text-rose-400 hover:underline hover:text-rose-300"
                       >
-                        Delete
+                        {t('article.commentDelete')}
                       </Button>
                     )}
                   </div>
@@ -698,7 +699,7 @@ export default function ArticleDetailPage() {
             {/* Comment Form */}
             <form onSubmit={handleCommentSubmit} className="pt-4 border-t border-border/60">
               <textarea
-                placeholder="Share your thoughts or suggest corrections..."
+                placeholder={t('article.commentPlaceholder')}
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 className="w-full rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-sm text-foreground placeholder-slate-500 outline-none focus:border-brand-500 h-24 resize-none"
@@ -712,7 +713,7 @@ export default function ArticleDetailPage() {
                   disabled={submittingComment}
                   loading={submittingComment}
                 >
-                  {submittingComment ? 'Posting...' : 'Post Comment'}
+                  {submittingComment ? t('article.posting') : t('article.postComment')}
                 </Button>
               </div>
             </form>
@@ -720,7 +721,7 @@ export default function ArticleDetailPage() {
 
           {relatedArticles.length > 0 && (
             <div className="bg-slate-900/30 border border-slate-800/80 rounded-xl p-6 space-y-4">
-              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Related articles</h3>
+              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">{t('article.related')}</h3>
               <div className="grid gap-2 sm:grid-cols-2">
                 {relatedArticles.map((related) => (
                   <Link key={related.id} to={`/articles/${related.id}`} className="rounded-lg border border-slate-800 bg-slate-950/30 p-3 transition hover:border-brand-500/50 hover:bg-slate-900">
@@ -737,37 +738,37 @@ export default function ArticleDetailPage() {
         <div className="lg:col-span-1 space-y-5">
           {/* On-demand document utility drawer */}
           {detailsOpen && <div className="sticky top-20 space-y-4 rounded-panel border border-border bg-surface p-5 shadow-popover">
-            <div className="flex items-center justify-between border-b border-border pb-3"><h2 className="font-display text-body font-bold text-foreground">Document details</h2><button type="button" onClick={() => setDetailsOpen(false)} className="rounded-control px-2 py-1 text-body-sm text-muted hover:bg-surface-soft hover:text-foreground">Close</button></div>
+            <div className="flex items-center justify-between border-b border-border pb-3"><h2 className="font-display text-body font-bold text-foreground">{t('article.documentDetails')}</h2><button type="button" onClick={() => setDetailsOpen(false)} className="rounded-control px-2 py-1 text-body-sm text-muted hover:bg-surface-soft hover:text-foreground">{t('article.close')}</button></div>
           {/* Attributes card */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-800 pb-2">
-              Attributes
+              {t('article.attributes')}
             </h3>
             
             <div className="space-y-3.5 text-sm">
               {article.needs_update && (
                 <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300">
-                  Review overdue — content needs update
+                  {t('article.reviewOverdue')}
                 </div>
               )}
               {article.self_approved && (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-300">
-                  Self-approved by Admin/CEO
+                  {t('article.selfApprovedNote')}
                 </div>
               )}
               {article.status === 'published' && article.index_status && article.index_status !== 'ready' && (
                 <div className={`rounded-lg border px-3 py-2 text-xs font-semibold ${article.index_status === 'failed' ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>
-                  Search index: {article.index_status === 'processing' ? 'processing in background…' : article.index_status}
+                  {t('article.searchIndex', { state: article.index_status === 'processing' ? t('article.indexProcessing') : article.index_status })}
                 </div>
               )}
               <div>
-                <label className="text-slate-500 text-xs block mb-0.5">Department</label>
+                <label className="text-slate-500 text-xs block mb-0.5">{t('article.department')}</label>
                 <span className="text-foreground font-semibold">{article.dept}</span>
               </div>
               <div>
-                <label className="text-slate-500 text-xs block mb-0.5">Next Review Schedule</label>
+                <label className="text-slate-500 text-xs block mb-0.5">{t('article.nextReview')}</label>
                 <span className="text-foreground font-semibold">
-                  {formatDay(article.next_review, 'No schedule set')}
+                  {formatDay(article.next_review, t('article.noSchedule'))}
                 </span>
               </div>
             </div>
@@ -787,14 +788,14 @@ export default function ArticleDetailPage() {
                     className="cursor-pointer hover:bg-slate-800/40 p-2 rounded transition-all text-xs border border-transparent hover:border-slate-800"
                   >
                     <div className="flex justify-between items-center text-foreground font-bold mb-1">
-                      <span>Version {hist.version}</span>
+                      <span>{t('article.version', { number: hist.version })}</span>
                       <span className="text-caption text-slate-500 font-normal">
                         {formatDay(hist.created_at)}
                       </span>
                     </div>
                     <div className="text-slate-400 line-clamp-1">{hist.snapshot.title}</div>
                     <div className="mt-1 flex items-center justify-between gap-2">
-                      <span className="text-caption text-slate-500">Edited by: {hist.editor?.name || 'Owner'}</span>
+                      <span className="text-caption text-slate-500">{t('article.editedBy', { name: hist.editor?.name || t('article.ownerFallback') })}</span>
                       {hist.version === article.version ? (
                         <Badge variant="success" size="sm">{t('articles.active')}</Badge>
                       ) : canEdit ? (
@@ -819,8 +820,8 @@ export default function ArticleDetailPage() {
       </div>
       {selectedExcerpt && has('ai.ask') && <div className="sticky bottom-4 z-sticky mx-auto flex w-fit max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl bg-foreground px-3 py-2 text-background shadow-popover">
         <span className="max-w-xs truncate text-body-sm">“{selectedExcerpt}”</span>
-        <Link to={`/ai?articleId=${encodeURIComponent(article.id)}&articleTitle=${encodeURIComponent(article.title)}&prompt=${encodeURIComponent(selectedExcerptPrompt)}`} className="shrink-0 rounded-lg bg-info px-3 py-2 text-body-sm font-bold text-info-foreground no-underline">Ask AI about this passage</Link>
-        <button type="button" onClick={() => setSelectedExcerpt('')} aria-label="Dismiss selection action" className="rounded-md px-1.5 py-1 text-background/65 hover:bg-background/10 hover:text-background">×</button>
+        <Link to={`/ai?articleId=${encodeURIComponent(article.id)}&articleTitle=${encodeURIComponent(article.title)}&prompt=${encodeURIComponent(selectedExcerptPrompt)}`} className="shrink-0 rounded-lg bg-info px-3 py-2 text-body-sm font-bold text-info-foreground no-underline">{t('article.askAboutPassage')}</Link>
+        <button type="button" onClick={() => setSelectedExcerpt('')} aria-label={t('article.dismissSelection')} className="rounded-md px-1.5 py-1 text-background/65 hover:bg-background/10 hover:text-background">×</button>
       </div>}
       {sourceViewer && (
         <PdfViewer
@@ -839,12 +840,12 @@ export default function ArticleDetailPage() {
         <Modal
           open
           onClose={() => setViewingVersion(null)}
-          title={`${t('articles.versionHistory')} · Version ${viewingVersion.version}`}
+          title={`${t('articles.versionHistory')} · ${t('article.versionTitle', { number: viewingVersion.version })}`}
           size="lg"
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
-              <span>{formatDateTime(viewingVersion.created_at)} · Edited by {viewingVersion.editor?.name || 'Owner'}</span>
+              <span>{formatDateTime(viewingVersion.created_at)} · {t('article.editedByInline', { name: viewingVersion.editor?.name || t('article.ownerFallback') })}</span>
               {viewingVersion.version !== article?.version && (
                 <Button
                   variant={compareWithCurrent ? 'primary' : 'secondary'}
@@ -852,7 +853,7 @@ export default function ArticleDetailPage() {
                   icon={<GitCompare size={14} />}
                   onClick={() => setCompareWithCurrent(current => !current)}
                 >
-                  {compareWithCurrent ? 'Showing differences' : 'Compare with current'}
+                  {compareWithCurrent ? t('article.showingDiff') : t('article.compareCurrent')}
                 </Button>
               )}
             </div>
@@ -866,7 +867,7 @@ export default function ArticleDetailPage() {
               )}
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
-              <Button variant="ghost" size="sm" onClick={() => setViewingVersion(null)}>Close</Button>
+              <Button variant="ghost" size="sm" onClick={() => setViewingVersion(null)}>{t('article.close')}</Button>
               {canEdit && viewingVersion.version !== article?.version && (
                 <Button
                   variant="primary"
@@ -881,15 +882,15 @@ export default function ArticleDetailPage() {
         </Modal>
       )}
       {editingMetadata && (
-        <Modal open onClose={() => setEditingMetadata(false)} title="Document details" size="sm">
+        <Modal open onClose={() => setEditingMetadata(false)} title={t('article.documentDetails')} size="sm">
           <div className="space-y-4">
-            <Input label="Document number" value={metadataDraft.document_number || ''} onChange={e => setMetadataDraft(current => ({ ...current, document_number: e.target.value }))} placeholder="e.g. SOP-114" />
-            <Input label="Issue date" type="date" value={metadataDraft.issue_date || ''} onChange={e => setMetadataDraft(current => ({ ...current, issue_date: e.target.value }))} />
-            <Input label="Expiry date" type="date" value={metadataDraft.expiry_date || ''} onChange={e => setMetadataDraft(current => ({ ...current, expiry_date: e.target.value }))} />
-            <Input label="Signed by" value={metadataDraft.signed_by || ''} onChange={e => setMetadataDraft(current => ({ ...current, signed_by: e.target.value }))} placeholder="Name or title" />
+            <Input label={t('article.fieldNumber')} value={metadataDraft.document_number || ''} onChange={e => setMetadataDraft(current => ({ ...current, document_number: e.target.value }))} placeholder={t('article.fieldNumberPlaceholder')} />
+            <Input label={t('article.fieldIssue')} type="date" value={metadataDraft.issue_date || ''} onChange={e => setMetadataDraft(current => ({ ...current, issue_date: e.target.value }))} />
+            <Input label={t('article.fieldExpiry')} type="date" value={metadataDraft.expiry_date || ''} onChange={e => setMetadataDraft(current => ({ ...current, expiry_date: e.target.value }))} />
+            <Input label={t('article.fieldSignedBy')} value={metadataDraft.signed_by || ''} onChange={e => setMetadataDraft(current => ({ ...current, signed_by: e.target.value }))} placeholder={t('article.fieldSignedByPlaceholder')} />
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
-              <Button variant="ghost" size="sm" onClick={() => setEditingMetadata(false)}>Cancel</Button>
-              <Button variant="primary" size="sm" disabled={savingMetadata} loading={savingMetadata} onClick={() => void saveMetadata()}>Save</Button>
+              <Button variant="ghost" size="sm" onClick={() => setEditingMetadata(false)}>{t('article.cancel')}</Button>
+              <Button variant="primary" size="sm" disabled={savingMetadata} loading={savingMetadata} onClick={() => void saveMetadata()}>{t('article.save')}</Button>
             </div>
           </div>
         </Modal>
