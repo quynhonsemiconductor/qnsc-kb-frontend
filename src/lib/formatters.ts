@@ -31,11 +31,21 @@ export function parseApiDate(value?: string | number | Date | null): Date | null
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
+let displayLocale: string | undefined
+
+/**
+ * The locale dates are written in. Unset: the browser's own, as before. The app sets it from the language the person
+ * chose, so a Vietnamese page does not show "Nov 4, 2026, 5:32 PM" on a browser that happens to be English.
+ */
+export function setDisplayLocale(locale?: string): void {
+  displayLocale = locale
+}
+
 /** Date and time in the reader's own timezone, e.g. "29 Aug 2026, 16:58". */
 export function formatDateTime(value?: string | number | Date | null, fallback = '—'): string {
   const parsed = parseApiDate(value)
   return parsed
-    ? parsed.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+    ? parsed.toLocaleString(displayLocale, { dateStyle: 'medium', timeStyle: 'short' })
     : fallback
 }
 
@@ -43,7 +53,7 @@ export function formatDateTime(value?: string | number | Date | null, fallback =
  * correct local date differs from the one in the raw string. */
 export function formatDay(value?: string | number | Date | null, fallback = '—'): string {
   const parsed = parseApiDate(value)
-  return parsed ? parsed.toLocaleDateString() : fallback
+  return parsed ? parsed.toLocaleDateString(displayLocale) : fallback
 }
 
 /** The `YYYY-MM-DD` a `<input type="date">` expects, in the reader's timezone. */
