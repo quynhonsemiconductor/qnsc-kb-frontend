@@ -21,7 +21,7 @@
     "docx-preview": "^0.4.1",
     "jszip": "^3.10.2",
     "lucide-react": "^1.33.0",
-    "pdfjs-dist": "5.7.284",
+    "pdfjs-dist": "6.2.108",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-markdown": "^10.1.0",
