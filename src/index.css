@@ -25,7 +25,9 @@
 
 /* The app's spacing scale names `xs`..`xl`, and Tailwind 4 resolves `max-w-xs`..`max-w-xl`
    against that spacing scale (`max-w-xl` became 1.5rem) instead of the container widths 3.x
-   used. Restore the 3.x values explicitly. */
+   used. Restore the 3.x values explicitly. These rules sit in the same utilities layer after
+   the generated ones (same specificity, later source), so they win; `@utility` cannot be used
+   here because a custom utility with a built-in's name is dropped rather than overriding it. */
 @layer utilities {
   .max-w-xs { max-width: 20rem; }
   .max-w-sm { max-width: 24rem; }
@@ -35,7 +37,8 @@
 }
 
 /* The same collision applies to prefixed variants, which Tailwind emits inside
-   its own media queries. Only these two are in use today. */
+   its own media queries; the hand-written classes do not carry variants, so the
+   ones in use are restated here. */
 @media (width >= 40rem) {
   .sm\:max-w-sm { max-width: 24rem; }
 }
