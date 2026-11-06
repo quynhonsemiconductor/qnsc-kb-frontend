@@ -161,7 +161,7 @@ function Grid({ table, label, labels, maxHeight, toolbar, renderCell }: {
             onChange={event => setQuery(event.target.value)}
             placeholder={labels.filter}
             aria-label={labels.filter}
-            className="h-7 w-full rounded-control border border-hairline bg-canvas pl-7 pr-2 text-caption text-ink outline-none focus:border-info/50"
+            className="h-7 w-full rounded-control border border-hairline bg-canvas pl-7 pr-2 text-caption text-ink outline-hidden focus:border-info/50"
           />
         </label>
         {toolbar({ columns: table.columns, rows })}

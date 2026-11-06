@@ -21,7 +21,7 @@ export default function BookmarksPage() {
           <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary"><Library size={24} /></div>
           <h2 className="mt-4 font-display text-lg font-bold text-foreground">Your library is ready for its first save</h2>
           <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">Bookmark a useful article from the knowledge library and it will appear here.</p>
-          <Link to="/browse" className="mt-6 inline-flex items-center gap-2 rounded-control bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90">Browse knowledge <ArrowUpRight size={15} /></Link>
+          <Link to="/browse" className="mt-6 inline-flex items-center gap-2 rounded-control bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-xs transition hover:bg-primary/90">Browse knowledge <ArrowUpRight size={15} /></Link>
         </div></FadeIn>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">

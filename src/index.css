@@ -6,9 +6,59 @@
    preload scanner sees the stylesheet in the first bytes and fetches it alongside
    the app's own CSS and JS. */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+/* The JS config is still the source of the theme extensions (screens, opacity, elevation,
+   semantic colours), so Tailwind 4 loads it through @config rather than a CSS-only theme. */
+@config "../tailwind.config.js";
+
+/* In Tailwind 3 the JS config replaces the `slate`, `stone` and `cyan` palettes with flat
+   tokens (`colors.slate = '...'`), so the numeric utilities such as `bg-slate-950` did not
+   exist; this file defines the ones the app uses as semantic aliases (see the compatibility
+   block below). Tailwind 4 keeps the default numeric scales alongside the flat token, which
+   would revive variants the aliases never covered — e.g. `bg-slate-950/40` rendered dark
+   where 3.x left it transparent. Remove the scales so only the aliases apply. */
+@theme {
+  --color-slate-*: initial;
+  --color-stone-*: initial;
+  --color-cyan-*: initial;
+}
+
+/* The app's spacing scale names `xs`..`xl`, and Tailwind 4 resolves `max-w-xs`..`max-w-xl`
+   against that spacing scale (`max-w-xl` became 1.5rem) instead of the container widths 3.x
+   used. Restore the 3.x values explicitly. Measured on the built stylesheet: these five
+   declarations are the ONLY max-w-{xs,sm,md,lg,xl} rules in the output — the engine's
+   1.5rem/1rem/0.75rem versions are not emitted while these classes exist, so there is no
+   same-specificity collision to lose. The two prefixed usages are restated below because
+   hand-written classes do not carry variant prefixes. */
+@layer utilities {
+  .max-w-xs { max-width: 20rem; }
+  .max-w-sm { max-width: 24rem; }
+  .max-w-md { max-width: 28rem; }
+  .max-w-lg { max-width: 32rem; }
+  .max-w-xl { max-width: 36rem; }
+}
+
+/* The two prefixed usages in the app, restated in the engine's own media queries. */
+@media (width >= 40rem) {
+  .sm\:max-w-sm { max-width: 24rem; }
+}
+@media (width >= 80rem) {
+  .xl\:max-w-md { max-width: 28rem; }
+}
+
+/* Tailwind 4 changed the default border colour to currentColor. Every `border` width utility in
+   this app was written against 3.x's gray-200 default, so restore it once here instead of adding a
+   colour class at 297 call sites. The value is the literal 3.x/Tailwind default gray-200
+   (oklch 92.8% 0.006 264.531), not `var(--color-gray-200)`: v4 emits a theme variable only when a
+   generated utility uses it, and a hand-written base rule does not make it available. */
+@layer base {
+  *,
+  ::before,
+  ::after,
+  ::backdrop {
+    border-color: oklch(92.8% 0.006 264.531);
+  }
+}
 
 /* Semantic values only live here. Components consume the token names through
    Tailwind utilities (bg-background, text-foreground, border-border, etc.). */
@@ -210,7 +260,7 @@
 .workspace-atmosphere, .metric-spark { background-image: none; }
 
 @layer components {
-  .field, .ui-control { @apply w-full min-h-controlMd rounded-control border border-border bg-input px-md text-body text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20; }
+  .field, .ui-control { @apply w-full min-h-controlMd rounded-control border border-border bg-input px-md text-body text-foreground outline-hidden transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20; }
   .ui-control-sm { @apply min-h-controlSm px-sm text-body-sm; }
   .ui-control-md { @apply min-h-controlMd px-md text-body; }
   .ui-control-lg { @apply min-h-controlLg px-lg text-body-lg; }
@@ -224,7 +274,7 @@
      they shipped in every stylesheet and styled nothing. `.mm-secondary` has one, and
      keeps its definition minus the `mm-pill` dependency. */
   .mm-secondary { @apply rounded-lg border border-border bg-surface text-foreground transition hover:bg-surface-soft; }
-  .theme-select { @apply cursor-pointer rounded-control border border-border bg-surface px-sm text-body-sm font-semibold text-foreground outline-none transition hover:bg-surface-soft focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20; }
+  .theme-select { @apply cursor-pointer rounded-control border border-border bg-surface px-sm text-body-sm font-semibold text-foreground outline-hidden transition hover:bg-surface-soft focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20; }
   /* `.ops-shell-glow` deleted — zero call sites, same as the mm-* classes above. */
   /* The header sits on every route and used to carry `backdrop-blur-xl`, then a
      two-stop translucent gradient after the blur was dropped. Now opaque and flat:
@@ -440,9 +490,9 @@
    their hover state entirely.
 
    Two rules for anything in this section:
-     1. Keep it OUT of @layer utilities. Tailwind prunes custom utilities whose
-        class name it also generates itself, which is what silently removed the
-        original hover:bg-slate-700 and hover:border-[#50627a] mappings.
+     1. Keep it OUT of @layer utilities. The original hover:bg-slate-700 and
+        hover:border-[#50627a] mappings silently disappeared when written there;
+        the html-prefixed rules below are the form that survived.
      2. Prefix every selector with `html`. Tailwind never emits that shape, so
         these rules cannot be merged into — or deduplicated against — the
         generated utility of the same class name.
@@ -517,11 +567,11 @@ html .text-blue-300 { color: rgb(var(--info)) !important; }
 /* ===== Accessibility: Enhanced Focus Styles ===== */
 @layer utilities {
   .focus-ring {
-    @apply outline-none ring-2 ring-primary/40 ring-offset-2 ring-offset-background;
+    @apply outline-hidden ring-2 ring-primary/40 ring-offset-2 ring-offset-background;
   }
 
   .focus-visible-ring {
-    @apply outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+    @apply outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 }
 

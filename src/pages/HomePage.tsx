@@ -43,7 +43,7 @@ export default function HomePage() {
         <p className="mt-4 max-w-2xl text-body-lg leading-7 text-white/70">{t('home.subtitle')}</p>
         <form action="/search" className="mt-8 flex max-w-4xl flex-col gap-2 rounded-panel bg-white p-2 shadow-modal sm:flex-row sm:items-center">
           <Search size={19} className="ml-3 hidden shrink-0 text-primary sm:block" />
-          <input name="q" aria-label="Search knowledge" placeholder={t('header.searchPlaceholder')} className="min-h-11 min-w-0 flex-1 bg-transparent px-3 text-body text-foreground outline-none placeholder:text-muted" />
+          <input name="q" aria-label="Search knowledge" placeholder={t('header.searchPlaceholder')} className="min-h-11 min-w-0 flex-1 bg-transparent px-3 text-body text-foreground outline-hidden placeholder:text-muted" />
           <button type="submit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-surface bg-info px-5 text-body-sm font-bold text-info-foreground transition hover:bg-info/90">{language === 'vi' ? 'Khám phá tri thức' : 'Explore knowledge'} <ArrowRight size={14} /></button>
         </form>
         <div className="mt-3 flex flex-wrap gap-2 text-body-sm">

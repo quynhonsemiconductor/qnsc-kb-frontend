@@ -421,7 +421,7 @@ export default function ArticleDetailPage() {
   return (
     <div className="article-reading-canvas page-shell-wide page-stack">
       {/* Navigation & contextual controls */}
-      <div className="article-reading-toolbar sticky top-0 z-sticky flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface/95 px-3 py-3 backdrop-blur sm:px-5">
+      <div className="article-reading-toolbar sticky top-0 z-sticky flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface/95 px-3 py-3 backdrop-blur-sm sm:px-5">
         <Link to="/articles" className="mm-secondary flex items-center gap-1.5 px-3 py-2 text-sm">
           <ArrowLeft size={16} />
           <span>{t('articles.back')}</span>
@@ -702,7 +702,7 @@ export default function ArticleDetailPage() {
                 placeholder={t('article.commentPlaceholder')}
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                className="w-full rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-sm text-foreground placeholder-slate-500 outline-none focus:border-brand-500 h-24 resize-none"
+                className="w-full rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-sm text-foreground placeholder-slate-500 outline-hidden focus:border-brand-500 h-24 resize-none"
                 required
               />
               <div className="flex justify-end mt-2">

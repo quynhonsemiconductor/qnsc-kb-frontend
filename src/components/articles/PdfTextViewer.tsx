@@ -247,7 +247,7 @@ function PdfPage({
   }, [visible, doc, slot.number, scale, width, rendered])
 
   return (
-    <div ref={wrapper} data-page={slot.number} className="relative bg-white shadow-sm" style={{ width: box.width, height: box.height }}>
+    <div ref={wrapper} data-page={slot.number} className="relative bg-white shadow-xs" style={{ width: box.width, height: box.height }}>
       <canvas ref={canvas} className="absolute inset-0" />
       <div ref={layer} className="textLayer absolute inset-0" style={{ width: box.width, height: box.height }} />
       {overlays.map(edit => edit.overlay && <ChangeChip key={edit.id} overlay={edit.overlay} text={edit.replace} />)}
@@ -260,7 +260,7 @@ export function ChangeChip({ overlay, text }: { overlay: Overlay; text: string }
   return (
     <div
       data-testid="change-chip"
-      className="pointer-events-none absolute z-10 overflow-hidden rounded-sm border border-amber-500 bg-amber-100 text-[11px] font-semibold leading-tight text-amber-950 shadow-sm"
+      className="pointer-events-none absolute z-10 overflow-hidden rounded-xs border border-amber-500 bg-amber-100 text-[11px] font-semibold leading-tight text-amber-950 shadow-xs"
       style={{ left: `${overlay.left * 100}%`, top: `${overlay.top * 100}%`, minWidth: `${overlay.width * 100}%`, minHeight: `${overlay.height * 100}%` }}
     >
       <span className="whitespace-nowrap px-0.5">{text || '∅'}</span>

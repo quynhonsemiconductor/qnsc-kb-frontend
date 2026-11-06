@@ -75,7 +75,7 @@ export default function GlossaryPage() {
           {filteredGlossary.map((item, idx) => (
             <div
               key={idx}
-              className="glass-panel interactive-lift rounded-2xl border border-border p-5 space-y-2.5 shadow-sm"
+              className="glass-panel interactive-lift rounded-2xl border border-border p-5 space-y-2.5 shadow-xs"
             >
               <div className="flex items-center gap-2">
                 <Badge variant="primary" size="md" className="uppercase font-extrabold">

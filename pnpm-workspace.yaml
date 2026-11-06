@@ -12,9 +12,3 @@ blockExoticSubdeps: true
 minimumReleaseAge: 1440
 # A version bump must never lower a package's trust level (e.g. verified -> unverified provenance).
 trustPolicy: no-downgrade
-
-# pomelo's tailwind chain resolves postcss-selector-parser 6.x; 7.1.7 carries the
-# fix this repo pinned for npm. Kept here because pnpm does not read package.json
-# "overrides" (npm does); the two managers cannot share one field.
-overrides:
-  postcss-selector-parser: 7.1.7

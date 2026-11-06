@@ -62,7 +62,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <div
             key={t.id}
             role="status"
-            className={`pointer-events-auto flex w-full items-center gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-bottom duration-300 ${styles[t.type]}`}
+            className={`pointer-events-auto flex w-full items-center gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-xs animate-in fade-in slide-in-from-bottom duration-300 ${styles[t.type]}`}
           >
             {icons[t.type]}
             <p className="flex-1 text-sm font-medium text-foreground">{t.message}</p>

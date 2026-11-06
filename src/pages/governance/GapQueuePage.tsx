@@ -115,7 +115,7 @@ export default function GapQueuePage() {
           {gaps.map((gap) => (
             <div
               key={gap.id}
-              className="glass-panel interactive-lift flex items-center justify-between gap-4 rounded-2xl border border-border p-5 shadow-sm"
+              className="glass-panel interactive-lift flex items-center justify-between gap-4 rounded-2xl border border-border p-5 shadow-xs"
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -163,7 +163,7 @@ export default function GapQueuePage() {
               <Select
                 value={assignDept}
                 onChange={(e) => setAssignDept(e.target.value)}
-                className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-3 text-xs text-foreground outline-none focus:border-brand-500"
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-3 text-xs text-foreground outline-hidden focus:border-brand-500"
               >
                 <option value="">Select department</option>
                 {visibleDepartments.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}

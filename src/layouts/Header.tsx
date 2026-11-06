@@ -155,7 +155,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const adminActive = path.startsWith('/admin')
 
   return <>
-    <header className="knowledge-header relative z-sticky shrink-0 border-b border-border bg-surface/95 backdrop-blur">
+    <header className="knowledge-header relative z-sticky shrink-0 border-b border-border bg-surface/95 backdrop-blur-sm">
       <div className="flex min-h-[3.875rem] flex-nowrap items-center gap-2 px-3 lg:gap-2.5 lg:px-4 2xl:px-5">
         <Link to="/home" aria-label={t('nav.home')} className="group flex shrink-0 items-center gap-2 rounded-lg text-foreground no-underline transition hover:text-primary hover:no-underline focus-visible:ring-2 focus-visible:ring-ring/30">
           <BrandMarkGlyph className="h-8 w-8 transition-transform group-hover:scale-[1.04]" title="QNSC" />
@@ -171,12 +171,12 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
 
         <form onSubmit={submitSearch} className="ml-auto flex min-w-0 max-w-xl flex-1 items-center rounded-xl border border-border bg-background px-2.5 focus-within:border-primary/45 focus-within:ring-2 focus-within:ring-primary/10 lg:min-w-40">
           <Search size={15} className="shrink-0 text-primary" />
-          <input id="global-knowledge-search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('header.searchPlaceholder')} className="h-9 min-w-0 flex-1 bg-transparent px-2 text-body-sm text-foreground outline-none placeholder:text-muted" />
+          <input id="global-knowledge-search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('header.searchPlaceholder')} className="h-9 min-w-0 flex-1 bg-transparent px-2 text-body-sm text-foreground outline-hidden placeholder:text-muted" />
           <kbd className="hidden rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-caption text-muted 2xl:block">Ctrl K</kbd>
         </form>
 
         <div className="flex shrink-0 items-center gap-1">
-          {has('article.create') && <Button type="button" variant="primary" size="sm" onClick={() => navigate('/articles/new')} icon={<Plus size={13} />} className="hidden 2xl:inline-flex">New article</Button>}
+          {has('article.create') && <Button type="button" variant="primary" size="sm" onClick={() => navigate('/articles/new')} icon={<Plus size={13} />} className="max-2xl:hidden">New article</Button>}
           <div className="relative">
             <button ref={notificationAnchor} type="button" onClick={() => setNotificationsOpen(open => !open)} aria-label="Notifications" aria-expanded={notificationsOpen} className="ui-icon-button h-8 min-h-8 min-w-8 border border-border bg-surface text-foreground hover:bg-surface-soft">
               <Bell size={15} />
@@ -202,7 +202,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
     </header>
 
-    <nav aria-label="Mobile primary navigation" className="fixed inset-x-0 bottom-0 z-drawer grid h-14 grid-cols-5 border-t border-border bg-surface/95 px-1 backdrop-blur lg:hidden">
+    <nav aria-label="Mobile primary navigation" className="fixed inset-x-0 bottom-0 z-drawer grid h-14 grid-cols-5 border-t border-border bg-surface/95 px-1 backdrop-blur-sm lg:hidden">
       <NavLink to="/home" className={directLink}><Home size={16} /><span className="sr-only">{t('nav.home')}</span></NavLink>
       <NavLink to="/articles" className={() => directLink({ isActive: knowledgeActive && !path.startsWith('/ai') })}><BookOpen size={16} /><span className="sr-only">{t('nav.articles')}</span></NavLink>
       <NavLink to="/ai" className={() => directLink({ isActive: path.startsWith('/ai') })}><Bot size={16} /><span className="sr-only">{t('nav.aiAssistant')}</span></NavLink>

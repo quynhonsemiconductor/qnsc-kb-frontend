@@ -31,7 +31,7 @@ function DepartmentPicker({ value, options, onChange }: { value: string[]; optio
       <label className="block text-xs font-semibold text-slate-400">{t('editor.departments')}</label>
       <span className="text-caption font-semibold text-slate-500">{t('editor.selectedCount', { count: selected.length })}</span>
     </div>
-    <button ref={anchorRef} type="button" aria-expanded={open} onClick={() => setOpen(current => !current)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 text-left text-xs text-foreground outline-none transition hover:border-brand-500/70 focus:border-brand-500">
+    <button ref={anchorRef} type="button" aria-expanded={open} onClick={() => setOpen(current => !current)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 text-left text-xs text-foreground outline-hidden transition hover:border-brand-500/70 focus:border-brand-500">
       <span className={selected.length ? 'font-semibold text-foreground' : 'text-slate-500'}>{selected.length ? t(selected.length === 1 ? 'editor.departmentsSelectedOne' : 'editor.departmentsSelectedMany', { count: selected.length }) : t('editor.chooseDepartments')}</span>
       <ChevronDown size={15} className={`shrink-0 text-slate-500 transition ${open ? 'rotate-180 text-brand-400' : ''}`} />
     </button>
@@ -381,7 +381,7 @@ export default function ArticleEditPage() {
                 <Select
                   value={visibility}
                   onChange={(e) => { setVisibility(e.target.value as typeof visibility); setDirty(true) }}
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-none focus:border-brand-500"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-hidden focus:border-brand-500"
                 >
                   <option value="department">{t('editor.visibilityDepartments')}</option>
                   <option value="public">{t('editor.visibilityPublic')}</option>
@@ -400,7 +400,7 @@ export default function ArticleEditPage() {
                     value={docType}
                     disabled={!canManageArticlePermissions}
                     onChange={(e) => { setDocType(e.target.value); setDirty(true) }}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-none focus:border-brand-500 disabled:opacity-60"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-hidden focus:border-brand-500 disabled:opacity-60"
                   >
                     {ARTICLE_TYPES.map(value => <option key={value} value={value}>{value}</option>)}
                   </Select>
@@ -409,7 +409,7 @@ export default function ArticleEditPage() {
                     value={sensitivity}
                     disabled={!canManageArticlePermissions}
                     onChange={(e) => { setSensitivity(e.target.value); setDirty(true) }}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-none focus:border-brand-500 disabled:opacity-60"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-hidden focus:border-brand-500 disabled:opacity-60"
                   >
                     {SENSITIVITY_LEVELS.map(value => <option key={value} value={value}>{value}</option>)}
                   </Select>
@@ -443,7 +443,7 @@ export default function ArticleEditPage() {
                 <Select
                   value={language}
                   onChange={(e) => { setLanguage(e.target.value); setDirty(true) }}
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-none focus:border-brand-500"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-hidden focus:border-brand-500"
                 >
                   <option value="en">{t('editor.langEn')}</option>
                   <option value="vi">{t('editor.langVi')}</option>
@@ -459,7 +459,7 @@ export default function ArticleEditPage() {
                   <Select
                     value={status}
                     onChange={(e) => { setStatus(e.target.value); setDirty(true) }}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-none focus:border-brand-500"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 px-2.5 text-xs text-foreground outline-hidden focus:border-brand-500"
                   >
                     <option value="draft">{t('editor.statusDraft')}</option>
                     <option value="published">{t('editor.statusPublished')}</option>
