@@ -25,9 +25,11 @@
 
 /* The app's spacing scale names `xs`..`xl`, and Tailwind 4 resolves `max-w-xs`..`max-w-xl`
    against that spacing scale (`max-w-xl` became 1.5rem) instead of the container widths 3.x
-   used. Restore the 3.x values explicitly. These rules sit in the same utilities layer after
-   the generated ones (same specificity, later source), so they win; `@utility` cannot be used
-   here because a custom utility with a built-in's name is dropped rather than overriding it. */
+   used. Restore the 3.x values explicitly. Measured on the built stylesheet: these five
+   declarations are the ONLY max-w-{xs,sm,md,lg,xl} rules in the output — the engine's
+   1.5rem/1rem/0.75rem versions are not emitted while these classes exist, so there is no
+   same-specificity collision to lose. The two prefixed usages are restated below because
+   hand-written classes do not carry variant prefixes. */
 @layer utilities {
   .max-w-xs { max-width: 20rem; }
   .max-w-sm { max-width: 24rem; }
@@ -36,9 +38,7 @@
   .max-w-xl { max-width: 36rem; }
 }
 
-/* The same collision applies to prefixed variants, which Tailwind emits inside
-   its own media queries; the hand-written classes do not carry variants, so the
-   ones in use are restated here. */
+/* The two prefixed usages in the app, restated in the engine's own media queries. */
 @media (width >= 40rem) {
   .sm\:max-w-sm { max-width: 24rem; }
 }
@@ -490,9 +490,9 @@
    their hover state entirely.
 
    Two rules for anything in this section:
-     1. Keep it OUT of @layer utilities. Tailwind prunes custom utilities whose
-        class name it also generates itself, which is what silently removed the
-        original hover:bg-slate-700 and hover:border-[#50627a] mappings.
+     1. Keep it OUT of @layer utilities. The original hover:bg-slate-700 and
+        hover:border-[#50627a] mappings silently disappeared when written there;
+        the html-prefixed rules below are the form that survived.
      2. Prefix every selector with `html`. Tailwind never emits that shape, so
         these rules cannot be merged into — or deduplicated against — the
         generated utility of the same class name.
