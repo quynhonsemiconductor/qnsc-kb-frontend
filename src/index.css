@@ -34,9 +34,19 @@
   .max-w-xl { max-width: 36rem; }
 }
 
+/* The same collision applies to prefixed variants, which Tailwind emits inside
+   its own media queries. Only these two are in use today. */
+@media (width >= 40rem) {
+  .sm\:max-w-sm { max-width: 24rem; }
+}
+@media (width >= 80rem) {
+  .xl\:max-w-md { max-width: 28rem; }
+}
+
 /* Tailwind 4 changed the default border colour to currentColor. Every `border` width utility in
    this app was written against 3.x's gray-200 default, so restore it once here instead of adding a
-   colour class at 297 call sites. */
+   colour class at 297 call sites. Tailwind emits `--color-gray-200` because this rule references
+   it (v4 emits only the theme variables that are used). */
 @layer base {
   *,
   ::before,
