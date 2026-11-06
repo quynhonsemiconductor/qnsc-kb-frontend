@@ -45,14 +45,15 @@
 
 /* Tailwind 4 changed the default border colour to currentColor. Every `border` width utility in
    this app was written against 3.x's gray-200 default, so restore it once here instead of adding a
-   colour class at 297 call sites. Tailwind emits `--color-gray-200` because this rule references
-   it (v4 emits only the theme variables that are used). */
+   colour class at 297 call sites. The value is the literal 3.x/Tailwind default gray-200
+   (oklch 92.8% 0.006 264.531), not `var(--color-gray-200)`: v4 emits a theme variable only when a
+   generated utility uses it, and a hand-written base rule does not make it available. */
 @layer base {
   *,
   ::before,
   ::after,
   ::backdrop {
-    border-color: var(--color-gray-200);
+    border-color: oklch(92.8% 0.006 264.531);
   }
 }
 
